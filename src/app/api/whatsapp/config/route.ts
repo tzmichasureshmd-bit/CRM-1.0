@@ -50,7 +50,13 @@ async function resolveAccountId(
     return null;
   }
 
-  const admin = supabaseAdmin();
+  let admin
+  try {
+    admin = supabaseAdmin()
+  } catch (err) {
+    console.error("[resolveAccountId] supabaseAdmin() threw:", err)
+    return null
+  }
   const accountName = data?.full_name || data?.email || 'My account';
 
   let accountId: string;
@@ -309,7 +315,17 @@ export async function POST(request: Request) {
     // inbound message. See issue #136. Post-multi-user we key on
     // account_id (not user_id) since teammates inside the same account
     // all share one config; the conflict is between accounts.
-    const { data: claimed, error: claimedError } = await supabaseAdmin()
+    let adminClient
+    try {
+      adminClient = supabaseAdmin()
+    } catch (err) {
+      console.error('[whatsapp/config POST] supabaseAdmin() threw:', err)
+      return NextResponse.json(
+        { error: 'Server is not configured to check number conflicts.' },
+        { status: 500 }
+      )
+    }
+    const { data: claimed, error: claimedError } = await adminClient
       .from('whatsapp_config')
       .select('account_id')
       .eq('phone_number_id', phone_number_id)
