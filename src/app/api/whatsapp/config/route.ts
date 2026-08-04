@@ -8,41 +8,76 @@ import {
 } from '@/lib/whatsapp/meta-api'
 import { encrypt, decrypt } from '@/lib/whatsapp/encryption'
 
-/**
- * Resolve the caller's account_id from their profile. Inlined here
- * (rather than going through `@/lib/auth/account.getCurrentAccount`)
- * because the GET handler wants to return shaped 200s for every
- * non-auth failure mode, not throw — keeping the helper minimal lets
- * the existing response branches stay as-is.
- *
- * Returns null if the user has no profile or no account; callers
- * should treat that the same as "not connected".
- */
 async function resolveAccountId(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
 ): Promise<string | null> {
-
-  console.log("========== resolveAccountId ==========");
-  console.log("Logged in User ID:", userId);
-
   const { data, error } = await supabase
     .from('profiles')
     .select('*')
     .eq('user_id', userId)
     .maybeSingle();
 
-  console.log("Profile Data:", data);
-  console.log("Profile Error:", error);
-
-  if (error || !data?.account_id) {
-    console.log("No account linked!");
+  if (error) {
+    console.error("[resolveAccountId] profile fetch error:", error);
     return null;
   }
 
-  console.log("Resolved Account ID:", data.account_id);
+  if (data?.account_id) {
+    return data.account_id;
+  }
 
-  return data.account_id;
+  const admin = supabaseAdmin();
+  const accountName = data?.full_name || data?.email || 'My account';
+
+  let accountId: string;
+  try {
+    const { data: account, error: accountErr } = await admin
+      .from('accounts')
+      .insert({ name: accountName, owner_user_id: userId })
+      .select('id')
+      .maybeSingle();
+
+    if (accountErr || !account?.id) {
+      console.error("[resolveAccountId] failed to create account:", accountErr);
+      return null;
+    }
+    accountId = account.id;
+  } catch (err) {
+    console.error("[resolveAccountId] exception creating account:", err);
+    return null;
+  }
+
+  const accountRole = 'owner';
+
+  if (data) {
+    const { error: updateErr } = await supabase
+      .from('profiles')
+      .update({ account_id: accountId, account_role: accountRole })
+      .eq('user_id', userId);
+
+    if (updateErr) {
+      console.error("[resolveAccountId] failed to link profile:", updateErr);
+      return null;
+    }
+  } else {
+    const { error: insertErr } = await supabase
+      .from('profiles')
+      .insert({
+        user_id: userId,
+        full_name: data?.full_name ?? '',
+        email: data?.email ?? '',
+        account_id: accountId,
+        account_role: accountRole,
+      });
+
+    if (insertErr) {
+      console.error("[resolveAccountId] failed to create profile:", insertErr);
+      return null;
+    }
+  }
+
+  return accountId;
 }
 
 // Lazy-initialised service-role client. We need it to detect a
