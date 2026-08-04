@@ -12,20 +12,37 @@ async function resolveAccountId(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
 ): Promise<string | null> {
+  console.log('[resolveAccountId] Called with userId:', userId)
+
   const { data, error } = await supabase
     .from('profiles')
     .select('*')
     .eq('user_id', userId)
     .maybeSingle();
 
+  console.log('[resolveAccountId] profiles query result:', {
+    hasData: !!data,
+    account_id: data?.account_id ?? null,
+    error: error ?? null,
+    userId: data?.user_id ?? null,
+  })
+
   if (error) {
-    console.error("[resolveAccountId] profile fetch error:", error);
-    return null;
+    console.error('[resolveAccountId] profile fetch error:', error)
+    return null
   }
 
-  if (data?.account_id) {
-    return data.account_id;
+  if (!data) {
+    console.log('[resolveAccountId] No profile row found for user_id:', userId)
+    return null
   }
+
+  if (data.account_id) {
+    console.log('[resolveAccountId] Found account_id:', data.account_id)
+    return data.account_id
+  }
+
+  console.log('[resolveAccountId] account_id is null for user_id:', userId)
 
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!serviceRoleKey) {
@@ -124,11 +141,19 @@ export async function GET() {
       error: authError,
     } = await supabase.auth.getUser()
 
+    console.log('[whatsapp/config GET] getUser result:', {
+      hasUser: !!user,
+      userId: user?.id ?? null,
+      authError: authError ?? null,
+    })
+
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    console.log('[whatsapp/config GET] Resolving account_id for user:', user.id)
     const accountId = await resolveAccountId(supabase, user.id)
+    console.log('[whatsapp/config GET] resolveAccountId returned:', accountId)
     if (!accountId) {
       return NextResponse.json(
         {
@@ -227,12 +252,23 @@ export async function POST(request: Request) {
       error: authError,
     } = await supabase.auth.getUser()
 
+    console.log('[whatsapp/config POST] getUser result:', {
+      hasUser: !!user,
+      userId: user?.id ?? null,
+      authError: authError ?? null,
+    })
+
     if (authError || !user) {
+      console.log('[whatsapp/config POST] Unauthorized: authError=', authError, 'user=', user)
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    console.log('[whatsapp/config POST] Resolving account_id for user:', user.id)
     const accountId = await resolveAccountId(supabase, user.id)
+    console.log('[whatsapp/config POST] resolveAccountId returned:', accountId)
+
     if (!accountId) {
+      console.log('[whatsapp/config POST] 403: accountId is null for user:', user.id)
       return NextResponse.json(
         { error: 'Your profile is not linked to an account.' },
         { status: 403 },
