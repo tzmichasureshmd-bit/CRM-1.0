@@ -27,6 +27,12 @@ async function resolveAccountId(
     return data.account_id;
   }
 
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!serviceRoleKey) {
+    console.error("[resolveAccountId] SUPABASE_SERVICE_ROLE_KEY is not set");
+    return null;
+  }
+
   const admin = supabaseAdmin();
   const accountName = data?.full_name || data?.email || 'My account';
 
@@ -65,8 +71,8 @@ async function resolveAccountId(
       .from('profiles')
       .insert({
         user_id: userId,
-        full_name: data?.full_name ?? '',
-        email: data?.email ?? '',
+        full_name: '',
+        email: '',
         account_id: accountId,
         account_role: accountRole,
       });
