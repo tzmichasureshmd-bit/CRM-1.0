@@ -111,10 +111,18 @@ async function resolveAccountId(
 let _adminClient: any = null
 function supabaseAdmin() {
   if (!_adminClient) {
-    _adminClient = createAdminClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+    console.log('[supabaseAdmin] URL set:', !!url, 'KEY set:', !!key, 'KEY length:', key?.length ?? 0)
+    if (!url) {
+      console.error('[supabaseAdmin] NEXT_PUBLIC_SUPABASE_URL is not set')
+      throw new Error('NEXT_PUBLIC_SUPABASE_URL is not set')
+    }
+    if (!key) {
+      console.error('[supabaseAdmin] SUPABASE_SERVICE_ROLE_KEY is not set')
+      throw new Error('SUPABASE_SERVICE_ROLE_KEY is not set')
+    }
+    _adminClient = createAdminClient(url, key)
   }
   return _adminClient
 }
@@ -309,7 +317,16 @@ export async function POST(request: Request) {
       .maybeSingle()
 
     if (claimedError) {
-      console.error('Error checking phone_number_id ownership:', claimedError)
+      console.error('[whatsapp/config POST] claimedError:', {
+        message: claimedError.message,
+        code: claimedError.code,
+        details: claimedError.details,
+        hint: claimedError.hint,
+        table: claimedError.table,
+        column: claimedError.column,
+        errno: claimedError.errno,
+        fullError: JSON.stringify(claimedError, null, 2),
+      })
       return NextResponse.json(
         { error: 'Failed to validate configuration' },
         { status: 500 }
