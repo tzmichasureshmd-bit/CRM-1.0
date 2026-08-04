@@ -1,0 +1,36 @@
+version: "3.8"
+
+services:
+  tzmicha-crm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+    container_name: tzmicha-crm
+    restart: unless-stopped
+    ports:
+      - "3002:3000"
+    environment:
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - META_APP_SECRET=${META_APP_SECRET}
+      - AI_PROVIDER=${AI_PROVIDER:-}
+      - AI_MODEL=${AI_MODEL:-}
+      - AI_API_KEY=${AI_API_KEY:-}
+      - AUTOMATION_CRON_SECRET=${AUTOMATION_CRON_SECRET:-}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tzmicha-crm.rule=Host(`crm.tzmicha.com`)"
+      - "traefik.http.routers.tzmicha-crm.entrypoints=websecure"
+      - "traefik.http.routers.tzmicha-crm.tls.certresolver=letsencrypt"
+      - "traefik.http.services.tzmicha-crm.loadbalancer.server.port=3000"
+    networks:
+      - traefik-net
+
+networks:
+  traefik-net:
+    external: true
