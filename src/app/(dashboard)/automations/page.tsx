@@ -227,26 +227,28 @@ export default function AutomationsPage() {
           </p>
         </div>
       ) : (
-        <ul className="space-y-3">
-          {automations.map((a) => (
-            <AutomationCard
-              key={a.id}
-              automation={a}
-              onToggle={(next) => toggleActive(a, next)}
-              onEdit={() => router.push(`/automations/${a.id}/edit`)}
-              onDuplicate={() => duplicate(a)}
-              onLogs={() => router.push(`/automations/${a.id}/logs`)}
-              onDelete={() => setPendingDelete(a)}
-              t={t}
-            />
-          ))}
-        </ul>
-        <Pagination
-          page={page}
-          pageSize={pageSize}
-          total={total}
-          onPageChange={setPage}
-        />
+        <>
+          <ul className="space-y-3">
+            {automations.map((a) => (
+              <AutomationCard
+                key={a.id}
+                automation={a}
+                onToggle={(next) => toggleActive(a, next)}
+                onEdit={() => router.push(`/automations/${a.id}/edit`)}
+                onDuplicate={() => duplicate(a)}
+                onLogs={() => router.push(`/automations/${a.id}/logs`)}
+                onDelete={() => setPendingDelete(a)}
+                t={t}
+              />
+            ))}
+          </ul>
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            total={total}
+            onPageChange={setPage}
+          />
+        </>
       )}
 
       <Dialog open={!!pendingDelete} onOpenChange={(v) => !v && setPendingDelete(null)}>
