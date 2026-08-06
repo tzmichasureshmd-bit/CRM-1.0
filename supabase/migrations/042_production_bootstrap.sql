@@ -82,7 +82,31 @@ CREATE TABLE whatsapp_config (
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(user_id)
 );
+ALTER TABLE accounts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS accounts_select ON accounts;
+DROP POLICY IF EXISTS accounts_update ON accounts;
+CREATE POLICY accounts_select ON accounts FOR SELECT USING (true);
+CREATE POLICY accounts_update ON accounts FOR UPDATE USING (true);
+
+-- WHATSAPP_CONFIG
+CREATE TABLE whatsapp_config (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  phone_number_id TEXT NOT NULL,
+  waba_id TEXT,
+  access_token TEXT NOT NULL,
+  verify_token TEXT,
+  status TEXT NOT NULL DEFAULT 'disconnected' CHECK (status IN ('connected', 'disconnected')),
+  connected_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id)
+);
 ALTER TABLE whatsapp_config ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS whatsapp_config_select ON whatsapp_config;
+DROP POLICY IF EXISTS whatsapp_config_insert ON whatsapp_config;
+DROP POLICY IF EXISTS whatsapp_config_update ON whatsapp_config;
+DROP POLICY IF EXISTS whatsapp_config_delete ON whatsapp_config;
 CREATE POLICY whatsapp_config_select ON whatsapp_config FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY whatsapp_config_insert ON whatsapp_config FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY whatsapp_config_update ON whatsapp_config FOR UPDATE USING (auth.uid() = user_id);
@@ -103,6 +127,10 @@ CREATE TABLE contacts (
 CREATE INDEX idx_contacts_user_id ON contacts(user_id);
 CREATE INDEX idx_contacts_phone ON contacts(phone);
 ALTER TABLE contacts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS contacts_select ON contacts;
+DROP POLICY IF EXISTS contacts_insert ON contacts;
+DROP POLICY IF EXISTS contacts_update ON contacts;
+DROP POLICY IF EXISTS contacts_delete ON contacts;
 CREATE POLICY contacts_select ON contacts FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY contacts_insert ON contacts FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY contacts_update ON contacts FOR UPDATE USING (auth.uid() = user_id);
@@ -117,6 +145,10 @@ CREATE TABLE tags (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 ALTER TABLE tags ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tags_select ON tags;
+DROP POLICY IF EXISTS tags_insert ON tags;
+DROP POLICY IF EXISTS tags_update ON tags;
+DROP POLICY IF EXISTS tags_delete ON tags;
 CREATE POLICY tags_select ON tags FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY tags_insert ON tags FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY tags_update ON tags FOR UPDATE USING (auth.uid() = user_id);
@@ -133,6 +165,8 @@ CREATE TABLE contact_tags (
 CREATE INDEX idx_contact_tags_contact ON contact_tags(contact_id);
 CREATE INDEX idx_contact_tags_tag ON contact_tags(tag_id);
 ALTER TABLE contact_tags ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS contact_tags_select ON contact_tags;
+DROP POLICY IF EXISTS contact_tags_modify ON contact_tags;
 CREATE POLICY contact_tags_select ON contact_tags FOR SELECT USING (
   EXISTS (SELECT 1 FROM contacts WHERE contacts.id = contact_tags.contact_id AND contacts.user_id = auth.uid())
 );
@@ -152,6 +186,10 @@ CREATE TABLE custom_fields (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 ALTER TABLE custom_fields ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS custom_fields_select ON custom_fields;
+DROP POLICY IF EXISTS custom_fields_insert ON custom_fields;
+DROP POLICY IF EXISTS custom_fields_update ON custom_fields;
+DROP POLICY IF EXISTS custom_fields_delete ON custom_fields;
 CREATE POLICY custom_fields_select ON custom_fields FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY custom_fields_insert ON custom_fields FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY custom_fields_update ON custom_fields FOR UPDATE USING (auth.uid() = user_id);
@@ -167,6 +205,8 @@ CREATE TABLE contact_custom_values (
   UNIQUE(contact_id, custom_field_id)
 );
 ALTER TABLE contact_custom_values ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS contact_custom_values_select ON contact_custom_values;
+DROP POLICY IF EXISTS contact_custom_values_modify ON contact_custom_values;
 CREATE POLICY contact_custom_values_select ON contact_custom_values FOR SELECT USING (
   EXISTS (SELECT 1 FROM contacts WHERE contacts.id = contact_custom_values.contact_id AND contacts.user_id = auth.uid())
 );
@@ -185,6 +225,10 @@ CREATE TABLE contact_notes (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 ALTER TABLE contact_notes ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS contact_notes_select ON contact_notes;
+DROP POLICY IF EXISTS contact_notes_insert ON contact_notes;
+DROP POLICY IF EXISTS contact_notes_update ON contact_notes;
+DROP POLICY IF EXISTS contact_notes_delete ON contact_notes;
 CREATE POLICY contact_notes_select ON contact_notes FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY contact_notes_insert ON contact_notes FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY contact_notes_update ON contact_notes FOR UPDATE USING (auth.uid() = user_id);
@@ -206,6 +250,10 @@ CREATE TABLE conversations (
 CREATE INDEX idx_conversations_user_id ON conversations(user_id);
 CREATE INDEX idx_conversations_contact_id ON conversations(contact_id);
 ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS conversations_select ON conversations;
+DROP POLICY IF EXISTS conversations_insert ON conversations;
+DROP POLICY IF EXISTS conversations_update ON conversations;
+DROP POLICY IF EXISTS conversations_delete ON conversations;
 CREATE POLICY conversations_select ON conversations FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY conversations_insert ON conversations FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY conversations_update ON conversations FOR UPDATE USING (auth.uid() = user_id);
@@ -228,6 +276,8 @@ CREATE TABLE messages (
 CREATE INDEX idx_messages_conversation ON messages(conversation_id);
 CREATE INDEX idx_messages_message_id ON messages(message_id);
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS messages_select ON messages;
+DROP POLICY IF EXISTS messages_modify ON messages;
 CREATE POLICY messages_select ON messages FOR SELECT USING (
   EXISTS (SELECT 1 FROM conversations WHERE conversations.id = messages.conversation_id AND conversations.user_id = auth.uid())
 );
@@ -254,6 +304,10 @@ CREATE TABLE message_templates (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 ALTER TABLE message_templates ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS message_templates_select ON message_templates;
+DROP POLICY IF EXISTS message_templates_insert ON message_templates;
+DROP POLICY IF EXISTS message_templates_update ON message_templates;
+DROP POLICY IF EXISTS message_templates_delete ON message_templates;
 CREATE POLICY message_templates_select ON message_templates FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY message_templates_insert ON message_templates FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY message_templates_update ON message_templates FOR UPDATE USING (auth.uid() = user_id);
@@ -267,6 +321,10 @@ CREATE TABLE pipelines (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 ALTER TABLE pipelines ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS pipelines_select ON pipelines;
+DROP POLICY IF EXISTS pipelines_insert ON pipelines;
+DROP POLICY IF EXISTS pipelines_update ON pipelines;
+DROP POLICY IF EXISTS pipelines_delete ON pipelines;
 CREATE POLICY pipelines_select ON pipelines FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY pipelines_insert ON pipelines FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY pipelines_update ON pipelines FOR UPDATE USING (auth.uid() = user_id);
@@ -283,6 +341,8 @@ CREATE TABLE pipeline_stages (
 );
 CREATE INDEX idx_pipeline_stages_pipeline ON pipeline_stages(pipeline_id);
 ALTER TABLE pipeline_stages ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS pipeline_stages_select ON pipeline_stages;
+DROP POLICY IF EXISTS pipeline_stages_modify ON pipeline_stages;
 CREATE POLICY pipeline_stages_select ON pipeline_stages FOR SELECT USING (
   EXISTS (SELECT 1 FROM pipelines WHERE pipelines.id = pipeline_stages.pipeline_id AND pipelines.user_id = auth.uid())
 );
@@ -312,6 +372,10 @@ CREATE TABLE deals (
 CREATE INDEX idx_deals_pipeline ON deals(pipeline_id);
 CREATE INDEX idx_deals_stage ON deals(stage_id);
 ALTER TABLE deals ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS deals_select ON deals;
+DROP POLICY IF EXISTS deals_insert ON deals;
+DROP POLICY IF EXISTS deals_update ON deals;
+DROP POLICY IF EXISTS deals_delete ON deals;
 CREATE POLICY deals_select ON deals FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY deals_insert ON deals FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY deals_update ON deals FOR UPDATE USING (auth.uid() = user_id);
@@ -338,6 +402,10 @@ CREATE TABLE broadcasts (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 ALTER TABLE broadcasts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS broadcasts_select ON broadcasts;
+DROP POLICY IF EXISTS broadcasts_insert ON broadcasts;
+DROP POLICY IF EXISTS broadcasts_update ON broadcasts;
+DROP POLICY IF EXISTS broadcasts_delete ON broadcasts;
 CREATE POLICY broadcasts_select ON broadcasts FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY broadcasts_insert ON broadcasts FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY broadcasts_update ON broadcasts FOR UPDATE USING (auth.uid() = user_id);
@@ -358,6 +426,8 @@ CREATE TABLE broadcast_recipients (
 );
 CREATE INDEX idx_broadcast_recipients_broadcast ON broadcast_recipients(broadcast_id);
 ALTER TABLE broadcast_recipients ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS broadcast_recipients_select ON broadcast_recipients;
+DROP POLICY IF EXISTS broadcast_recipients_modify ON broadcast_recipients;
 CREATE POLICY broadcast_recipients_select ON broadcast_recipients FOR SELECT USING (
   EXISTS (SELECT 1 FROM broadcasts WHERE broadcasts.id = broadcast_recipients.broadcast_id AND broadcasts.user_id = auth.uid())
 );
@@ -379,6 +449,10 @@ CREATE TABLE automations (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 ALTER TABLE automations ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS automations_select ON automations;
+DROP POLICY IF EXISTS automations_insert ON automations;
+DROP POLICY IF EXISTS automations_update ON automations;
+DROP POLICY IF EXISTS automations_delete ON automations;
 CREATE POLICY automations_select ON automations FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY automations_insert ON automations FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY automations_update ON automations FOR UPDATE USING (auth.uid() = user_id);
@@ -394,6 +468,8 @@ CREATE TABLE automation_steps (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 ALTER TABLE automation_steps ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS automation_steps_select ON automation_steps;
+DROP POLICY IF EXISTS automation_steps_modify ON automation_steps;
 CREATE POLICY automation_steps_select ON automation_steps FOR SELECT USING (
   EXISTS (SELECT 1 FROM automations WHERE automations.id = automation_steps.automation_id AND automations.user_id = auth.uid())
 );
@@ -414,6 +490,7 @@ CREATE TABLE automation_logs (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 ALTER TABLE automation_logs ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS automation_logs_select ON automation_logs;
 CREATE POLICY automation_logs_select ON automation_logs FOR SELECT USING (auth.uid() = user_id);
 
 -- AUTOMATION_PENDING_EXECUTIONS
@@ -439,6 +516,10 @@ CREATE TABLE flows (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 ALTER TABLE flows ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS flows_select ON flows;
+DROP POLICY IF EXISTS flows_insert ON flows;
+DROP POLICY IF EXISTS flows_update ON flows;
+DROP POLICY IF EXISTS flows_delete ON flows;
 CREATE POLICY flows_select ON flows FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY flows_insert ON flows FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY flows_update ON flows FOR UPDATE USING (auth.uid() = user_id);
@@ -455,6 +536,8 @@ CREATE TABLE flow_nodes (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 ALTER TABLE flow_nodes ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS flow_nodes_select ON flow_nodes;
+DROP POLICY IF EXISTS flow_nodes_modify ON flow_nodes;
 CREATE POLICY flow_nodes_select ON flow_nodes FOR SELECT USING (
   EXISTS (SELECT 1 FROM flows WHERE flows.id = flow_nodes.flow_id AND flows.user_id = auth.uid())
 );
@@ -477,6 +560,7 @@ CREATE TABLE flow_runs (
 CREATE INDEX idx_flow_runs_flow ON flow_runs(flow_id);
 CREATE INDEX idx_flow_runs_contact ON flow_runs(contact_id);
 ALTER TABLE flow_runs ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS flow_runs_select ON flow_runs;
 CREATE POLICY flow_runs_select ON flow_runs FOR SELECT USING (
   EXISTS (SELECT 1 FROM flows WHERE flows.id = flow_runs.flow_id AND flows.user_id = auth.uid())
 );
@@ -490,6 +574,7 @@ CREATE TABLE flow_run_events (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 ALTER TABLE flow_run_events ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS flow_run_events_select ON flow_run_events;
 CREATE POLICY flow_run_events_select ON flow_run_events FOR SELECT USING (
   EXISTS (
     SELECT 1 FROM flow_runs fr

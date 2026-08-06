@@ -33,8 +33,8 @@ async function resolveAccountId(
   }
 
   if (!data) {
-    console.log('[resolveAccountId] No profile row found for user_id:', userId)
-    return null
+    console.log('[resolveAccountId] No profile row found for user_id:', userId, '— creating profile + account')
+    return await createProfileAndAccount(supabase, userId)
   }
 
   if (data.account_id) {
@@ -42,70 +42,137 @@ async function resolveAccountId(
     return data.account_id
   }
 
-  console.log('[resolveAccountId] account_id is null for user_id:', userId)
+  console.log('[resolveAccountId] account_id is null for user_id:', userId, '— linking to existing or creating account')
+  return await linkOrCreateAccount(supabase, userId, data)
+}
 
+async function createProfileAndAccount(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+): Promise<string | null> {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!serviceRoleKey) {
-    console.error("[resolveAccountId] SUPABASE_SERVICE_ROLE_KEY is not set");
+    console.error('[resolveAccountId] SUPABASE_SERVICE_ROLE_KEY is not set');
     return null;
   }
 
-  let admin
+  let admin;
   try {
-    admin = supabaseAdmin()
+    admin = supabaseAdmin();
   } catch (err) {
-    console.error("[resolveAccountId] supabaseAdmin() threw:", err)
-    return null
+    console.error('[resolveAccountId] supabaseAdmin() threw:', err);
+    return null;
   }
-  const accountName = data?.full_name || data?.email || 'My account';
 
   let accountId: string;
   try {
     const { data: account, error: accountErr } = await admin
       .from('accounts')
-      .insert({ name: accountName, owner_user_id: userId })
+      .insert({ name: 'My account', owner_user_id: userId })
       .select('id')
       .maybeSingle();
 
     if (accountErr || !account?.id) {
-      console.error("[resolveAccountId] failed to create account:", accountErr);
+      console.error('[resolveAccountId] failed to create account:', accountErr);
       return null;
     }
     accountId = account.id;
   } catch (err) {
-    console.error("[resolveAccountId] exception creating account:", err);
+    console.error('[resolveAccountId] exception creating account:', err);
     return null;
   }
 
-  const accountRole = 'owner';
-
-  if (data) {
-    const { error: updateErr } = await supabase
-      .from('profiles')
-      .update({ account_id: accountId, account_role: accountRole })
-      .eq('user_id', userId);
-
-    if (updateErr) {
-      console.error("[resolveAccountId] failed to link profile:", updateErr);
-      return null;
-    }
-  } else {
-    const { error: insertErr } = await supabase
+  try {
+    const { error: profileErr } = await supabase
       .from('profiles')
       .insert({
         user_id: userId,
         full_name: '',
         email: '',
         account_id: accountId,
-        account_role: accountRole,
+        account_role: 'owner',
       });
 
-    if (insertErr) {
-      console.error("[resolveAccountId] failed to create profile:", insertErr);
+    if (profileErr) {
+      console.error('[resolveAccountId] failed to create profile:', profileErr);
       return null;
     }
+  } catch (err) {
+    console.error('[resolveAccountId] exception creating profile:', err);
+    return null;
   }
 
+  console.log('[resolveAccountId] Created account', accountId, 'and profile for user', userId);
+  return accountId;
+}
+
+async function linkOrCreateAccount(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  profileData: { full_name?: string | null; email?: string | null },
+): Promise<string | null> {
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!serviceRoleKey) {
+    console.error('[resolveAccountId] SUPABASE_SERVICE_ROLE_KEY is not set');
+    return null;
+  }
+
+  let admin;
+  try {
+    admin = supabaseAdmin();
+  } catch (err) {
+    console.error('[resolveAccountId] supabaseAdmin() threw:', err);
+    return null;
+  }
+
+  const accountName = profileData.full_name || profileData.email || 'My account';
+
+  let accountId: string;
+  try {
+    const { data: existingAccount, error: lookupErr } = await admin
+      .from('accounts')
+      .select('id')
+      .eq('owner_user_id', userId)
+      .maybeSingle();
+
+    if (lookupErr) {
+      console.error('[resolveAccountId] failed to lookup existing account:', lookupErr);
+      return null;
+    }
+
+    if (existingAccount) {
+      accountId = existingAccount.id;
+      console.log('[resolveAccountId] Found existing account:', accountId, 'for user:', userId);
+    } else {
+      const { data: account, error: accountErr } = await admin
+        .from('accounts')
+        .insert({ name: accountName, owner_user_id: userId })
+        .select('id')
+        .maybeSingle();
+
+      if (accountErr || !account?.id) {
+        console.error('[resolveAccountId] failed to create account:', accountErr);
+        return null;
+      }
+      accountId = account.id;
+    }
+  } catch (err) {
+    console.error('[resolveAccountId] exception creating/looking up account:', err);
+    return null;
+  }
+
+  const accountRole = 'owner';
+  const { error: updateErr } = await supabase
+    .from('profiles')
+    .update({ account_id: accountId, account_role: accountRole })
+    .eq('user_id', userId);
+
+  if (updateErr) {
+    console.error('[resolveAccountId] failed to link profile:', updateErr);
+    return null;
+  }
+
+  console.log('[resolveAccountId] Linked profile to account:', accountId, 'for user:', userId);
   return accountId;
 }
 
@@ -243,12 +310,12 @@ export async function GET() {
       )
     }
   } catch (error) {
-    console.error('Error in WhatsApp config GET:', error)
-    return NextResponse.json(
-      { connected: false, reason: 'unknown', message: 'Internal server error' },
-      { status: 500 }
-    )
-  }
+  console.error('Error in WhatsApp config GET:', error)
+  return NextResponse.json(
+    { connected: false, reason: 'unknown', message: 'Internal server error', detail: error instanceof Error ? error.message : String(error) },
+    { status: 500 }
+  )
+}
 }
 
 /**
