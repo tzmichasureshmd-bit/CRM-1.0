@@ -352,9 +352,10 @@ export async function POST(request: Request) {
       console.error('[whatsapp/config POST] resolveAccountId failed for user:', user.id)
       return NextResponse.json(
         {
-          error: 'Failed to resolve your account. This usually means your profile is not linked to an account and the system could not create one automatically. Please contact support or try logging out and back in.',
+          error: 'Account not linked',
+          message: 'Your profile is not linked to an account and the system could not create one automatically. Please try again or contact support.',
         },
-        { status: 500 },
+        { status: 503 },
       )
     }
 

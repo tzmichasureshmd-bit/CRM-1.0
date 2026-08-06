@@ -71,6 +71,7 @@ CREATE POLICY accounts_update ON accounts FOR UPDATE USING (true);
 -- WHATSAPP_CONFIG
 CREATE TABLE whatsapp_config (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  account_id UUID REFERENCES accounts(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   phone_number_id TEXT NOT NULL,
   waba_id TEXT,
@@ -80,27 +81,7 @@ CREATE TABLE whatsapp_config (
   connected_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(user_id)
-);
-ALTER TABLE accounts ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS accounts_select ON accounts;
-DROP POLICY IF EXISTS accounts_update ON accounts;
-CREATE POLICY accounts_select ON accounts FOR SELECT USING (true);
-CREATE POLICY accounts_update ON accounts FOR UPDATE USING (true);
-
--- WHATSAPP_CONFIG
-CREATE TABLE whatsapp_config (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  phone_number_id TEXT NOT NULL,
-  waba_id TEXT,
-  access_token TEXT NOT NULL,
-  verify_token TEXT,
-  status TEXT NOT NULL DEFAULT 'disconnected' CHECK (status IN ('connected', 'disconnected')),
-  connected_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(user_id)
+  UNIQUE(account_id)
 );
 ALTER TABLE whatsapp_config ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS whatsapp_config_select ON whatsapp_config;
@@ -669,7 +650,7 @@ CREATE TRIGGER set_updated_at BEFORE UPDATE ON accounts FOR EACH ROW EXECUTE FUN
 CREATE TRIGGER set_updated_at BEFORE UPDATE ON automations FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER set_updated_at BEFORE UPDATE ON flows FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- SIGNUP TRIGGER (basic version — creates profile on user signup)
+-- SIGNUP TRIGGER — creates both account and profile on user signup
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 DROP FUNCTION IF EXISTS public.handle_new_user();
 
@@ -679,16 +660,19 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
+DECLARE
+  v_account_id UUID;
 BEGIN
-  INSERT INTO public.profiles (user_id, full_name, email)
-  VALUES (
-    NEW.id,
-    COALESCE(NEW.raw_user_meta_data->>'full_name', ''),
-    NEW.email
-  );
+  INSERT INTO public.accounts (name, owner_user_id)
+  VALUES (COALESCE(NULLIF(NEW.raw_user_meta_data->>'full_name', ''), NEW.email, 'My account'), NEW.id)
+  RETURNING id INTO v_account_id;
+
+  INSERT INTO public.profiles (user_id, full_name, email, account_id, account_role)
+  VALUES (NEW.id, COALESCE(NEW.raw_user_meta_data->>'full_name', ''), NEW.email, v_account_id, 'owner');
+
   RETURN NEW;
 EXCEPTION WHEN OTHERS THEN
-  RAISE WARNING 'Failed to create profile for user %: %', NEW.id, SQLERRM;
+  RAISE WARNING 'Failed to bootstrap account/profile for user %: %', NEW.id, SQLERRM;
   RETURN NEW;
 END;
 $$;

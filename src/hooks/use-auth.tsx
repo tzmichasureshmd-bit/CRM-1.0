@@ -149,7 +149,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           details: error.details,
           hint: error.hint,
           code: error.code,
+          userId,
         });
+        lastFetchedUserIdRef.current = null;
+        return;
+      }
+
+      if (!data) {
+        console.warn("[AuthProvider] fetchProfile: no profile row for user_id:", userId);
         lastFetchedUserIdRef.current = null;
         return;
       }
