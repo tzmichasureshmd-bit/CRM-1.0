@@ -135,13 +135,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfileLoading(true);
     lastFetchedUserIdRef.current = userId;
     try {
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from("profiles")
         .select(
           "id, full_name, email, avatar_url, role, beta_features, account_id, account_role",
         )
         .eq("user_id", userId)
         .maybeSingle();
+
+      if (error && error.code === 'PGRST204') {
+        console.warn("[AuthProvider] fetchProfile: profiles missing beta_features column, retrying without it");
+        const fallback = await supabase
+          .from("profiles")
+          .select(
+            "id, full_name, email, avatar_url, role, account_id, account_role",
+          )
+          .eq("user_id", userId)
+          .maybeSingle();
+        if (fallback.data) {
+          data = { ...fallback.data, beta_features: [] };
+        }
+        error = fallback.error;
+      }
 
       if (error) {
         console.error("[AuthProvider] fetchProfile error:", {
@@ -174,13 +189,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // account name lookup itself can't.
         let accountRow: AccountSummary | null = null;
         if (data.account_id) {
-          const { data: account, error: accountErr } = await supabase
+          let account: { id: string; name: string; default_currency?: string } | null = null;
+          let accountErr: { code?: string; message?: string; details?: string; hint?: string } | null = null;
+
+          const primary = await supabase
             .from("accounts")
             // default_currency added in migration 021; narrowed to the
             // USD fallback below for older schemas where it reads null.
             .select("id, name, default_currency")
             .eq("id", data.account_id)
             .maybeSingle();
+
+          account = primary.data;
+          accountErr = primary.error;
+
+          if (accountErr && accountErr.code === 'PGRST204') {
+            console.warn("[AuthProvider] fetchAccount: accounts missing default_currency column, retrying without it");
+            const accountFallback = await supabase
+              .from("accounts")
+              .select("id, name")
+              .eq("id", data.account_id)
+              .maybeSingle();
+            account = accountFallback.data;
+            accountErr = accountFallback.error;
+          }
+
           if (accountErr) {
             console.error("[AuthProvider] fetchAccount error:", {
               message: accountErr.message,

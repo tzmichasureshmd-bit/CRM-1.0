@@ -65,20 +65,38 @@ async function createProfileAndAccount(
   }
 
   let accountId: string;
+
   try {
-    const { data: account, error: accountErr } = await admin
+    const { data: existingAccount, error: lookupErr } = await admin
       .from('accounts')
-      .insert({ name: 'My account', owner_user_id: userId })
       .select('id')
+      .eq('owner_user_id', userId)
       .maybeSingle();
 
-    if (accountErr || !account?.id) {
-      console.error('[resolveAccountId] failed to create account:', accountErr);
+    if (lookupErr) {
+      console.error('[resolveAccountId] failed to lookup existing account:', lookupErr);
       return null;
     }
-    accountId = account.id;
+
+    if (existingAccount?.id) {
+      accountId = existingAccount.id;
+      console.log('[resolveAccountId] Found existing account for user (no profile):', accountId);
+    } else {
+      const { data: account, error: accountErr } = await admin
+        .from('accounts')
+        .insert({ name: 'My account', owner_user_id: userId })
+        .select('id')
+        .maybeSingle();
+
+      if (accountErr || !account?.id) {
+        console.error('[resolveAccountId] failed to create account:', accountErr);
+        return null;
+      }
+      accountId = account.id;
+      console.log('[resolveAccountId] Created new account', accountId, 'for user', userId);
+    }
   } catch (err) {
-    console.error('[resolveAccountId] exception creating account:', err);
+    console.error('[resolveAccountId] exception creating/looking up account:', err);
     return null;
   }
 
@@ -94,6 +112,22 @@ async function createProfileAndAccount(
       });
 
     if (profileErr) {
+      // If the profile already exists (unique constraint on user_id),
+      // that's actually fine — just link the existing profile to the account.
+      if (profileErr.code === '23505') {
+        console.log('[resolveAccountId] Profile already exists for user, linking to account:', accountId);
+        const { error: updateErr } = await supabase
+          .from('profiles')
+          .update({ account_id: accountId, account_role: 'owner' })
+          .eq('user_id', userId);
+
+        if (updateErr) {
+          console.error('[resolveAccountId] failed to link existing profile:', updateErr);
+          return null;
+        }
+        console.log('[resolveAccountId] Linked existing profile to account:', accountId);
+        return accountId;
+      }
       console.error('[resolveAccountId] failed to create profile:', profileErr);
       return null;
     }
@@ -352,10 +386,10 @@ export async function POST(request: Request) {
       console.error('[whatsapp/config POST] resolveAccountId failed for user:', user.id)
       return NextResponse.json(
         {
-          error: 'Account not linked',
-          message: 'Your profile is not linked to an account and the system could not create one automatically. Please try again or contact support.',
+          error: 'Account setup failed',
+          message: 'We could not set up your account automatically. Please refresh the page and try again. If the problem persists, contact support.',
         },
-        { status: 503 },
+        { status: 500 },
       )
     }
 
