@@ -609,8 +609,6 @@ CREATE TABLE account_invitations (
 );
 CREATE INDEX idx_account_invitations_account_pending ON account_invitations(account_id, expires_at) WHERE accepted_at IS NULL;
 ALTER TABLE account_invitations ENABLE ROW LEVEL SECURITY;
-CREATE POLICY accounts_select ON accounts FOR SELECT USING (true);
-CREATE POLICY accounts_update ON accounts FOR UPDATE USING (true);
 CREATE POLICY account_invitations_select ON account_invitations FOR SELECT USING (true);
 CREATE POLICY account_invitations_modify ON account_invitations FOR ALL USING (true);
 
