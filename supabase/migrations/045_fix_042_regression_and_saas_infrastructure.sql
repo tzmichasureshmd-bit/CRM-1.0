@@ -676,14 +676,14 @@ DROP POLICY IF EXISTS flow_run_events_insert ON flow_run_events;
 CREATE POLICY flow_run_events_select ON flow_run_events
   FOR SELECT USING (
     EXISTS (
-      SELECT 1 FROM flow_runs fr WHERE fr.id = flow_run_events.run_id
+      SELECT 1 FROM flow_runs fr WHERE fr.id = flow_run_events.flow_run_id
         AND (is_account_member(fr.account_id) OR is_super_admin())
     )
   );
 CREATE POLICY flow_run_events_insert ON flow_run_events
   FOR INSERT WITH CHECK (
     EXISTS (
-      SELECT 1 FROM flow_runs fr WHERE fr.id = flow_run_events.run_id
+      SELECT 1 FROM flow_runs fr WHERE fr.id = flow_run_events.flow_run_id
         AND (is_account_member(fr.account_id, 'agent') OR is_super_admin())
     )
   );
@@ -784,9 +784,15 @@ CREATE POLICY subscription_plans_delete ON subscription_plans
   FOR DELETE USING (is_super_admin());
 
 -- Business subscriptions
-CREATE TYPE subscription_status_enum AS ENUM (
-  'trialing', 'active', 'past_due', 'canceled', 'expired', 'paused'
-);
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'subscription_status_enum') THEN
+    CREATE TYPE subscription_status_enum AS ENUM (
+      'trialing', 'active', 'past_due', 'canceled', 'expired', 'paused'
+    );
+  END IF;
+END
+$$;
 
 CREATE TABLE IF NOT EXISTS business_subscriptions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

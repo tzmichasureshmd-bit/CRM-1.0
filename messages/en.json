@@ -12,7 +12,9 @@
     "signingIn": "Signing in...",
     "signIn": "Sign in",
     "noAccount": "Don't have an account?",
-    "createAccount": "Create account"
+    "createAccount": "Create account",
+    "or": "or",
+    "superAdmin": "Super Admin"
   },
   "Sidebar": {
     "title": "WhatsApp CRM",

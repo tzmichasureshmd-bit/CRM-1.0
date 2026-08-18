@@ -12,7 +12,9 @@
     "signingIn": "로그인 중...",
     "signIn": "로그인",
     "noAccount": "계정이 없으신가요?",
-    "createAccount": "계정 만들기"
+    "createAccount": "계정 만들기",
+    "or": "또는",
+    "superAdmin": "슈퍼 관리자"
   },
   "Sidebar": {
     "title": "WhatsApp CRM",

@@ -69,11 +69,25 @@ export async function middleware(request: NextRequest) {
     return withRefreshedCookies(NextResponse.redirect(url))
   }
 
-  // Protected pages - redirect to login if not authenticated
-  const protectedPaths = ['/dashboard', '/inbox', '/contacts', '/pipelines', '/broadcasts', '/automations', '/settings']
+  // Super admin login page — redirect to /admin if already logged in
+  if (user && request.nextUrl.pathname === '/admin/login') {
+    const url = request.nextUrl.clone()
+    url.pathname = '/admin'
+    url.search = ''
+    return withRefreshedCookies(NextResponse.redirect(url))
+  }
+
+  // Protected pages - redirect to login if not authenticated.
+  // /admin/* (except /admin/login) redirects to /admin/login.
+  const protectedPaths = ['/dashboard', '/inbox', '/contacts', '/pipelines', '/broadcasts', '/automations', '/settings', '/admin']
   if (!user && protectedPaths.some(path => request.nextUrl.pathname.startsWith(path))) {
     const url = request.nextUrl.clone()
-    url.pathname = '/login'
+    if (request.nextUrl.pathname.startsWith('/admin')) {
+      url.pathname = '/admin/login'
+    } else {
+      url.pathname = '/login'
+    }
+    url.search = ''
     return withRefreshedCookies(NextResponse.redirect(url))
   }
 

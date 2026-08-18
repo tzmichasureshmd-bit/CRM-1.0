@@ -60,6 +60,28 @@ function LoginPageInner() {
       return;
     }
 
+    // Check if user is a super_admin so we can route them to /admin
+    // instead of the normal customer dashboard.
+    let destination = inviteToken
+      ? `/join/${encodeURIComponent(inviteToken)}`
+      : "/dashboard";
+
+    if (!inviteToken) {
+      try {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("platform_role")
+          .eq("user_id", (await supabase.auth.getUser()).data.user?.id ?? "")
+          .maybeSingle();
+
+        if (profile?.platform_role === "super_admin") {
+          destination = "/admin";
+        }
+      } catch {
+        // Profile fetch failed — fall through to /dashboard.
+      }
+    }
+
     // Full-page navigation (not router.push) so the browser issues a
     // fresh top-level request that carries the just-written Supabase
     // auth cookies to the middleware gating /dashboard. A soft
@@ -68,9 +90,6 @@ function LoginPageInner() {
     // back to /login — which looks like the page "just refreshing"
     // instead of signing in (issue #365). Mirrors the deliberate full
     // reload the invite-accept flow already uses in join/[token].
-    const destination = inviteToken
-      ? `/join/${encodeURIComponent(inviteToken)}`
-      : "/dashboard";
     window.location.href = destination;
   };
 
@@ -148,6 +167,22 @@ function LoginPageInner() {
               {loading ? t('signingIn') : t('signIn')}
             </Button>
           </form>
+
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-2 text-muted-foreground">{t('or')}</span>
+            </div>
+          </div>
+
+          <Link
+            href="/admin/login"
+            className="flex h-10 w-full items-center justify-center rounded-lg border border-border bg-background text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            {t('superAdmin')}
+          </Link>
 
           <p className="mt-6 text-center text-sm text-muted-foreground">
             {t('noAccount')}{" "}
