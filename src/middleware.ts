@@ -85,6 +85,14 @@ export async function middleware(request: NextRequest) {
     )
   }
 
+  // Super admin API routes — require authenticated user
+  // (actual super_admin check happens in the route handler via requireSuperAdmin)
+  if (request.nextUrl.pathname.startsWith('/api/admin/') && !user) {
+    return withRefreshedCookies(
+      NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    )
+  }
+
   return supabaseResponse
 }
 

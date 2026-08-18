@@ -29,7 +29,13 @@ import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { createClient } from "@/lib/supabase/server";
-import { hasMinRole, isAccountRole, type AccountRole } from "./roles";
+import {
+  hasMinRole,
+  isAccountRole,
+  isPlatformRole,
+  type AccountRole,
+  type PlatformRole,
+} from "./roles";
 
 // ------------------------------------------------------------
 // Errors
@@ -87,6 +93,8 @@ export interface AccountContext {
   accountId: string;
   /** Caller's role within their account. */
   role: AccountRole;
+  /** Caller's platform-level role (super_admin or user). */
+  platformRole: PlatformRole;
   /** Lightweight account meta — id + name. */
   account: { id: string; name: string };
 }
@@ -116,7 +124,7 @@ export async function getCurrentAccount(): Promise<AccountContext> {
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("account_id, account_role")
+    .select("account_id, account_role, platform_role")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -136,6 +144,12 @@ export async function getCurrentAccount(): Promise<AccountContext> {
     // hit this — surface it rather than silently widening.
     throw new ForbiddenError(`Unknown account role: ${data.account_role}`);
   }
+
+  // platform_role defaults to 'user' if column doesn't exist yet
+  const platformRole: PlatformRole =
+    data.platform_role && isPlatformRole(data.platform_role)
+      ? data.platform_role
+      : "user";
 
   // Load the account with a plain point lookup by id rather than an
   // embedded FK join (`account:accounts!inner(...)`). The embed forces
@@ -168,6 +182,7 @@ export async function getCurrentAccount(): Promise<AccountContext> {
     userId: user.id,
     accountId: data.account_id,
     role: data.account_role,
+    platformRole,
     account: { id: account.id, name: account.name },
   };
 }

@@ -1,5 +1,5 @@
-import { createClient } from "@/lib/supabase/client";
 import { NextResponse } from "next/server";
+import { getCurrentAccount, toErrorResponse } from "@/lib/auth/account";
 
 type ReportType = "leads" | "customers" | "conversations" | "sales" | "employees" | "daily" | "monthly";
 
@@ -9,39 +9,21 @@ interface ReportRow {
 
 export async function GET(request: Request) {
   try {
-    const supabase = createClient();
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const ctx = await getCurrentAccount();
 
     const { searchParams } = new URL(request.url);
     const type = (searchParams.get("type") || "daily") as ReportType;
     const from = searchParams.get("from");
     const to = searchParams.get("to");
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("account_id")
-      .eq("user_id", session.user.id)
-      .maybeSingle();
-
-    if (!profile?.account_id) {
-      return NextResponse.json({ error: "No account found" }, { status: 404 });
-    }
-
-    const accountId = profile.account_id;
     let rows: ReportRow[] = [];
 
     switch (type) {
       case "leads": {
-        const { data } = await supabase
+        const { data } = await ctx.supabase
           .from("contacts")
           .select("id, name, phone, email, company, lead_status, created_at")
-          .eq("account_id", accountId)
+          .eq("account_id", ctx.accountId)
           .order("created_at", { ascending: false });
         rows = (data ?? []).map((c) => ({
           ID: c.id,
@@ -55,10 +37,10 @@ export async function GET(request: Request) {
         break;
       }
       case "customers": {
-        const { data } = await supabase
+        const { data } = await ctx.supabase
           .from("contacts")
           .select("id, name, phone, email, company, created_at, contact_tags(tags(name, color))")
-          .eq("account_id", accountId)
+          .eq("account_id", ctx.accountId)
           .order("created_at", { ascending: false });
         rows = (data ?? []).map((c) => ({
           ID: c.id,
@@ -75,10 +57,10 @@ export async function GET(request: Request) {
         break;
       }
       case "conversations": {
-        const { data } = await supabase
+        const { data } = await ctx.supabase
           .from("conversations")
           .select("id, status, last_message_text, last_message_at, unread_count, contact:contacts(name, phone), assigned_agent_id")
-          .eq("account_id", accountId)
+          .eq("account_id", ctx.accountId)
           .order("last_message_at", { ascending: false });
         rows = (data ?? []).map((c) => {
           const conv = c as { contact?: { name: string | null; phone: string }[] | null; assigned_agent_id?: string | null };
@@ -96,10 +78,10 @@ export async function GET(request: Request) {
         break;
       }
       case "sales": {
-        const { data } = await supabase
+        const { data } = await ctx.supabase
           .from("deals")
           .select("id, title, value, currency, status, created_at, stage:pipeline_stages(name, color), contact:contacts(name, phone)")
-          .eq("account_id", accountId)
+          .eq("account_id", ctx.accountId)
           .order("created_at", { ascending: false });
         rows = (data ?? []).map((d) => {
           const deal = d as { stage?: { name: string }[] | null; contact?: { name: string | null; phone: string }[] | null };
@@ -118,10 +100,10 @@ export async function GET(request: Request) {
         break;
       }
       case "employees": {
-        const { data } = await supabase
+        const { data } = await ctx.supabase
           .from("profiles")
           .select("id, full_name, email, account_role, created_at")
-          .eq("account_id", accountId)
+          .eq("account_id", ctx.accountId)
           .order("created_at", { ascending: false });
         rows = (data ?? []).map((p) => ({
           ID: p.id,
@@ -139,10 +121,10 @@ export async function GET(request: Request) {
         const endDate = to ? new Date(to) : new Date();
 
         const [conversations, messages, contacts, deals] = await Promise.all([
-          supabase.from("conversations").select("id, status, created_at").eq("account_id", accountId).gte("created_at", startDate.toISOString()).lte("created_at", endDate.toISOString()),
-          supabase.from("messages").select("id, sender_type, content_type, created_at").eq("conversations.account_id", accountId).gte("created_at", startDate.toISOString()).lte("created_at", endDate.toISOString()),
-          supabase.from("contacts").select("id, created_at").eq("account_id", accountId).gte("created_at", startDate.toISOString()).lte("created_at", endDate.toISOString()),
-          supabase.from("deals").select("id, value, status, created_at").eq("account_id", accountId).gte("created_at", startDate.toISOString()).lte("created_at", endDate.toISOString()),
+          ctx.supabase.from("conversations").select("id, status, created_at").eq("account_id", ctx.accountId).gte("created_at", startDate.toISOString()).lte("created_at", endDate.toISOString()),
+          ctx.supabase.from("messages").select("id, sender_type, content_type, created_at").eq("conversations.account_id", ctx.accountId).gte("created_at", startDate.toISOString()).lte("created_at", endDate.toISOString()),
+          ctx.supabase.from("contacts").select("id, created_at").eq("account_id", ctx.accountId).gte("created_at", startDate.toISOString()).lte("created_at", endDate.toISOString()),
+          ctx.supabase.from("deals").select("id, value, status, created_at").eq("account_id", ctx.accountId).gte("created_at", startDate.toISOString()).lte("created_at", endDate.toISOString()),
         ]);
 
         const messageCount = (messages.data ?? []).length;
@@ -165,7 +147,6 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ type, rows, count: rows.length });
   } catch (err) {
-    console.error("Reports GET error:", err);
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+    return toErrorResponse(err);
   }
 }

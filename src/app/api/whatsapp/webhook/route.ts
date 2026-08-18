@@ -107,7 +107,7 @@ export async function GET(request: Request) {
       .select('id, verify_token')
 
     if (configError || !configs) {
-      console.error('Error fetching configs for verification:', configError)
+      console.error('[WhatsApp Webhook] Error fetching configs for verification:', configError)
       return NextResponse.json(
         { error: 'Verification failed' },
         { status: 403 }
@@ -160,7 +160,7 @@ export async function GET(request: Request) {
       { status: 403 }
     )
   } catch (error) {
-    console.error('Error in webhook GET verification:', error)
+    console.error('[WhatsApp Webhook] Error in webhook GET verification:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -208,7 +208,7 @@ export async function POST(request: Request) {
     try {
       await processWebhook(body)
     } catch (error) {
-      console.error('Error processing webhook:', error)
+      console.error('[WhatsApp Webhook] Error processing webhook:', error)
     }
   })
 
@@ -226,6 +226,10 @@ async function processWebhook(body: { entry?: WhatsAppWebhookEntry[] }) {
       // dedicated handler. Skip the messaging branches below so we
       // don't try to read message-shaped fields off a template event.
       if (isTemplateWebhookField(change.field)) {
+        console.log(
+          '[WhatsApp Webhook] Template lifecycle event received — field:',
+          change.field
+        )
         await handleTemplateWebhookChange(
           { field: change.field, value: change.value as unknown },
           supabaseAdmin(),
@@ -238,6 +242,12 @@ async function processWebhook(body: { entry?: WhatsAppWebhookEntry[] }) {
       // Handle status updates
       if (value.statuses) {
         for (const status of value.statuses) {
+          console.log(
+            '[WhatsApp Webhook] Status update received — message:',
+            status.id,
+            'status:',
+            status.status
+          )
           await handleStatusUpdate(status)
         }
       }
@@ -246,6 +256,12 @@ async function processWebhook(body: { entry?: WhatsAppWebhookEntry[] }) {
       if (!value.messages || !value.contacts) continue
 
       const phoneNumberId = value.metadata.phone_number_id
+      console.log(
+        '[WhatsApp Webhook] Incoming message(s) detected — count:',
+        value.messages.length,
+        'phone_number_id:',
+        phoneNumberId
+      )
 
       // Find user's config by phone_number_id. `.single()` returns
       // PGRST116 for both 0 rows AND ≥2 rows — distinguish them so
@@ -259,7 +275,7 @@ async function processWebhook(body: { entry?: WhatsAppWebhookEntry[] }) {
 
       if (configError) {
         console.error(
-          'Error fetching whatsapp_config for phone_number_id:',
+          '[WhatsApp Webhook] Error fetching whatsapp_config for phone_number_id:',
           phoneNumberId,
           configError
         )
@@ -267,13 +283,13 @@ async function processWebhook(body: { entry?: WhatsAppWebhookEntry[] }) {
       }
 
       if (!configRows || configRows.length === 0) {
-        console.error('No config found for phone_number_id:', phoneNumberId)
+        console.error('[WhatsApp Webhook] No config found for phone_number_id:', phoneNumberId)
         continue
       }
 
       if (configRows.length > 1) {
         console.error(
-          `Multiple configs (${configRows.length}) found for phone_number_id:`,
+          `[WhatsApp Webhook] Multiple configs (${configRows.length}) found for phone_number_id:`,
           phoneNumberId,
           '— inbound message dropped. Resolve duplicates so each number maps to a single account.',
           'Account owners:',
@@ -366,7 +382,7 @@ async function handleStatusUpdate(status: {
     .eq('message_id', status.id)
 
   if (msgErr) {
-    console.error('Error updating message status:', msgErr)
+    console.error('[WhatsApp Webhook] Error updating message status:', msgErr)
   }
 
   // Webhook fan-out for this status change happens at the END of this
@@ -386,7 +402,7 @@ async function handleStatusUpdate(status: {
     .maybeSingle()
 
   if (recFetchErr) {
-    console.error('Error fetching broadcast recipient:', recFetchErr)
+    console.error('[WhatsApp Webhook] Error fetching broadcast recipient:', recFetchErr)
   } else if (
     recipient &&
     // Guard transitions — forward-only on the success ladder, and
@@ -404,7 +420,7 @@ async function handleStatusUpdate(status: {
       .eq('id', recipient.id)
 
     if (recUpdateErr) {
-      console.error('Error updating broadcast recipient status:', recUpdateErr)
+      console.error('[WhatsApp Webhook] Error updating broadcast recipient status:', recUpdateErr)
     }
   }
 
@@ -469,10 +485,10 @@ async function flagBroadcastReplyIfAny(accountId: string, contactId: string) {
       .eq('id', row.id)
 
     if (updErr) {
-      console.error('Error marking broadcast recipient replied:', updErr)
+      console.error('[WhatsApp Webhook] Error marking broadcast recipient replied:', updErr)
     }
   } catch (err) {
-    console.error('flagBroadcastReplyIfAny failed:', err)
+    console.error('[WhatsApp Webhook] flagBroadcastReplyIfAny failed:', err)
   }
 }
 
@@ -611,6 +627,30 @@ async function processMessage(
     return
   }
 
+  // ============================================================
+  // Idempotency guard (Step 8 — Prevent Duplicate Messages).
+  //
+  // WhatsApp webhooks can deliver the same event more than once.
+  // Before doing any work, check whether we already stored a row
+  // with this WhatsApp message_id. If so, skip the entire message
+  // processing path — the contact, conversation, and conversation
+  // update already exist from the first delivery.
+  // ============================================================
+  const { data: existingMessage } = await supabaseAdmin()
+    .from('messages')
+    .select('id')
+    .eq('message_id', message.id)
+    .limit(1)
+    .maybeSingle()
+
+  if (existingMessage) {
+    console.log(
+      '[WhatsApp Webhook] Duplicate message ignored — message_id already exists:',
+      message.id
+    )
+    return
+  }
+
   // Parse message content based on type
   const { contentText, mediaUrl, mediaType, interactiveReplyId } =
     await parseMessageContent(message, accessToken)
@@ -625,7 +665,7 @@ async function processMessage(
     )
     if (!replyToInternalId) {
       console.warn(
-        '[webhook] reply context parent not found:',
+        '[WhatsApp Webhook] reply context parent not found:',
         message.context.id
       )
     }
@@ -683,9 +723,18 @@ async function processMessage(
   })
 
   if (msgError) {
-    console.error('Error inserting message:', msgError)
+    console.error('[WhatsApp Webhook] Error inserting message:', msgError)
     return
   }
+
+  console.log(
+    '[WhatsApp Webhook] Message saved — conversation_id:',
+    conversation.id,
+    'content_type:',
+    contentType,
+    'message_id:',
+    message.id
+  )
 
   // Update conversation
   const { error: convError } = await supabaseAdmin()
@@ -699,7 +748,7 @@ async function processMessage(
     .eq('id', conversation.id)
 
   if (convError) {
-    console.error('Error updating conversation:', convError)
+    console.error('[WhatsApp Webhook] Error updating conversation:', convError)
   }
 
   // If this contact was a recent broadcast recipient, flag the reply
@@ -1000,6 +1049,12 @@ async function findOrCreateContact(
   )
 
   if (existingContact) {
+    console.log(
+      '[WhatsApp Webhook] Contact found — id:',
+      existingContact.id,
+      'phone:',
+      phone
+    )
     // Update name if it changed
     if (name && name !== existingContact.name) {
       await supabaseAdmin()
@@ -1032,12 +1087,28 @@ async function findOrCreateContact(
     // the existing row instead of dropping the message.
     if (isUniqueViolation(createError)) {
       const raced = await findExistingContact(supabaseAdmin(), accountId, phone)
-      if (raced) return { contact: raced, wasCreated: false }
+      if (raced) {
+        console.log(
+          '[WhatsApp Webhook] Contact created (after race recovery) — id:',
+          raced.id,
+          'phone:',
+          phone
+        )
+        return { contact: raced, wasCreated: false }
+      }
     }
-    console.error('Error creating contact:', createError)
+    console.error('[WhatsApp Webhook] Error creating contact:', createError)
     return null
   }
 
+  console.log(
+    '[WhatsApp Webhook] New contact created — id:',
+    newContact.id,
+    'phone:',
+    phone,
+    'name:',
+    name || phone
+  )
   return { contact: newContact, wasCreated: true }
 }
 
@@ -1073,6 +1144,12 @@ async function findOrCreateConversation(
   }
 
   if (existingRows && existingRows.length > 0) {
+    console.log(
+      '[WhatsApp Webhook] Conversation found — id:',
+      existingRows[0].id,
+      'contact_id:',
+      contactId
+    )
     return { conversation: existingRows[0], created: false }
   }
 
@@ -1102,12 +1179,24 @@ async function findOrCreateConversation(
         .order('created_at', { ascending: true })
         .limit(1)
       if (raced && raced.length > 0) {
+        console.log(
+          '[WhatsApp Webhook] Conversation found (after race recovery) — id:',
+          raced[0].id,
+          'contact_id:',
+          contactId
+        )
         return { conversation: raced[0], created: false }
       }
     }
-    console.error('Error creating conversation:', createError)
+    console.error('[WhatsApp Webhook] Error creating conversation:', createError)
     return null
   }
 
+  console.log(
+    '[WhatsApp Webhook] New conversation created — id:',
+    newConv.id,
+    'contact_id:',
+    contactId
+  )
   return { conversation: newConv, created: true }
 }

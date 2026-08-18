@@ -17,12 +17,25 @@
 
 export type AccountRole = "owner" | "admin" | "agent" | "viewer";
 
-/** Ordered list of every valid role, lowest privilege first. */
+/**
+ * Platform-level role. `super_admin` operates across ALL accounts
+ * (platform management, billing, usage monitoring). `user` is the
+ * default for normal CRM users.
+ */
+export type PlatformRole = "super_admin" | "user";
+
+/** Ordered list of every valid account role, lowest privilege first. */
 export const ACCOUNT_ROLES: readonly AccountRole[] = [
   "viewer",
   "agent",
   "admin",
   "owner",
+] as const;
+
+/** All valid platform roles. */
+export const PLATFORM_ROLES: readonly PlatformRole[] = [
+  "user",
+  "super_admin",
 ] as const;
 
 /**
@@ -55,6 +68,14 @@ export function isAccountRole(value: unknown): value is AccountRole {
   return (
     typeof value === "string" &&
     (ACCOUNT_ROLES as readonly string[]).includes(value)
+  );
+}
+
+/** Type-narrow an unknown string into a valid `PlatformRole`. */
+export function isPlatformRole(value: unknown): value is PlatformRole {
+  return (
+    typeof value === "string" &&
+    (PLATFORM_ROLES as readonly string[]).includes(value)
   );
 }
 
@@ -106,4 +127,28 @@ export function canDeleteAccount(role: AccountRole): boolean {
 /** Owner only: hand the account to another member. */
 export function canTransferOwnership(role: AccountRole): boolean {
   return role === "owner";
+}
+
+// ============================================================
+// Platform-level predicates (super_admin)
+// ============================================================
+
+/** Super admin: manage businesses, users, billing, platform health. */
+export function canManagePlatform(platformRole: PlatformRole): boolean {
+  return platformRole === "super_admin";
+}
+
+/** Super admin: view any business's data for support/debugging. */
+export function canViewAnyAccount(platformRole: PlatformRole): boolean {
+  return platformRole === "super_admin";
+}
+
+/** Super admin: suspend or delete any business. */
+export function canManageAccountStatus(platformRole: PlatformRole): boolean {
+  return platformRole === "super_admin";
+}
+
+/** Super admin: manage subscription plans. */
+export function canManagePlans(platformRole: PlatformRole): boolean {
+  return platformRole === "super_admin";
 }

@@ -1,4 +1,4 @@
-import type { AccountRole } from "@/lib/auth/roles";
+import type { AccountRole, PlatformRole } from "@/lib/auth/roles";
 import type { InteractiveMessagePayload } from "@/lib/whatsapp/interactive";
 
 export type {
@@ -9,6 +9,8 @@ export type {
   InteractiveListRow,
   InteractiveListSection,
 } from "@/lib/whatsapp/interactive";
+
+export type { AccountRole, PlatformRole } from "@/lib/auth/roles";
 
 export interface Profile {
   id: string;
@@ -45,6 +47,11 @@ export interface Profile {
    * `@/lib/auth/roles` rather than comparing this string directly.
    */
   account_role?: AccountRole;
+  /**
+   * Platform-level role. `super_admin` operates across all accounts
+   * (platform management, billing, usage). `user` is the default.
+   */
+  platform_role?: PlatformRole;
   created_at: string;
 }
 
@@ -681,4 +688,89 @@ export interface QuickReply {
   interactive_payload?: InteractiveMessagePayload | null;
   created_at: string;
   updated_at: string;
+}
+
+// ============================================================
+// SaaS / Billing Types (migration 045)
+// ============================================================
+
+export type SubscriptionStatus =
+  | "trialing"
+  | "active"
+  | "past_due"
+  | "canceled"
+  | "expired"
+  | "paused";
+
+export interface SubscriptionPlan {
+  id: string;
+  slug: string;
+  name: string;
+  description?: string;
+  is_active: boolean;
+  is_default: boolean;
+  price_monthly_cents: number;
+  price_yearly_cents: number;
+  max_contacts: number;
+  max_team_members: number;
+  max_whatsapp_numbers: number;
+  max_monthly_messages: number;
+  max_broadcasts_per_month: number;
+  max_automations: number;
+  max_flows: number;
+  max_ai_requests_per_month: number;
+  max_api_requests_per_day: number;
+  max_storage_mb: number;
+  features: Record<string, unknown>;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BusinessSubscription {
+  id: string;
+  account_id: string;
+  plan_id: string;
+  status: SubscriptionStatus;
+  billing_period: "monthly" | "yearly";
+  trial_started_at?: string;
+  trial_ends_at?: string;
+  current_period_start?: string;
+  current_period_end?: string;
+  cancel_at_period_end: boolean;
+  canceled_at?: string;
+  billing_customer_id?: string;
+  billing_subscription_id?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ResourceUsage {
+  id: string;
+  account_id: string;
+  period_start: string;
+  messages_sent: number;
+  messages_received: number;
+  contacts_created: number;
+  broadcasts_created: number;
+  automations_executed: number;
+  ai_requests: number;
+  api_requests: number;
+  storage_used_bytes: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  actor_user_id?: string;
+  actor_email?: string;
+  actor_role?: string;
+  action: string;
+  resource_type: string;
+  resource_id?: string;
+  account_id?: string;
+  details?: Record<string, unknown>;
+  ip_address?: string;
+  created_at: string;
 }

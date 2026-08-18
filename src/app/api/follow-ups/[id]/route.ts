@@ -1,41 +1,20 @@
-import { createClient } from "@/lib/supabase/client";
 import { NextResponse } from "next/server";
+import { getCurrentAccount, toErrorResponse } from "@/lib/auth/account";
 import type { FollowUp } from "@/types";
-
-async function getAccountId(supabase: ReturnType<typeof createClient>, userId: string): Promise<string | null> {
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("account_id")
-    .eq("user_id", userId)
-    .maybeSingle();
-  return profile?.account_id ?? null;
-}
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = createClient();
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
+    const ctx = await getCurrentAccount();
     const { id } = await params;
-    const accountId = await getAccountId(supabase, session.user.id);
-    if (!accountId) {
-      return NextResponse.json({ error: "No account found" }, { status: 404 });
-    }
 
-    const { data, error } = await supabase
+    const { data, error } = await ctx.supabase
       .from("follow_ups")
       .select("*")
       .eq("id", id)
-      .eq("account_id", accountId)
+      .eq("account_id", ctx.accountId)
       .maybeSingle();
 
     if (error || !data) {
@@ -44,8 +23,7 @@ export async function GET(
 
     return NextResponse.json(data as FollowUp);
   } catch (err) {
-    console.error("Follow-up GET error:", err);
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+    return toErrorResponse(err);
   }
 }
 
@@ -54,20 +32,8 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = createClient();
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
+    const ctx = await getCurrentAccount();
     const { id } = await params;
-    const accountId = await getAccountId(supabase, session.user.id);
-    if (!accountId) {
-      return NextResponse.json({ error: "No account found" }, { status: 404 });
-    }
 
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
     if (!body || typeof body !== "object") {
@@ -92,11 +58,11 @@ export async function PATCH(
       return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await ctx.supabase
       .from("follow_ups")
       .update(updates)
       .eq("id", id)
-      .eq("account_id", accountId)
+      .eq("account_id", ctx.accountId)
       .select("*")
       .single();
 
@@ -107,8 +73,7 @@ export async function PATCH(
 
     return NextResponse.json(data as FollowUp);
   } catch (err) {
-    console.error("Follow-up PATCH error:", err);
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+    return toErrorResponse(err);
   }
 }
 
@@ -117,26 +82,14 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = createClient();
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
+    const ctx = await getCurrentAccount();
     const { id } = await params;
-    const accountId = await getAccountId(supabase, session.user.id);
-    if (!accountId) {
-      return NextResponse.json({ error: "No account found" }, { status: 404 });
-    }
 
-    const { error } = await supabase
+    const { error } = await ctx.supabase
       .from("follow_ups")
       .delete()
       .eq("id", id)
-      .eq("account_id", accountId);
+      .eq("account_id", ctx.accountId);
 
     if (error) {
       console.error("Failed to delete follow-up:", error);
@@ -145,7 +98,6 @@ export async function DELETE(
 
     return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error("Follow-up DELETE error:", err);
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+    return toErrorResponse(err);
   }
 }

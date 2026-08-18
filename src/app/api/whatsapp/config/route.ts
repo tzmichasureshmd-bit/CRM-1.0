@@ -220,7 +220,7 @@ function supabaseAdmin() {
   if (!_adminClient) {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-    console.log('[supabaseAdmin] URL set:', !!url, 'KEY set:', !!key, 'KEY length:', key?.length ?? 0)
+    console.log('[supabaseAdmin] URL set:', !!url, 'KEY set:', !!key)
     if (!url) {
       console.error('[supabaseAdmin] NEXT_PUBLIC_SUPABASE_URL is not set')
       throw new Error('NEXT_PUBLIC_SUPABASE_URL is not set')

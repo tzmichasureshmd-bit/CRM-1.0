@@ -1,57 +1,39 @@
-import { createClient } from "@/lib/supabase/client";
 import { NextResponse } from "next/server";
+import { getCurrentAccount, toErrorResponse } from "@/lib/auth/account";
+import { canEditSettings } from "@/lib/auth/roles";
 
 type SettingsType = "company" | "email" | "notifications";
 
 export async function GET(request: Request) {
   try {
-    const supabase = createClient();
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const ctx = await getCurrentAccount();
 
     const { searchParams } = new URL(request.url);
     const type = (searchParams.get("type") || "company") as SettingsType;
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("account_id")
-      .eq("user_id", session.user.id)
-      .maybeSingle();
-
-    if (!profile?.account_id) {
-      return NextResponse.json({ error: "No account found" }, { status: 404 });
-    }
-
-    const accountId = profile.account_id;
-
     switch (type) {
       case "company": {
-        const { data } = await supabase
+        const { data } = await ctx.supabase
           .from("accounts")
           .select("id, name, address, phone, website, industry")
-          .eq("id", accountId)
+          .eq("id", ctx.accountId)
           .single();
         return NextResponse.json({ data: data ?? null });
       }
       case "email": {
-        const { data } = await supabase
+        const { data } = await ctx.supabase
           .from("email_config")
           .select("*")
-          .eq("account_id", accountId)
+          .eq("account_id", ctx.accountId)
           .maybeSingle();
         return NextResponse.json({ data: data ?? null });
       }
       case "notifications": {
-        const { data } = await supabase
+        const { data } = await ctx.supabase
           .from("notification_preferences")
           .select("*")
-          .eq("account_id", accountId)
-          .eq("user_id", session.user.id)
+          .eq("account_id", ctx.accountId)
+          .eq("user_id", ctx.userId)
           .maybeSingle();
         return NextResponse.json({ data: data ?? null });
       }
@@ -59,41 +41,26 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: "Invalid type" }, { status: 400 });
     }
   } catch (err) {
-    console.error("Settings GET error:", err);
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+    return toErrorResponse(err);
   }
 }
 
 export async function PATCH(request: Request) {
   try {
-    const supabase = createClient();
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+    const ctx = await getCurrentAccount();
 
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!canEditSettings(ctx.role)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);
     const type = (searchParams.get("type") || "company") as SettingsType;
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("account_id, account_role")
-      .eq("user_id", session.user.id)
-      .maybeSingle();
-
-    if (!profile?.account_id) {
-      return NextResponse.json({ error: "No account found" }, { status: 404 });
-    }
-
-    const accountId = profile.account_id;
     const body = await request.json();
 
     switch (type) {
       case "company": {
-        const { data } = await supabase
+        const { data } = await ctx.supabase
           .from("accounts")
           .update({
             name: body.name,
@@ -103,16 +70,16 @@ export async function PATCH(request: Request) {
             industry: body.industry,
             updated_at: new Date().toISOString(),
           })
-          .eq("id", accountId)
+          .eq("id", ctx.accountId)
           .select("id, name, address, phone, website, industry")
           .single();
         return NextResponse.json({ data: data ?? null });
       }
       case "email": {
-        const { data } = await supabase
+        const { data } = await ctx.supabase
           .from("email_config")
           .upsert({
-            account_id: accountId,
+            account_id: ctx.accountId,
             provider: body.provider ?? "smtp",
             smtp_host: body.smtp_host,
             smtp_port: body.smtp_port,
@@ -129,11 +96,11 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ data: data ?? null });
       }
       case "notifications": {
-        const { data } = await supabase
+        const { data } = await ctx.supabase
           .from("notification_preferences")
           .upsert({
-            account_id: accountId,
-            user_id: session.user.id,
+            account_id: ctx.accountId,
+            user_id: ctx.userId,
             email_messages: body.email_messages ?? true,
             email_broadcasts: body.email_broadcasts ?? true,
             email_automations: body.email_automations ?? true,
@@ -152,7 +119,6 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ error: "Invalid type" }, { status: 400 });
     }
   } catch (err) {
-    console.error("Settings PATCH error:", err);
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+    return toErrorResponse(err);
   }
 }

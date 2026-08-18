@@ -1,39 +1,21 @@
-import { createClient } from "@/lib/supabase/client";
 import { NextResponse } from "next/server";
+import { getCurrentAccount, toErrorResponse } from "@/lib/auth/account";
 import type { FollowUp } from "@/types";
 
 export async function GET(request: Request) {
   try {
-    const supabase = createClient();
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const ctx = await getCurrentAccount();
 
     const { searchParams } = new URL(request.url);
     const contactId = searchParams.get("contact_id");
     const status = searchParams.get("status");
 
-    let query = supabase
+    let query = ctx.supabase
       .from("follow_ups")
       .select("*")
       .order("due_date", { ascending: true, nullsFirst: false })
-      .order("created_at", { ascending: false });
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("account_id")
-      .eq("user_id", session.user.id)
-      .maybeSingle();
-
-    if (!profile?.account_id) {
-      return NextResponse.json({ error: "No account found" }, { status: 404 });
-    }
-
-    query = query.eq("account_id", profile.account_id);
+      .order("created_at", { ascending: false })
+      .eq("account_id", ctx.accountId);
 
     if (contactId) {
       query = query.eq("contact_id", contactId);
@@ -52,21 +34,13 @@ export async function GET(request: Request) {
 
     return NextResponse.json((data ?? []) as FollowUp[]);
   } catch (err) {
-    console.error("Follow-ups GET error:", err);
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+    return toErrorResponse(err);
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const supabase = createClient();
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const ctx = await getCurrentAccount();
 
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
     if (!body || typeof body !== "object") {
@@ -79,22 +53,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "contact_id and title are required" }, { status: 400 });
     }
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("account_id")
-      .eq("user_id", session.user.id)
-      .maybeSingle();
-
-    if (!profile?.account_id) {
-      return NextResponse.json({ error: "No account found" }, { status: 404 });
-    }
-
-    const { data, error } = await supabase
+    const { data, error } = await ctx.supabase
       .from("follow_ups")
       .insert({
         contact_id,
-        account_id: profile.account_id,
-        user_id: session.user.id,
+        account_id: ctx.accountId,
+        user_id: ctx.userId,
         title: title.trim(),
         description: typeof description === "string" ? description.trim() || null : null,
         due_date: due_date || null,
@@ -110,7 +74,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json(data as FollowUp, { status: 201 });
   } catch (err) {
-    console.error("Follow-ups POST error:", err);
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+    return toErrorResponse(err);
   }
 }
