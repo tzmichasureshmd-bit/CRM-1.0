@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { AdminShell } from "@/components/admin/admin-shell";
+import { UnauthorizedAccess } from "@/components/admin/unauthorized-access";
 
 export const metadata: Metadata = {
   title: "Super Admin",
@@ -26,7 +27,9 @@ export const metadata: Metadata = {
  *   1. The user has an authenticated session.
  *   2. The user's profile has platform_role = "super_admin".
  *
- * If either check fails the user is redirected to /super-admin/login.
+ * If the user is unauthenticated, they are redirected to /super-admin/login.
+ * If the user is authenticated but NOT a super_admin, they see an
+ * authorization error page (not a redirect to login).
  */
 export default async function SuperAdminLayout({
   children,
@@ -61,8 +64,8 @@ export default async function SuperAdminLayout({
   const legacyRole = (profile as Record<string, unknown> | null)?.role as string | undefined;
 
   if (platformRole !== "super_admin" && legacyRole !== "super_admin") {
-    console.log("[SUPER ADMIN LAYOUT] Access denied. platform_role:", platformRole ?? "MISSING", "legacy role:", legacyRole ?? "MISSING");
-    redirect("/super-admin/login");
+    // Authenticated but NOT authorized — show error page, don't redirect to login
+    return <UnauthorizedAccess />;
   }
 
   return (

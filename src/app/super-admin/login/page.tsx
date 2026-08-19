@@ -109,20 +109,18 @@ export default function SuperAdminLoginPage() {
         return;
       }
 
-      // Role does not match — show a detailed diagnostic error
+      // Role does not match — show a user-friendly error (no info leak)
       await supabase.auth.signOut();
 
       if (platformRole === undefined) {
         setError(
-          "Super Admin account authenticated successfully, but the 'platform_role' column " +
-            "does not exist in the profiles table. Please run database migration 045.",
+          "Super Admin access is not configured for this account. " +
+            "Please contact an existing Super Admin.",
         );
       } else {
         setError(
-          `Super Admin account authenticated successfully, but no Super Admin role is ` +
-            `assigned to this account. Current role: "${platformRole}". ` +
-            `To grant Super Admin access, run in your database:\n\n` +
-            `UPDATE profiles SET platform_role = 'super_admin' WHERE user_id = '${authData.user.id}';`,
+          "You are authenticated, but you do not have Super Admin access. " +
+            "Please contact an existing Super Admin to request access.",
         );
       }
     } catch (err) {

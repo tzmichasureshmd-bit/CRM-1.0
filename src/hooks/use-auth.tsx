@@ -35,6 +35,8 @@ interface Profile {
   beta_features: string[];
   account_id: string | null;
   account_role: AccountRole | null;
+  /** Platform-wide role: "super_admin" or "user". */
+  platform_role: "super_admin" | "user" | null;
 }
 
 interface AccountSummary {
@@ -102,6 +104,10 @@ interface AuthContextValue {
   canEditSettings: boolean;
   /** True if the caller can send messages and edit operational data (agent+). */
   canSendMessages: boolean;
+  /** Platform-wide role. Null while loading. */
+  platformRole: "super_admin" | "user" | null;
+  /** True if platformRole === 'super_admin'. */
+  isSuperAdmin: boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -138,7 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       let { data, error } = await supabase
         .from("profiles")
         .select(
-          "id, full_name, email, avatar_url, role, beta_features, account_id, account_role",
+          "id, full_name, email, avatar_url, role, beta_features, account_id, account_role, platform_role",
         )
         .eq("user_id", userId)
         .maybeSingle();
@@ -148,7 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const fallback = await supabase
           .from("profiles")
           .select(
-            "id, full_name, email, avatar_url, role, account_id, account_role",
+            "id, full_name, email, avatar_url, role, account_id, account_role, platform_role",
           )
           .eq("user_id", userId)
           .maybeSingle();
@@ -252,6 +258,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           beta_features: data.beta_features ?? [],
           account_id: data.account_id ?? null,
           account_role: accountRole,
+          platform_role: (data.platform_role === "super_admin" || data.platform_role === "user")
+            ? data.platform_role
+            : "user",
         });
         setAccount(accountRow);
       } else {
@@ -360,6 +369,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // dependencies downstream.
   const derived = useMemo(() => {
     const role = profile?.account_role ?? null;
+    const platformRole = profile?.platform_role ?? null;
     return {
       accountRole: role,
       accountId: profile?.account_id ?? null,
@@ -370,8 +380,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       canManageMembers: role ? canManageMembersFor(role) : false,
       canEditSettings: role ? canEditSettingsFor(role) : false,
       canSendMessages: role ? canSendMessagesFor(role) : false,
+      platformRole,
+      isSuperAdmin: platformRole === "super_admin",
     };
-  }, [profile?.account_role, profile?.account_id]);
+  }, [profile?.account_role, profile?.account_id, profile?.platform_role]);
 
   return (
     <AuthContext.Provider
@@ -423,6 +435,8 @@ export function useAuth(): AuthContextValue {
       canManageMembers: false,
       canEditSettings: false,
       canSendMessages: false,
+      platformRole: null,
+      isSuperAdmin: false,
     };
   }
   return ctx;

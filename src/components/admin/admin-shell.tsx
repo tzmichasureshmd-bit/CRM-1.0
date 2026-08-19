@@ -112,12 +112,18 @@ interface AdminShellProps {
 }
 
 function AdminShellInner({ children, basePath, logoutRedirect, showBackToCrm }: AdminShellProps & { basePath: string; logoutRedirect: string }) {
-  const { user, loading, profile, signOut } = useAuth();
+  const { user, loading, profile, signOut, isSuperAdmin } = useAuth();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
 
   const navSections = buildNavSections(basePath);
+
+  // For super-admin routes, only show nav if user is a super admin.
+  // The layout already gates access server-side; this is UX-only.
+  const visibleSections = basePath === "/super-admin" && !isSuperAdmin
+    ? []
+    : navSections;
 
   const handleSignOut = useCallback(async () => {
     await signOut();
@@ -211,7 +217,7 @@ function AdminShellInner({ children, basePath, logoutRedirect, showBackToCrm }: 
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 py-4">
-          {navSections.map((section, i) => (
+          {visibleSections.map((section, i) => (
             <div key={section.title}>
               {i > 0 && <div className="my-3 border-t border-border" />}
               <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
