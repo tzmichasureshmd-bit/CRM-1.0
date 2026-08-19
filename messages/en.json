@@ -30,6 +30,7 @@
     "flows": "Flows",
     "aiAgents": "AI Agents",
     "settings": "Settings",
+    "billing": "Plans & Billing",
     "beta": "Beta",
     "unreadConversations": "{count} unread {count, plural, =1 {conversation} other {conversations}}",
     "unreadNotifications": "{count} unread {count, plural, =1 {notification} other {notifications}}",
@@ -52,6 +53,7 @@
     "pipelines": "Pipelines",
     "broadcasts": "Broadcasts",
     "automations": "Automations",
+    "billing": "Plans & Billing",
     "settings": "Settings",
     "openMenu": "Open menu",
     "openAccountMenu": "Open account menu",
@@ -1848,5 +1850,78 @@
       "reindexTooltip": "Re-embed all documents (e.g. after adding an embeddings key)",
       "loading": "Loading…"
     }
+  },
+  "Billing": {
+    "currentPlan": {
+      "title": "Current Plan",
+      "noPlan": "No active plan",
+      "noPlanDesc": "Choose a plan to start using WhatsApp CRM.",
+      "viewPlans": "View Plans",
+      "active": "Active",
+      "trialing": "Trial",
+      "pastDue": "Past Due",
+      "canceled": "Canceled",
+      "expired": "Expired",
+      "paused": "Paused",
+      "renewsOn": "Renews: {date}",
+      "expiresOn": "Expires: {date}",
+      "trialEndsOn": "Trial ends: {date}",
+      "managePlan": "Manage Plan",
+      "perMonth": "/ month",
+      "perYear": "/ year",
+      "monthly": "Monthly",
+      "yearly": "Yearly",
+      "yearlyBadge": "Save {percent}%",
+      "freePlan": "Free"
+    },
+    "plans": {
+      "title": "Available Plans",
+      "choosePlan": "Choose {plan}",
+      "currentPlanBadge": "Current Plan",
+      "mostPopular": "Most Popular",
+      "features": {
+        "contacts": "{count} contacts",
+        "contactsUnlimited": "Unlimited contacts",
+        "teamMembers": "{count} team {count, plural, =1 {member} other {members}}",
+        "teamMembersUnlimited": "Unlimited team members",
+        "whatsappNumbers": "{count} WhatsApp {count, plural, =1 {number} other {numbers}}",
+        "messagesPerMonth": "{count} messages / month",
+        "messagesUnlimited": "Unlimited messages",
+        "broadcastsPerMonth": "{count} broadcasts / month",
+        "broadcastsUnlimited": "Unlimited broadcasts",
+        "automations": "{count} automations",
+        "automationsUnlimited": "Unlimited automations",
+        "flows": "{count} flows",
+        "flowsUnlimited": "Unlimited flows",
+        "aiRequests": "{count} AI requests / month",
+        "aiRequestsUnlimited": "Unlimited AI requests",
+        "storage": "{count} MB storage",
+        "storageUnlimited": "Unlimited storage"
+      }
+    },
+    "usage": {
+      "title": "Usage",
+      "contacts": "Contacts",
+      "teamMembers": "Team Members",
+      "messagesSent": "Messages Sent",
+      "broadcasts": "Broadcasts",
+      "automations": "Automations",
+      "aiRequests": "AI Requests",
+      "of": "of {limit}",
+      "unlimited": "Unlimited",
+      "noData": "No usage data available yet."
+    },
+    "upgrade": {
+      "title": "Upgrade to {plan}",
+      "currentPlan": "Current plan:",
+      "newPlan": "New plan:",
+      "priceDifference": "Additional cost:",
+      "continuePayment": "Continue to Payment",
+      "comingSoon": "Payment setup is coming soon. Your selected plan has been saved for checkout.",
+      "goBack": "Go back"
+    },
+    "loading": "Loading plans...",
+    "error": "Failed to load billing information",
+    "retry": "Retry"
   }
 }

@@ -39,7 +39,7 @@ export default async function AdminBillingPage({
         trial_ends_at,
         current_period_end,
         accounts(name),
-        subscription_plans(name, price_monthly_cents)
+        subscription_plans(name, price_monthly_cents, currency)
       `,
       { count: "exact" }
     );
@@ -57,7 +57,7 @@ export default async function AdminBillingPage({
   // Fetch all subscriptions (unfiltered) for summary stats
   const { data: allSubs } = await supabase
     .from("business_subscriptions")
-    .select("status, subscription_plans(price_monthly_cents)");
+    .select("status, subscription_plans(price_monthly_cents, currency)");
 
   let totalRevenue = 0;
   let activeCount = 0;
@@ -197,7 +197,7 @@ export default async function AdminBillingPage({
                       | { name: string | null }
                       | null;
                     const plan = sub.subscription_plans as
-                      | { name: string | null; price_monthly_cents: number | null }
+                      | { name: string | null; price_monthly_cents: number | null; currency: string | null }
                       | null;
                     return (
                       <tr
@@ -219,7 +219,7 @@ export default async function AdminBillingPage({
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
                           {plan?.price_monthly_cents != null
-                            ? `$${(plan.price_monthly_cents / 100).toFixed(2)}`
+                            ? `${plan.currency === "INR" ? "₹" : "$"}${(plan.price_monthly_cents / 100).toLocaleString()}`
                             : "—"}
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">

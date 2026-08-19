@@ -69,26 +69,34 @@ export async function middleware(request: NextRequest) {
     return withRefreshedCookies(NextResponse.redirect(url))
   }
 
-  // Super admin login page — redirect to /admin if already logged in
-  if (user && request.nextUrl.pathname === '/admin/login') {
+  // Super admin login page — redirect to /super-admin if already logged in
+  if (user && request.nextUrl.pathname === '/super-admin/login') {
     const url = request.nextUrl.clone()
-    url.pathname = '/admin'
+    url.pathname = '/super-admin'
     url.search = ''
     return withRefreshedCookies(NextResponse.redirect(url))
   }
 
   // Protected pages - redirect to login if not authenticated.
   // /admin/* (except /admin/login) redirects to /admin/login.
-  const protectedPaths = ['/dashboard', '/inbox', '/contacts', '/pipelines', '/broadcasts', '/automations', '/settings', '/admin']
-  if (!user && protectedPaths.some(path => request.nextUrl.pathname.startsWith(path))) {
-    const url = request.nextUrl.clone()
-    if (request.nextUrl.pathname.startsWith('/admin')) {
-      url.pathname = '/admin/login'
-    } else {
-      url.pathname = '/login'
+  // /super-admin/* (except /super-admin/login) redirects to /super-admin/login.
+  if (!user) {
+    const pathname = request.nextUrl.pathname
+    const isProtectedSuperAdmin = pathname.startsWith('/super-admin') && pathname !== '/super-admin/login'
+    const isProtectedAdmin = pathname.startsWith('/admin') && pathname !== '/admin/login'
+    const isOtherProtected = ['/dashboard', '/inbox', '/contacts', '/pipelines', '/broadcasts', '/automations', '/settings'].some(path => pathname.startsWith(path))
+    if (isProtectedSuperAdmin || isProtectedAdmin || isOtherProtected) {
+      const url = request.nextUrl.clone()
+      if (isProtectedSuperAdmin) {
+        url.pathname = '/super-admin/login'
+      } else if (isProtectedAdmin) {
+        url.pathname = '/admin/login'
+      } else {
+        url.pathname = '/login'
+      }
+      url.search = ''
+      return withRefreshedCookies(NextResponse.redirect(url))
     }
-    url.search = ''
-    return withRefreshedCookies(NextResponse.redirect(url))
   }
 
   // API routes that need auth (not webhooks)

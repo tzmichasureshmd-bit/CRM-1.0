@@ -60,7 +60,7 @@ function LoginPageInner() {
       return;
     }
 
-    // Check if user is a super_admin so we can route them to /admin
+    // Check if user is a super_admin so we can route them to /super-admin
     // instead of the normal customer dashboard.
     let destination = inviteToken
       ? `/join/${encodeURIComponent(inviteToken)}`
@@ -70,12 +70,12 @@ function LoginPageInner() {
       try {
         const { data: profile } = await supabase
           .from("profiles")
-          .select("platform_role")
+          .select("platform_role, role")
           .eq("user_id", (await supabase.auth.getUser()).data.user?.id ?? "")
           .maybeSingle();
 
-        if (profile?.platform_role === "super_admin") {
-          destination = "/admin";
+        if (profile?.platform_role === "super_admin" || (profile as Record<string, unknown>)?.role === "super_admin") {
+          destination = "/super-admin";
         }
       } catch {
         // Profile fetch failed — fall through to /dashboard.
@@ -178,7 +178,7 @@ function LoginPageInner() {
           </div>
 
           <Link
-            href="/admin/login"
+            href="/super-admin/login"
             className="flex h-10 w-full items-center justify-center rounded-lg border border-border bg-background text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             {t('superAdmin')}

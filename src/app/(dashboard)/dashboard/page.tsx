@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { formatCurrency } from '@/lib/currency'
+import { OnboardingBanner } from '@/components/onboarding/onboarding-banner'
 import {
   MessageSquare,
   UserPlus,
@@ -159,6 +160,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-5">
+      <OnboardingBanner />
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-foreground">{t('title')}</h1>

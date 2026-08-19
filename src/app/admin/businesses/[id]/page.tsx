@@ -63,7 +63,7 @@ export default async function BusinessDetailPage({
         `
         id, status, billing_period, trial_started_at, trial_ends_at,
         current_period_start, current_period_end, cancel_at_period_end,
-        subscription_plans ( name, slug, price_monthly_cents, price_yearly_cents )
+        subscription_plans ( name, slug, price_monthly_cents, price_yearly_cents, currency )
         `
       )
       .eq("account_id", id)
@@ -298,7 +298,7 @@ export default async function BusinessDetailPage({
                       Monthly Price
                     </dt>
                     <dd className="text-sm font-medium text-foreground">
-                      ${(plan.price_monthly_cents / 100).toFixed(2)}/mo
+                      {plan.currency === "INR" ? "₹" : "$"}{(plan.price_monthly_cents / 100).toLocaleString()}/mo
                     </dd>
                   </div>
                 )}

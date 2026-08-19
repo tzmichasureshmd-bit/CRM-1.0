@@ -12,6 +12,7 @@ import {
   Building2,
   Code,
   CreditCard,
+  DollarSign,
   FileStack,
   LayoutDashboard,
   LifeBuoy,
@@ -49,59 +50,79 @@ interface NavSection {
   items: NavItem[];
 }
 
-const navSections: NavSection[] = [
-  {
-    title: "Main",
-    items: [
-      { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/admin/businesses", label: "Businesses", icon: Building2 },
-      { href: "/admin/users", label: "Users", icon: Users },
-    ],
-  },
-  {
-    title: "Platform",
-    items: [
-      { href: "/admin/subscriptions", label: "Subscriptions", icon: CreditCard },
-      { href: "/admin/plans", label: "Plans", icon: FileStack },
-      { href: "/admin/billing", label: "Billing", icon: Receipt },
-      { href: "/admin/usage", label: "Usage", icon: BarChart3 },
-    ],
-  },
-  {
-    title: "Communication",
-    items: [
-      { href: "/admin/campaigns", label: "Campaigns", icon: Radio },
-      { href: "/admin/automations", label: "Automations", icon: Zap },
-    ],
-  },
-  {
-    title: "Intelligence",
-    items: [
-      { href: "/admin/ai-usage", label: "AI Usage", icon: Bot },
-      { href: "/admin/api-usage", label: "API Usage", icon: Code },
-    ],
-  },
-  {
-    title: "System",
-    items: [
-      { href: "/admin/audit", label: "Audit Logs", icon: ScrollText },
-      { href: "/admin/health", label: "Platform Health", icon: Activity },
-      { href: "/admin/support", label: "Support", icon: LifeBuoy },
-      { href: "/admin/settings", label: "Settings", icon: Settings },
-    ],
-  },
-];
+function buildNavSections(basePath: string): NavSection[] {
+  return [
+    {
+      title: "Main",
+      items: [
+        { href: basePath, label: "Dashboard", icon: LayoutDashboard },
+        { href: `${basePath}/businesses`, label: "Businesses", icon: Building2 },
+        { href: `${basePath}/users`, label: "Users", icon: Users },
+      ],
+    },
+    {
+      title: "Platform",
+      items: [
+        { href: `${basePath}/subscriptions`, label: "Subscriptions", icon: CreditCard },
+        { href: `${basePath}/plans`, label: "Plans", icon: FileStack },
+        { href: `${basePath}/payments`, label: "Payments", icon: DollarSign },
+        { href: `${basePath}/billing`, label: "Billing", icon: Receipt },
+        { href: `${basePath}/usage`, label: "Usage", icon: BarChart3 },
+      ],
+    },
+    {
+      title: "Communication",
+      items: [
+        { href: `${basePath}/campaigns`, label: "Campaigns", icon: Radio },
+        { href: `${basePath}/automations`, label: "Automations", icon: Zap },
+      ],
+    },
+    {
+      title: "Intelligence",
+      items: [
+        { href: `${basePath}/ai-usage`, label: "AI Usage", icon: Bot },
+        { href: `${basePath}/api-usage`, label: "API Usage", icon: Code },
+      ],
+    },
+    {
+      title: "System",
+      items: [
+        { href: `${basePath}/audit`, label: "Audit Logs", icon: ScrollText },
+        { href: `${basePath}/health`, label: "Platform Health", icon: Activity },
+        { href: `${basePath}/support`, label: "Support", icon: LifeBuoy },
+        { href: `${basePath}/settings`, label: "Settings", icon: Settings },
+      ],
+    },
+  ];
+}
 
-function isActive(pathname: string, href: string) {
-  if (href === "/admin") return pathname === "/admin";
+function isActive(pathname: string, href: string, basePath: string) {
+  if (href === basePath) return pathname === basePath;
   return pathname.startsWith(href);
 }
 
-function AdminShellInner({ children }: { children: React.ReactNode }) {
+interface AdminShellProps {
+  children: React.ReactNode;
+  /** Route prefix for this admin area. Defaults to "/admin". */
+  basePath?: string;
+  /** Where to send the user after signing out. Defaults to "/login". */
+  logoutRedirect?: string;
+  /** Whether to show the "Back to CRM" link in the header. Defaults to true. */
+  showBackToCrm?: boolean;
+}
+
+function AdminShellInner({ children, basePath, logoutRedirect, showBackToCrm }: AdminShellProps & { basePath: string; logoutRedirect: string }) {
   const { user, loading, profile, signOut } = useAuth();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
+
+  const navSections = buildNavSections(basePath);
+
+  const handleSignOut = useCallback(async () => {
+    await signOut();
+    window.location.href = logoutRedirect;
+  }, [signOut, logoutRedirect]);
 
   const onSidebarCloseRef = useRef(closeSidebar);
   useEffect(() => {
@@ -166,7 +187,7 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
         aria-label="Admin"
       >
         <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border px-4">
-          <Link href="/admin" className="flex items-center gap-2">
+          <Link href={basePath} className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <LayoutDashboard className="h-4 w-4" />
             </div>
@@ -198,7 +219,7 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
               </p>
               <ul className="flex flex-col gap-1">
                 {section.items.map((item) => {
-                  const active = isActive(pathname, item.href);
+                  const active = isActive(pathname, item.href, basePath);
                   return (
                     <li key={item.href}>
                       <Link
@@ -254,7 +275,7 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
             >
               <DropdownMenuSeparator className="bg-border" />
               <DropdownMenuItem
-                onClick={signOut}
+                onClick={handleSignOut}
                 className="text-popover-foreground focus:bg-accent focus:text-accent-foreground"
               >
                 <LogOut className="size-4" />
@@ -287,12 +308,14 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-2">
-            <Link
-              href="/dashboard"
-              className="hidden items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:flex"
-            >
-              Back to CRM
-            </Link>
+            {showBackToCrm && (
+              <Link
+                href="/dashboard"
+                className="hidden items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:flex"
+              >
+                Back to CRM
+              </Link>
+            )}
 
             <DropdownMenu>
               <DropdownMenuTrigger
@@ -333,7 +356,7 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
                 <DropdownMenuItem
                   render={
                     <Link
-                      href="/admin/settings"
+                      href={`${basePath}/settings`}
                       className="text-popover-foreground focus:bg-accent focus:text-accent-foreground"
                     />
                   }
@@ -343,7 +366,7 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-border" />
                 <DropdownMenuItem
-                  onClick={signOut}
+                  onClick={handleSignOut}
                   className="text-popover-foreground focus:bg-accent focus:text-accent-foreground"
                 >
                   <LogOut className="size-4" />
@@ -360,10 +383,12 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function AdminShell({ children }: { children: React.ReactNode }) {
+export function AdminShell({ children, basePath = "/admin", logoutRedirect = "/login", showBackToCrm = true }: AdminShellProps) {
   return (
     <AuthProvider>
-      <AdminShellInner>{children}</AdminShellInner>
+      <AdminShellInner basePath={basePath} logoutRedirect={logoutRedirect} showBackToCrm={showBackToCrm}>
+        {children}
+      </AdminShellInner>
     </AuthProvider>
   );
 }

@@ -23,10 +23,13 @@ export const metadata: Metadata = {
 /**
  * Server-side authorization gate for the Super Admin dashboard.
  *
- * 1. Unauthenticated → redirect to /login
- * 2. platform_role !== "super_admin" → redirect to /dashboard
- * 3. Email not in SUPER_ADMIN_EMAILS → redirect to /dashboard
- * 4. All checks pass → render the admin shell with sidebar
+ * The middleware ensures:
+ *  - Unauthenticated users on /admin (except /admin/login) → /admin/login
+ *  - Unauthenticated users on /admin/login → passed through to here
+ *  - Authenticated users on /admin/login → /admin
+ *
+ * So the only unauthenticated users reaching this layout are on /admin/login.
+ * We render children without the AdminShell for that page.
  */
 export default async function AdminLayout({
   children,
@@ -39,8 +42,10 @@ export default async function AdminLayout({
     data: { user },
   } = await supabase.auth.getUser();
 
+  // Middleware already routed unauthenticated users to /admin/login.
+  // Render children directly (no shell, no auth gate) for the login page.
   if (!user) {
-    redirect("/login");
+    return <>{children}</>;
   }
 
   const { data: profile } = await supabase

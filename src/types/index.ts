@@ -711,6 +711,7 @@ export interface SubscriptionPlan {
   is_default: boolean;
   price_monthly_cents: number;
   price_yearly_cents: number;
+  currency: string;
   max_contacts: number;
   max_team_members: number;
   max_whatsapp_numbers: number;
@@ -741,6 +742,21 @@ export interface BusinessSubscription {
   canceled_at?: string;
   billing_customer_id?: string;
   billing_subscription_id?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Payment {
+  id: string;
+  account_id: string;
+  subscription_id?: string;
+  amount_cents: number;
+  currency: string;
+  status: "pending" | "processing" | "succeeded" | "failed" | "refunded" | "partially_refunded";
+  provider?: string;
+  provider_payment_id?: string;
+  provider_metadata?: Record<string, unknown>;
+  description?: string;
   created_at: string;
   updated_at: string;
 }

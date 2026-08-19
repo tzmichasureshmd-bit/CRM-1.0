@@ -21,6 +21,7 @@ import {
   User,
   UserCog,
   Users,
+  CreditCard,
   UsersRound,
   Workflow,
   X,
@@ -104,6 +105,7 @@ const navItems: NavItem[] = [
 ];
 
 const bottomNavItems = [
+  { href: "/billing", labelKey: "billing", icon: CreditCard },
   { href: "/settings", labelKey: "settings", icon: Settings },
 ];
 

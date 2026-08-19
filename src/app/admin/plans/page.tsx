@@ -17,6 +17,7 @@ interface PlanRow {
   is_default: boolean;
   price_monthly_cents: number;
   price_yearly_cents: number;
+  currency: string;
   max_contacts: number;
   max_team_members: number;
   max_whatsapp_numbers: number;
@@ -31,9 +32,17 @@ interface PlanRow {
   sort_order: number;
 }
 
-function formatPrice(cents: number): string {
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  INR: "₹",
+  USD: "$",
+  EUR: "€",
+  GBP: "£",
+};
+
+function formatPrice(cents: number, currency: string = "INR"): string {
   if (cents === 0) return "Free";
-  return `$${(cents / 100).toFixed(2)}`;
+  const symbol = CURRENCY_SYMBOLS[currency] ?? currency + " ";
+  return `${symbol}${(cents / 100).toLocaleString()}`;
 }
 
 function formatLimit(n: number): string {
@@ -125,7 +134,7 @@ export default async function AdminPlansPage() {
 
                 <div className="mt-4 flex items-baseline gap-1">
                   <span className="text-3xl font-bold text-foreground">
-                    {formatPrice(plan.price_monthly_cents)}
+                    {formatPrice(plan.price_monthly_cents, plan.currency)}
                   </span>
                   {plan.price_monthly_cents > 0 && (
                     <span className="text-sm text-muted-foreground">
@@ -135,7 +144,7 @@ export default async function AdminPlansPage() {
                 </div>
                 {plan.price_yearly_cents > 0 && (
                   <p className="text-xs text-muted-foreground">
-                    {formatPrice(plan.price_yearly_cents)} / year
+                    {formatPrice(plan.price_yearly_cents, plan.currency)} / year
                     {plan.price_monthly_cents > 0 && (
                       <>
                         {" "}
