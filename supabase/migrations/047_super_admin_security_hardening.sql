@@ -67,7 +67,10 @@ BEGIN
   END IF;
 
   UPDATE profiles
-  SET platform_role = CASE WHEN make_super_admin THEN 'super_admin' ELSE 'user' END
+  SET platform_role = CASE
+    WHEN make_super_admin THEN 'super_admin'::platform_role_enum
+    ELSE 'user'::platform_role_enum
+  END
   WHERE user_id = target_user_id;
 
   IF NOT FOUND THEN
@@ -114,9 +117,9 @@ GRANT EXECUTE ON FUNCTION get_super_admin_members() TO authenticated;
 -- ──────────────────────────────────────────────────────────────
 
 UPDATE profiles
-SET platform_role = 'super_admin'
+SET platform_role = 'super_admin'::platform_role_enum
 WHERE user_id = '489c398c-13ab-4f67-95f6-ef8507c86f92'
-  AND platform_role IS DISTINCT FROM 'super_admin';
+  AND platform_role IS DISTINCT FROM 'super_admin'::platform_role_enum;
 
 -- ──────────────────────────────────────────────────────────────
 -- 5. Ensure handle_new_user() trigger NEVER assigns super_admin
