@@ -4,9 +4,19 @@ import { NextResponse, type NextRequest } from 'next/server'
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseKey) {
+    console.error(
+      '[MIDDLEWARE] Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY. Auth middleware is non-functional.',
+    )
+    return supabaseResponse
+  }
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseKey,
     {
       cookies: {
         getAll() {
@@ -42,13 +52,19 @@ export async function middleware(request: NextRequest) {
     return response
   }
 
+  // Server actions are POST requests with the Next-Action header.
+  // They must never be redirected — a redirect would prevent the
+  // server action from executing (e.g. verifySuperAdminRole after
+  // signInWithPassword on /super-admin/login).
+  const isServerAction = request.method === 'POST' && request.headers.has('Next-Action');
+
   // Auth pages - redirect to dashboard if already logged in.
   // Exception: when an invite token is in the query string we
   // send the already-signed-in user to /join/<token> instead so
   // they can accept the invitation in one click. Without this,
   // a forwarded invite link to someone who's already signed in
   // would silently drop them on /dashboard.
-  if (user && (
+  if (user && !isServerAction && (
     request.nextUrl.pathname === '/login' ||
     request.nextUrl.pathname === '/signup' ||
     request.nextUrl.pathname === '/forgot-password'
@@ -70,7 +86,8 @@ export async function middleware(request: NextRequest) {
   }
 
   // Super admin login page — redirect to /super-admin if already logged in
-  if (user && request.nextUrl.pathname === '/super-admin/login') {
+  // (skip for server actions — they must reach their handler)
+  if (user && !isServerAction && request.nextUrl.pathname === '/super-admin/login') {
     const url = request.nextUrl.clone()
     url.pathname = '/super-admin'
     url.search = ''

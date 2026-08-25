@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, checkSupabaseConnection } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -29,46 +29,96 @@ export default function AdminLoginPage() {
     setLoading(true);
 
     try {
-      console.log("[SUPER ADMIN] Login started");
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+      if (!supabaseUrl || !supabaseKey) {
+        setError(
+          "Super Admin authentication is temporarily unavailable. The Supabase configuration is missing. Please contact the administrator.",
+        );
+        return;
+      }
+
+      const health = await checkSupabaseConnection();
+      if (!health.ok) {
+        if (health.reason === "paused_project") {
+          setError(
+            "The Supabase project is paused or unavailable. The project administrator must log in to the Supabase dashboard (supabase.com) and resume the project before login can proceed.",
+          );
+        } else if (health.reason === "network_error") {
+          setError(
+            "Unable to reach the Supabase authentication server. Please verify the NEXT_PUBLIC_SUPABASE_URL environment variable is correct and try again.",
+          );
+        } else {
+          setError(
+            "Super Admin authentication is temporarily unavailable. Please contact the administrator.",
+          );
+        }
+        return;
+      }
 
       const supabase = createClient();
 
-      console.log("[SUPER ADMIN] Calling Supabase signInWithPassword");
-      const { data: authData, error: authError } =
-        await supabase.auth.signInWithPassword({
+      let authData;
+      try {
+        const result = await supabase.auth.signInWithPassword({
           email,
           password,
         });
+        authData = result.data;
+        if (result.error) {
+          const msg = result.error.message;
+          if (
+            msg.includes("Invalid login credentials") ||
+            msg.includes("invalid_grant") ||
+            msg.includes(" Email not confirmed")
+          ) {
+            setError("Invalid email or password. Please try again.");
+          } else {
+            console.error("[SUPER ADMIN] signInWithPassword error:", msg);
+            setError(
+              "Unable to sign in. Please verify your credentials and try again.",
+            );
+          }
+          return;
+        }
+      } catch (fetchErr) {
+        console.error("[SUPER ADMIN] signInWithPassword threw:", fetchErr);
+        const fetchMsg =
+          fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
 
-      if (authError) {
-        console.error("[SUPER ADMIN ERROR] signInWithPassword failed:", authError.message);
-        setError(authError.message);
+        if (fetchMsg.includes("Failed to fetch") || fetchMsg.includes("NetworkError")) {
+          setError(
+            "Unable to connect to the authentication server. Please verify the deployment environment variables are correctly configured and try again.",
+          );
+        } else {
+          setError(
+            "Unable to sign in. Please try again.",
+          );
+        }
         return;
       }
 
-      console.log("[SUPER ADMIN] Supabase authentication completed");
-      console.log("[SUPER ADMIN] User ID:", authData.user?.id);
+      if (!authData?.user) {
+        setError("Sign in succeeded but no user was returned. Please try again.");
+        return;
+      }
 
-      console.log("[SUPER ADMIN] Calling verifySuperAdmin server action");
+      console.log("[SUPER ADMIN] Auth successful, verifying role for user:", authData.user.id);
+
       const result = await verifySuperAdmin();
 
-      console.log("[SUPER ADMIN] Super Admin verification completed, result:", result);
-
       if (!result.authorized) {
-        console.warn("[SUPER ADMIN] Authorization denied:", result.reason);
         await supabase.auth.signOut();
-        setError(result.reason ?? "Unauthorized Super Admin account.");
+        setError(result.reason ?? "You do not have Super Admin access.");
         return;
       }
 
-      console.log("[SUPER ADMIN] Redirecting to /admin");
       window.location.href = "/admin";
     } catch (err) {
-      console.error("[SUPER ADMIN ERROR] Unexpected error during login:", err);
+      console.error("[SUPER ADMIN] Unexpected error:", err);
       setError(
-        err instanceof Error
-          ? `Login failed: ${err.message}`
-          : "An unexpected error occurred during login. Please try again.",
+        "Super Admin authentication is temporarily unavailable. Please try again later.",
       );
     } finally {
       setLoading(false);
