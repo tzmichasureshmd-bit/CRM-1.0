@@ -448,6 +448,17 @@ export function WhatsAppConfig() {
               ? t('connectedDesc')
               : statusMessage ||
                 t('notConnectedDesc')}
+            {/* Identity reported by Meta on the last successful
+                verification — lets users confirm they wired the right
+                number/business without leaving the page. */}
+            {(config?.business_name || config?.display_phone_number) &&
+             connectionStatus === 'connected' && (
+              <span className="mt-1 block text-xs">
+                {[config.business_name, config.display_phone_number]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </span>
+            )}
           </AlertDescription>
         </Alert>
 

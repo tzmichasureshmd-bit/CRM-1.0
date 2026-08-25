@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { cn } from "@/lib/utils";
 import type { Contact, Deal, ContactNote, Tag, Conversation, FollowUp, LeadStatus } from "@/types";
 import {
   Phone,
@@ -21,16 +20,23 @@ import {
   CheckCircle2,
   Circle,
   Trash2,
+  X,
+  Pencil,
+  Save,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { format } from "date-fns";
+import { toast } from "sonner";
 import { useTranslations } from "next-intl";
+import { addContactTag, deleteContactTag } from "@/lib/contacts/tag-api";
 
 interface ContactSidebarProps {
   contact: Contact | null;
   /** The active conversation, used to look up the assigned agent. */
   conversation: Conversation | null;
+  onContactUpdated?: () => void;
 }
 
 function leadStatusColor(status: LeadStatus): { bg: string; text: string } {
@@ -54,15 +60,17 @@ function leadStatusColor(status: LeadStatus): { bg: string; text: string } {
   }
 }
 
-export function ContactSidebar({ contact, conversation }: ContactSidebarProps) {
+export function ContactSidebar({ contact, conversation, onContactUpdated }: ContactSidebarProps) {
   const tSidebar = useTranslations("Inbox.sidebar");
   const tThread = useTranslations("Inbox.messageThread");
 
-  const { accountId } = useAuth();
+  const { accountId, defaultCurrency } = useAuth();
   const [copied, setCopied] = useState(false);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [notes, setNotes] = useState<ContactNote[]>([]);
   const [tags, setTags] = useState<(Tag & { contact_tag_id: string })[]>([]);
+  const [allTags, setAllTags] = useState<Tag[]>([]);
+  const [showTagPicker, setShowTagPicker] = useState(false);
   const [documents, setDocuments] = useState<
     {
       id: string;
@@ -79,7 +87,17 @@ export function ContactSidebar({ contact, conversation }: ContactSidebarProps) {
   const [addingNote, setAddingNote] = useState(false);
   const [followUps, setFollowUps] = useState<FollowUp[]>([]);
   const [newFollowUpTitle, setNewFollowUpTitle] = useState("");
+  const [newFollowUpDate, setNewFollowUpDate] = useState("");
   const [addingFollowUp, setAddingFollowUp] = useState(false);
+  const [showDealForm, setShowDealForm] = useState(false);
+  const [newDealTitle, setNewDealTitle] = useState("");
+  const [newDealValue, setNewDealValue] = useState("");
+  const [savingDeal, setSavingDeal] = useState(false);
+  const [editingContact, setEditingContact] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editCompany, setEditCompany] = useState("");
+  const [savingContact, setSavingContact] = useState(false);
 
   const fetchContactData = useCallback(async () => {
     if (!contact) return;
@@ -147,21 +165,55 @@ export function ContactSidebar({ contact, conversation }: ContactSidebarProps) {
     if (followUpsRes.data) setFollowUps(followUpsRes.data as FollowUp[]);
   }, [contact, conversation?.assigned_agent_id]);
 
-  // Load on contact change. setContactData/setTags run inside async
-  // Supabase callbacks, not synchronously in the effect body.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchContactData();
   }, [fetchContactData]);
+
+  useEffect(() => {
+    if (!accountId) return;
+    const supabase = createClient();
+    supabase
+      .from("tags")
+      .select("*")
+      .eq("account_id", accountId)
+      .order("name")
+      .then(({ data }) => {
+        if (data) setAllTags(data as Tag[]);
+      });
+  }, [accountId]);
+
+  const handleRemoveTag = useCallback(async (contactTagId: string, tagId: string) => {
+    if (!contact) return;
+    try {
+      await deleteContactTag(contact.id, tagId);
+      setTags((prev) => prev.filter((t) => t.contact_tag_id !== contactTagId));
+    } catch {
+      // silently fail
+    }
+  }, [contact]);
+
+  const handleAddTag = useCallback(async (tagId: string) => {
+    if (!contact) return;
+    const alreadyApplied = tags.some((t) => t.id === tagId);
+    if (alreadyApplied) return;
+    try {
+      await addContactTag(contact.id, tagId);
+      const tag = allTags.find((t) => t.id === tagId);
+      if (tag) {
+        setTags((prev) => [...prev, { ...tag, contact_tag_id: "" }]);
+        fetchContactData();
+      }
+    } catch {
+      // silently fail
+    }
+  }, [contact, tags, allTags, fetchContactData]);
 
   const handleCopyPhone = useCallback(async () => {
     if (!contact?.phone) return;
     await navigator.clipboard.writeText(contact.phone);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-    // Dep is the whole `contact` object (not `contact?.phone`) so the
-    // React Compiler's inference agrees with the manual dep list —
-    // fixes the `preserve-manual-memoization` lint error.
   }, [contact]);
 
   const handleAddNote = useCallback(async () => {
@@ -211,6 +263,7 @@ export function ContactSidebar({ contact, conversation }: ContactSidebarProps) {
         user_id: user?.id,
         title: newFollowUpTitle.trim(),
         status: "pending",
+        due_date: newFollowUpDate || null,
       })
       .select("*")
       .single();
@@ -218,9 +271,10 @@ export function ContactSidebar({ contact, conversation }: ContactSidebarProps) {
     if (!error && data) {
       setFollowUps((prev) => [data, ...prev]);
       setNewFollowUpTitle("");
+      setNewFollowUpDate("");
     }
     setAddingFollowUp(false);
-  }, [contact, newFollowUpTitle, accountId]);
+  }, [contact, newFollowUpTitle, newFollowUpDate, accountId]);
 
   const handleToggleFollowUp = useCallback(async (fu: FollowUp) => {
     const supabase = createClient();
@@ -260,6 +314,105 @@ export function ContactSidebar({ contact, conversation }: ContactSidebarProps) {
     }
   }, []);
 
+  const handleCreateDeal = useCallback(async () => {
+    if (!contact || !newDealTitle.trim() || !accountId) return;
+    setSavingDeal(true);
+
+    const supabase = createClient();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    const { data: pipeline } = await supabase
+      .from("pipelines")
+      .select("*")
+      .order("created_at")
+      .limit(1)
+      .maybeSingle();
+
+    if (!pipeline) {
+      toast.error(tSidebar("toastDealFailed"));
+      setSavingDeal(false);
+      return;
+    }
+
+    const { data: stage } = await supabase
+      .from("pipeline_stages")
+      .select("*")
+      .eq("pipeline_id", pipeline.id)
+      .order("position")
+      .limit(1)
+      .maybeSingle();
+
+    if (!stage) {
+      toast.error(tSidebar("toastDealFailed"));
+      setSavingDeal(false);
+      return;
+    }
+
+    const value = parseFloat(newDealValue) || 0;
+
+    const { data, error } = await supabase
+      .from("deals")
+      .insert({
+        title: newDealTitle.trim(),
+        value,
+        currency: defaultCurrency,
+        contact_id: contact.id,
+        pipeline_id: pipeline.id,
+        stage_id: stage.id,
+        user_id: session?.user.id,
+        account_id: accountId,
+        status: "open",
+      })
+      .select("*, stage:pipeline_stages(*)")
+      .single();
+
+    if (!error && data) {
+      setDeals((prev) => [data, ...prev]);
+      setNewDealTitle("");
+      setNewDealValue("");
+      setShowDealForm(false);
+      toast.success(tSidebar("toastDealCreated"));
+    } else {
+      toast.error(tSidebar("toastDealFailed"));
+    }
+    setSavingDeal(false);
+  }, [contact, newDealTitle, newDealValue, accountId, defaultCurrency, tSidebar]);
+
+  const handleSaveContact = useCallback(async () => {
+    if (!contact) return;
+    setSavingContact(true);
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("contacts")
+      .update({
+        name: editName.trim() || null,
+        email: editEmail.trim() || null,
+        company: editCompany.trim() || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", contact.id);
+
+    if (!error) {
+      setEditingContact(false);
+      fetchContactData();
+      onContactUpdated?.();
+      toast.success(tSidebar("toastContactUpdated"));
+    } else {
+      toast.error(tSidebar("toastContactUpdateFailed"));
+    }
+    setSavingContact(false);
+  }, [contact, editName, editEmail, editCompany, fetchContactData, onContactUpdated, tSidebar]);
+
+  const startEditingContact = useCallback(() => {
+    if (!contact) return;
+    setEditName(contact.name ?? "");
+    setEditEmail(contact.email ?? "");
+    setEditCompany(contact.company ?? "");
+    setEditingContact(true);
+  }, [contact]);
+
   if (!contact) {
     return (
       <div className="flex h-full w-70 items-center justify-center border-l border-border bg-card">
@@ -288,11 +441,67 @@ export function ContactSidebar({ contact, conversation }: ContactSidebarProps) {
                 initials
               )}
             </div>
-            <h3 className="mt-3 text-sm font-semibold text-foreground">
-              {displayName}
-            </h3>
-            {contact.company && (
-              <p className="text-xs text-muted-foreground">{contact.company}</p>
+            {editingContact ? (
+              <div className="mt-3 w-full space-y-2">
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="Name"
+                  className="w-full rounded-lg border border-border bg-muted px-3 py-1.5 text-sm text-foreground outline-none focus:border-primary/50"
+                />
+                <input
+                  type="email"
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  placeholder="Email"
+                  className="w-full rounded-lg border border-border bg-muted px-3 py-1.5 text-sm text-foreground outline-none focus:border-primary/50"
+                />
+                <input
+                  type="text"
+                  value={editCompany}
+                  onChange={(e) => setEditCompany(e.target.value)}
+                  placeholder="Company"
+                  className="w-full rounded-lg border border-border bg-muted px-3 py-1.5 text-sm text-foreground outline-none focus:border-primary/50"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    className="flex-1 h-7 bg-primary text-primary-foreground hover:bg-primary/90"
+                    onClick={handleSaveContact}
+                    disabled={savingContact}
+                  >
+                    <Save className="h-3 w-3 mr-1" />
+                    {tSidebar("saveChanges")}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 border-border text-muted-foreground"
+                    onClick={() => setEditingContact(false)}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="mt-3 flex items-center gap-1">
+                  <h3 className="text-sm font-semibold text-foreground">
+                    {displayName}
+                  </h3>
+                  <button
+                    onClick={startEditingContact}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    title={tSidebar("editContact")}
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </button>
+                </div>
+                {contact.company && (
+                  <p className="text-xs text-muted-foreground">{contact.company}</p>
+                )}
+              </>
             )}
           </div>
 
@@ -358,6 +567,41 @@ export function ContactSidebar({ contact, conversation }: ContactSidebarProps) {
             <div className="flex items-center gap-2 px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
               <TagIcon className="h-3 w-3" />
               {tSidebar("tags")}
+              <Popover open={showTagPicker} onOpenChange={setShowTagPicker}>
+                <PopoverTrigger
+                  className="ml-auto rounded p-0.5 text-muted-foreground hover:text-foreground"
+                  title={tSidebar("addTag")}
+                >
+                  <Plus className="h-3 w-3" />
+                </PopoverTrigger>
+                <PopoverContent align="start" side="bottom" sideOffset={4} className="max-h-60 overflow-y-auto p-1">
+                  {allTags.length === 0 ? (
+                    <p className="px-2 py-1 text-xs text-muted-foreground">{tSidebar("noAvailableTags")}</p>
+                  ) : (
+                    allTags.map((tag) => {
+                      const isApplied = tags.some((t) => t.id === tag.id);
+                      return (
+                        <button
+                          key={tag.id}
+                          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-muted"
+                          onClick={() => {
+                            if (!isApplied) {
+                              handleAddTag(tag.id);
+                            }
+                          }}
+                        >
+                          <span
+                            className="inline-block h-2.5 w-2.5 rounded-full"
+                            style={{ backgroundColor: tag.color }}
+                          />
+                          <span className="flex-1 text-left text-foreground">{tag.name}</span>
+                          {isApplied && <Check className="h-3 w-3 text-primary" />}
+                        </button>
+                      );
+                    })
+                  )}
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="mt-2 flex flex-wrap gap-1">
               {tags.length === 0 ? (
@@ -366,13 +610,21 @@ export function ContactSidebar({ contact, conversation }: ContactSidebarProps) {
                 tags.map((tag) => (
                   <span
                     key={tag.contact_tag_id}
-                    className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                    className="group flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
                     style={{
                       backgroundColor: `${tag.color}20`,
                       color: tag.color,
                     }}
                   >
                     {tag.name}
+                    <button
+                      className="ml-0.5 rounded-full opacity-0 transition-opacity hover:opacity-100 group-hover:opacity-100"
+                      style={{ color: tag.color }}
+                      title={tSidebar("removeTag")}
+                      onClick={() => handleRemoveTag(tag.contact_tag_id, tag.id)}
+                    >
+                      <X className="h-2.5 w-2.5" />
+                    </button>
                   </span>
                 ))
               )}
@@ -387,7 +639,54 @@ export function ContactSidebar({ contact, conversation }: ContactSidebarProps) {
             <div className="flex items-center gap-2 px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
               <DollarSign className="h-3 w-3" />
               {tSidebar("deals")}
+              <button
+                onClick={() => setShowDealForm((prev) => !prev)}
+                className="ml-auto rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                title={tSidebar("createDeal")}
+              >
+                <Plus className="h-3 w-3" />
+              </button>
             </div>
+            {showDealForm && (
+              <div className="mt-2 rounded-lg border border-border p-2">
+                <input
+                  type="text"
+                  value={newDealTitle}
+                  onChange={(e) => setNewDealTitle(e.target.value)}
+                  placeholder={tSidebar("dealTitlePlaceholder")}
+                  className="mb-1.5 w-full rounded-md border border-border bg-muted px-2.5 py-1.5 text-xs text-foreground placeholder-muted-foreground outline-none focus:border-primary/50"
+                />
+                <input
+                  type="number"
+                  value={newDealValue}
+                  onChange={(e) => setNewDealValue(e.target.value)}
+                  placeholder={tSidebar("dealValuePlaceholder")}
+                  className="mb-1.5 w-full rounded-md border border-border bg-muted px-2.5 py-1.5 text-xs text-foreground placeholder-muted-foreground outline-none focus:border-primary/50"
+                />
+                <div className="flex gap-1.5">
+                  <Button
+                    size="sm"
+                    className="h-7 flex-1 bg-primary text-[11px] hover:bg-primary/90"
+                    onClick={handleCreateDeal}
+                    disabled={!newDealTitle.trim() || savingDeal}
+                  >
+                    {savingDeal ? "..." : tSidebar("createDeal")}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-[11px]"
+                    onClick={() => {
+                      setShowDealForm(false);
+                      setNewDealTitle("");
+                      setNewDealValue("");
+                    }}
+                  >
+                    {tSidebar("cancel")}
+                  </Button>
+                </div>
+              </div>
+            )}
             <div className="mt-2 space-y-2">
               {deals.length === 0 ? (
                 <p className="px-1 text-xs text-muted-foreground">{tSidebar("noDeals")}</p>
@@ -575,25 +874,33 @@ export function ContactSidebar({ contact, conversation }: ContactSidebarProps) {
                 ))
               )}
             </div>
-            <div className="mt-2 flex gap-2">
+            <div className="mt-2 space-y-1.5">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newFollowUpTitle}
+                  onChange={(e) => setNewFollowUpTitle(e.target.value)}
+                  placeholder={tSidebar("addFollowUpPlaceholder")}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleAddFollowUp();
+                  }}
+                  className="flex-1 resize-none rounded-lg border border-border bg-muted px-3 py-1.5 text-xs text-foreground placeholder-muted-foreground outline-none focus:border-primary/50"
+                />
+                <Button
+                  size="sm"
+                  className="h-auto bg-primary px-2 hover:bg-primary/90"
+                  onClick={handleAddFollowUp}
+                  disabled={!newFollowUpTitle.trim() || addingFollowUp}
+                >
+                  <Plus className="h-3 w-3" />
+                </Button>
+              </div>
               <input
-                type="text"
-                value={newFollowUpTitle}
-                onChange={(e) => setNewFollowUpTitle(e.target.value)}
-                placeholder={tSidebar("addFollowUpPlaceholder")}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleAddFollowUp();
-                }}
-                className="flex-1 resize-none rounded-lg border border-border bg-muted px-3 py-1.5 text-xs text-foreground placeholder-muted-foreground outline-none focus:border-primary/50"
+                type="datetime-local"
+                value={newFollowUpDate}
+                onChange={(e) => setNewFollowUpDate(e.target.value)}
+                className="w-full rounded-lg border border-border bg-muted px-3 py-1.5 text-xs text-foreground placeholder-muted-foreground outline-none focus:border-primary/50"
               />
-              <Button
-                size="sm"
-                className="h-auto bg-primary px-2 hover:bg-primary/90"
-                onClick={handleAddFollowUp}
-                disabled={!newFollowUpTitle.trim() || addingFollowUp}
-              >
-                <Plus className="h-3 w-3" />
-              </Button>
             </div>
           </div>
         </div>

@@ -15,31 +15,75 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/hooks/use-auth";
-import { formatCurrency } from "@/lib/currency";
-import { Loader2, Download, FileSpreadsheet, FileText } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import {
+  Loader2,
+  FileSpreadsheet,
+  FileText,
+  Users,
+  MessageSquare,
+  Megaphone,
+  TrendingUp,
+  BarChart3,
+} from "lucide-react";
 import jsPDF from "jspdf";
 
 type ReportType = "leads" | "customers" | "conversations" | "sales" | "employees" | "daily" | "monthly";
 
-const REPORT_TYPES: { value: ReportType; label: string }[] = [
-  { value: "leads", label: "Leads" },
-  { value: "customers", label: "Customers" },
-  { value: "conversations", label: "WhatsApp Conversations" },
-  { value: "sales", label: "Sales" },
-  { value: "employees", label: "Employee Performance" },
-  { value: "daily", label: "Daily Summary" },
-  { value: "monthly", label: "Monthly Summary" },
+const REPORT_TYPES: { value: ReportType; label: string; icon: typeof Users }[] = [
+  { value: "leads", label: "Leads", icon: Users },
+  { value: "customers", label: "Customers", icon: Users },
+  { value: "conversations", label: "WhatsApp Conversations", icon: MessageSquare },
+  { value: "sales", label: "Sales", icon: TrendingUp },
+  { value: "employees", label: "Employee Performance", icon: Users },
+  { value: "daily", label: "Daily Summary", icon: BarChart3 },
+  { value: "monthly", label: "Monthly Summary", icon: BarChart3 },
 ];
+
+interface SummaryStats {
+  totalContacts: number;
+  totalConversations: number;
+  totalDeals: number;
+  totalBroadcasts: number;
+}
 
 export default function ReportsPage() {
   const t = useTranslations("Reports.page");
-  const { defaultCurrency } = useAuth();
+  const { accountId } = useAuth();
   const [reportType, setReportType] = useState<ReportType>("daily");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(false);
   const [count, setCount] = useState(0);
+  const [summaryStats, setSummaryStats] = useState<SummaryStats | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(true);
+
+  useEffect(() => {
+    if (!accountId) return;
+    const db = createClient();
+    const loadSummary = async () => {
+      try {
+        const [contacts, conversations, deals, broadcasts] = await Promise.all([
+          db.from("contacts").select("id", { count: "exact", head: true }).eq("account_id", accountId),
+          db.from("conversations").select("id", { count: "exact", head: true }).eq("account_id", accountId),
+          db.from("deals").select("id", { count: "exact", head: true }).eq("account_id", accountId),
+          db.from("broadcasts").select("id", { count: "exact", head: true }).eq("account_id", accountId),
+        ]);
+        setSummaryStats({
+          totalContacts: contacts.count ?? 0,
+          totalConversations: conversations.count ?? 0,
+          totalDeals: deals.count ?? 0,
+          totalBroadcasts: broadcasts.count ?? 0,
+        });
+      } catch {
+        // non-critical
+      } finally {
+        setSummaryLoading(false);
+      }
+    };
+    void loadSummary();
+  }, [accountId]);
 
   const fetchReport = useCallback(async () => {
     setLoading(true);
@@ -121,7 +165,34 @@ export default function ReportsPage() {
         <p className="mt-1 text-sm text-muted-foreground">{t("description")}</p>
       </div>
 
-      <Card>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <SummaryStatCard
+          icon={Users}
+          label="Total Contacts"
+          value={summaryStats?.totalContacts ?? 0}
+          loading={summaryLoading}
+        />
+        <SummaryStatCard
+          icon={MessageSquare}
+          label="Total Conversations"
+          value={summaryStats?.totalConversations ?? 0}
+          loading={summaryLoading}
+        />
+        <SummaryStatCard
+          icon={TrendingUp}
+          label="Total Deals"
+          value={summaryStats?.totalDeals ?? 0}
+          loading={summaryLoading}
+        />
+        <SummaryStatCard
+          icon={Megaphone}
+          label="Total Broadcasts"
+          value={summaryStats?.totalBroadcasts ?? 0}
+          loading={summaryLoading}
+        />
+      </div>
+
+      <Card className="border-border bg-card">
         <CardHeader>
           <CardTitle className="text-sm font-medium">{t("filters")}</CardTitle>
         </CardHeader>
@@ -182,7 +253,7 @@ export default function ReportsPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="border-border bg-card">
         <CardHeader>
           <CardTitle className="text-sm font-medium">
             {t("results", { count })}
@@ -190,11 +261,15 @@ export default function ReportsPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex items-center justify-center py-12">
+            <div className="flex flex-col items-center justify-center gap-3 py-16">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Generating report...</p>
             </div>
           ) : rows.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
+            <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                <BarChart3 className="h-6 w-6 text-muted-foreground" />
+              </div>
               <p className="text-sm font-medium text-foreground">{t("noData")}</p>
               <p className="text-xs text-muted-foreground">{t("noDataHint")}</p>
             </div>
@@ -226,6 +301,36 @@ export default function ReportsPage() {
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function SummaryStatCard({
+  icon: Icon,
+  label,
+  value,
+  loading,
+}: {
+  icon: typeof Users;
+  label: string;
+  value: number;
+  loading: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-4">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <Icon className="h-4 w-4" />
+      </div>
+      <div>
+        <p className="text-xs text-muted-foreground">{label}</p>
+        {loading ? (
+          <div className="mt-1 h-5 w-12 animate-pulse rounded bg-muted" />
+        ) : (
+          <p className="text-lg font-bold tabular-nums text-foreground">
+            {value.toLocaleString()}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

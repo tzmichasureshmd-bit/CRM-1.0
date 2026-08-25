@@ -14,6 +14,7 @@ import { AppearancePanel } from '@/components/settings/appearance-panel';
 import { CompanySettings } from '@/components/settings/company-settings';
 import { MembersTab } from '@/components/settings/members-tab';
 import { RolesSettings } from '@/components/settings/roles-settings';
+import { ActivityLog } from '@/components/settings/activity-log';
 import { WhatsAppConfig } from '@/components/settings/whatsapp-config';
 import { EmailSettings } from '@/components/settings/email-settings';
 import { NotificationSettings } from '@/components/settings/notification-settings';
@@ -81,6 +82,7 @@ function SettingsPageInner() {
     company: <CompanySettings />,
     members: <MembersTab />,
     roles: <RolesSettings />,
+    activity: <ActivityLog />,
     whatsapp: <WhatsAppConfig />,
     email: <EmailSettings />,
     notifications: <NotificationSettings />,

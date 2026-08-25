@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import type { Contact, Tag, ContactTag } from '@/types';
@@ -64,8 +65,21 @@ interface ContactWithTags extends Contact {
   tags?: Tag[];
 }
 
+// `useSearchParams` (the `?contact=<id>` deep link below) requires a
+// Suspense boundary or the production build bails to CSR and errors out.
+// Thin wrapper supplies it; the inner component holds all the state.
 export default function ContactsPage() {
+  return (
+    <Suspense>
+      <ContactsPageInner />
+    </Suspense>
+  );
+}
+
+function ContactsPageInner() {
   const t = useTranslations('Contacts.page');
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
   const canEdit = useCan('send-messages');
   const canEditSettings = useCan('edit-settings');
@@ -102,6 +116,23 @@ export default function ContactsPage() {
   // results. Without this, rapidly toggling tag filters could let a slower
   // earlier request resolve last and render stale rows.
   const fetchSeq = useRef(0);
+
+  // Deep-link support: /contacts/<id> redirects here with `?contact=<id>`
+  // (see app/contacts/[contactId]). Opens the detail drawer; openDetail
+  // strips the param from the URL when the drawer closes so refreshes
+  // don't re-open it.
+  const contactParam = searchParams.get('contact');
+  // Render-time state adjustment (react.dev/learn/you-might-not-need-an-effect):
+  // syncing drawer state to the URL param without an effect avoids
+  // cascading renders entirely.
+  const [lastContactParam, setLastContactParam] = useState<string | null>(null);
+  if (contactParam !== lastContactParam) {
+    setLastContactParam(contactParam);
+    if (contactParam) {
+      setDetailContactId(contactParam);
+      setDetailOpen(true);
+    }
+  }
 
   const fetchTags = useCallback(async () => {
     const { data } = await supabase.from('tags').select('*');
@@ -242,6 +273,12 @@ export default function ContactsPage() {
   function openDetail(contactId: string) {
     setDetailContactId(contactId);
     setDetailOpen(true);
+    // Keep the URL shareable: /contacts/<id> redirects here with the
+    // id in `?contact=`. Strip it when the drawer closes so a refresh
+    // doesn't re-open it.
+    if (searchParams.get('contact')) {
+      router.replace('/contacts', { scroll: false });
+    }
   }
 
   function confirmDelete(contact: Contact) {

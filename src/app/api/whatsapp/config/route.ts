@@ -234,6 +234,26 @@ function supabaseAdmin() {
   return _adminClient
 }
 
+// Best-effort persistence of the detailed connection-health flag
+// (added in migration 046) so account/monitoring views stay truthful
+// between saves — a token can rot or Meta can start rejecting calls
+// long after the last POST. Fire-and-forget: a failed status write
+// must never break the health check itself.
+async function persistConnectionStatus(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  configId: string,
+  status: 'connected' | 'disconnected' | 'pending' | 'error',
+) {
+  try {
+    await supabase
+      .from('whatsapp_config')
+      .update({ connection_status: status })
+      .eq('id', configId)
+  } catch (err) {
+    console.warn('[whatsapp/config] connection_status write skipped:', err)
+  }
+}
+
 /**
  * GET /api/whatsapp/config
  *
@@ -282,7 +302,7 @@ export async function GET() {
 
     const { data: config, error: configError } = await supabase
       .from('whatsapp_config')
-      .select('phone_number_id, access_token, status')
+      .select('id, phone_number_id, access_token, status')
       .eq('account_id', accountId)
       .maybeSingle()
 
@@ -312,6 +332,7 @@ export async function GET() {
       accessToken = decrypt(config.access_token)
     } catch (err) {
       console.error('[whatsapp/config GET] Token decryption failed:', err)
+      void persistConnectionStatus(supabase, config.id, 'error')
       return NextResponse.json(
         {
           connected: false,
@@ -330,10 +351,12 @@ export async function GET() {
         phoneNumberId: config.phone_number_id,
         accessToken,
       })
+      void persistConnectionStatus(supabase, config.id, 'connected')
       return NextResponse.json({ connected: true, phone_info: phoneInfo })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown Meta API error'
       console.error('[whatsapp/config GET] Meta API verification failed:', message)
+      void persistConnectionStatus(supabase, config.id, 'error')
       return NextResponse.json(
         {
           connected: false,
@@ -581,12 +604,21 @@ export async function POST(request: Request) {
     // Persist everything in one shot. If /register failed we still
     // store the credentials and the error so the UI can guide the
     // user through a retry.
+    //
+    // `connection_status` (+ display metadata) feeds the account
+    // health views — Settings shows it back to the user and the
+    // platform's WhatsApp monitoring reads it. 'error' marks a save
+    // whose Meta verification passed but webhook registration failed.
     const baseRow = {
       phone_number_id,
       waba_id: waba_id || null,
       access_token: encryptedAccessToken,
       verify_token: encryptedVerifyToken,
       status: registrationError ? 'disconnected' : 'connected',
+      connection_status:
+        registrationError ? 'error' : 'connected',
+      display_phone_number: phoneInfo?.display_phone_number ?? null,
+      business_name: phoneInfo?.verified_name ?? null,
       connected_at: registrationError ? null : new Date().toISOString(),
       registered_at: registrationError ? null : registeredAt,
       subscribed_apps_at: subscribedAppsAt ?? null,

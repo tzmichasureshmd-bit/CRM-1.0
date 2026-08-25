@@ -31,10 +31,16 @@ export const dynamic = "force-dynamic";
 
 interface BusinessDetailPageProps {
   params: Promise<{ id: string }>;
+  basePath?: string;
 }
 
-export default async function BusinessDetailPage({
+/**
+ * Shared by /admin and /super-admin — internal links derive from
+ * `basePath` so either tree stays self-contained.
+ */
+export async function AdminBusinessDetailPage({
   params,
+  basePath = "/admin",
 }: BusinessDetailPageProps) {
   const { id } = await params;
   const supabase = await createClient();
@@ -152,7 +158,7 @@ export default async function BusinessDetailPage({
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <Link
-          href="/admin/businesses"
+          href={`${basePath}/businesses`}
           className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -479,4 +485,12 @@ export default async function BusinessDetailPage({
       </div>
     </div>
   );
+}
+
+export default async function BusinessDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  return <AdminBusinessDetailPage params={params} basePath="/admin" />;
 }

@@ -32,7 +32,7 @@ export function SuspendAccountButton({
 
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/accounts/${accountId}/status`, {
+      const res = await fetch(`/api/admin/accounts/${accountId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),

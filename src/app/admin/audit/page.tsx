@@ -16,12 +16,19 @@ const PAGE_SIZE = 50;
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminAuditPage({
+type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
+
+interface Props {
+  basePath?: string;
+  searchParams?: SearchParams;
+}
+
+/** Shared by /admin and /super-admin � links derive from `basePath`. */
+export async function AdminAuditPage({
+  basePath = "/admin",
   searchParams,
-}: {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
-}) {
-  const params = await searchParams;
+}: Props = {}) {
+  const params = (await searchParams) ?? {};
   const supabase = await createClient();
 
   const page = Math.max(1, Number(params.page) || 1);
@@ -51,7 +58,7 @@ export default async function AdminAuditPage({
     const sp = new URLSearchParams();
     if (p > 1) sp.set("page", String(p));
     if (accountId) sp.set("account_id", accountId);
-    return `/admin/audit?${sp.toString()}`;
+    return `${basePath}/audit?${sp.toString()}`;
   }
 
   return (
@@ -84,7 +91,7 @@ export default async function AdminAuditPage({
               Filter
             </Button>
             {accountId && (
-              <Link href="/admin/audit" className="inline-flex">
+              <Link href={basePath + "/audit"} className="inline-flex">
                 <Button type="button" variant="ghost" size="sm">
                   Clear
                 </Button>
@@ -200,4 +207,12 @@ export default async function AdminAuditPage({
       </Card>
     </div>
   );
+}
+
+export default async function AuditPage({
+  searchParams,
+}: {
+  searchParams?: SearchParams;
+}) {
+  return <AdminAuditPage basePath="/admin" searchParams={searchParams} />;
 }

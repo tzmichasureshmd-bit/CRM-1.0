@@ -10,13 +10,18 @@ import { Search, Building2, ArrowRight, Users, MessageSquare } from "lucide-reac
 
 export const dynamic = "force-dynamic";
 
-interface BusinessesPageProps {
-  searchParams: Promise<{ q?: string; status?: string }>;
+interface AdminBusinessesPageProps {
+  basePath?: string;
+  searchParams?: Promise<{ q?: string; status?: string }>;
 }
 
-export default async function BusinessesPage({ searchParams }: BusinessesPageProps) {
+/** Shared by /admin and /super-admin — links derive from `basePath`. */
+export async function AdminBusinessesPage({
+  basePath = "/admin",
+  searchParams,
+}: AdminBusinessesPageProps = {}) {
   const supabase = await createClient();
-  const params = await searchParams;
+  const params = (await searchParams) ?? {};
   const query = params.q?.trim() ?? "";
   const statusFilter = params.status ?? "";
 
@@ -185,7 +190,7 @@ export default async function BusinessesPage({ searchParams }: BusinessesPagePro
             const contactCount = contactCounts[account.id] ?? 0;
 
             return (
-              <Link key={account.id} href={`/admin/businesses/${account.id}`}>
+              <Link key={account.id} href={`${basePath}/businesses/${account.id}`}>
                 <Card className="border-border bg-card transition-colors hover:bg-muted/50">
                   <CardContent className="flex items-center gap-4 py-4">
                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -245,4 +250,12 @@ export default async function BusinessesPage({ searchParams }: BusinessesPagePro
       )}
     </div>
   );
+}
+
+export default async function BusinessesPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ q?: string; status?: string }>;
+}) {
+  return <AdminBusinessesPage basePath="/admin" searchParams={searchParams} />;
 }

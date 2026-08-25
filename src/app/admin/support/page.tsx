@@ -16,7 +16,14 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminSupportPage() {
+interface AdminSupportPageProps {
+  basePath?: string;
+}
+
+/** Shared by /admin and /super-admin � links derive from `basePath`. */
+export async function AdminSupportPage({
+  basePath = "/admin",
+}: AdminSupportPageProps = {}) {
   const supabase = await createClient();
 
   const [recentAccountsResult, pastDueResult, suspendedResult] =
@@ -93,7 +100,7 @@ export default async function AdminSupportPage() {
                 {recentAccountsResult.data.map((account) => (
                   <Link
                     key={account.id}
-                    href={`/admin/businesses/${account.id}`}
+                    href={`${basePath}/businesses/${account.id}`}
                     className="flex items-center justify-between rounded-lg border border-border p-3 transition-colors hover:bg-muted/50"
                   >
                     <div className="min-w-0">
@@ -143,7 +150,7 @@ export default async function AdminSupportPage() {
                       key={sub.id}
                       href={
                         account
-                          ? `/admin/businesses/${account.id}`
+                          ? `${basePath}/businesses/${account.id}`
                           : "#"
                       }
                       className="flex items-center justify-between rounded-lg border border-border p-3 transition-colors hover:bg-muted/50"
@@ -192,7 +199,7 @@ export default async function AdminSupportPage() {
               {suspendedResult.data.map((account) => (
                 <Link
                   key={account.id}
-                  href={`/admin/businesses/${account.id}`}
+                  href={`${basePath}/businesses/${account.id}`}
                   className="flex items-center justify-between rounded-lg border border-border p-3 transition-colors hover:bg-muted/50"
                 >
                   <div className="min-w-0">
@@ -213,4 +220,8 @@ export default async function AdminSupportPage() {
       </Card>
     </div>
   );
+}
+
+export default function SupportPage() {
+  return <AdminSupportPage basePath="/admin" />;
 }

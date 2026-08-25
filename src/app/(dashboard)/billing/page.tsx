@@ -19,18 +19,19 @@ import {
   Loader2,
   RefreshCw,
   AlertTriangle,
+  BarChart3,
   Zap,
   Users,
   MessageSquare,
   Send,
   Bot,
-  Radio,
-  Workflow,
+  Receipt,
 } from "lucide-react";
 import type {
   SubscriptionPlan,
   BusinessSubscription,
   ResourceUsage,
+  Payment,
 } from "@/types";
 
 interface PlanWithSubscription extends SubscriptionPlan {
@@ -38,13 +39,15 @@ interface PlanWithSubscription extends SubscriptionPlan {
 }
 
 export default function BillingPage() {
-  const { accountId, defaultCurrency } = useAuth();
+  const { accountId } = useAuth();
   const supabase = createClient();
 
   const [currentSub, setCurrentSub] = useState<BusinessSubscription | null>(null);
   const [currentPlan, setCurrentPlan] = useState<SubscriptionPlan | null>(null);
   const [plans, setPlans] = useState<PlanWithSubscription[]>([]);
   const [usage, setUsage] = useState<ResourceUsage | null>(null);
+  const [usageHistory, setUsageHistory] = useState<ResourceUsage[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<PlanWithSubscription | null>(null);
@@ -75,22 +78,35 @@ export default function BillingPage() {
         .limit(1)
         .single();
 
-      // Fetch usage
+      // Fetch usage — the current month drives the live meters below,
+      // and we also keep up to 6 past months for the history table
+      // (mirrors the platform-side usage view Super Admin sees).
       const now = new Date();
-      const periodStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-      const { data: usageData } = await supabase
+      const monthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+      const { data: usageRows } = await supabase
         .from("resource_usage")
         .select("*")
         .eq("account_id", accountId)
-        .gte("period_start", periodStart)
+        .gte("period_start", monthsAgo.toISOString())
         .order("period_start", { ascending: false })
-        .limit(1)
-        .single();
+        .limit(6);
+      const usageData = usageRows?.[0] ?? null;
+
+      // Payment history — non-fatal: an RLS hiccup here must not blank
+      // the whole billing page, plans and usage still render.
+      const { data: paymentsData } = await supabase
+        .from("payments")
+        .select("*")
+        .eq("account_id", accountId)
+        .order("created_at", { ascending: false })
+        .limit(20);
 
       setPlans(plansData || []);
       setCurrentSub(subData as BusinessSubscription | null);
       setCurrentPlan(subData?.subscription_plans as SubscriptionPlan | null);
       setUsage(usageData as ResourceUsage | null);
+      setUsageHistory((usageRows ?? []) as ResourceUsage[]);
+      setPayments((paymentsData ?? []) as Payment[]);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to load billing information";
       setError(message);
@@ -113,16 +129,33 @@ export default function BillingPage() {
       year: "numeric",
     });
 
-  const getStatusColor = (status: string) => {
+  const getStatusBadgeClasses = (status: string) => {
     switch (status) {
       case "active":
-        return "text-emerald-500";
+        return "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
       case "trialing":
-        return "text-blue-500";
+        return "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-400";
       case "past_due":
-        return "text-amber-500";
+        return "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400";
       default:
-        return "text-muted-foreground";
+        return "border-border bg-muted text-muted-foreground";
+    }
+  };
+
+  const getPaymentStatusClasses = (status: Payment["status"]) => {
+    switch (status) {
+      case "succeeded":
+        return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
+      case "processing":
+      case "pending":
+        return "bg-blue-500/10 text-blue-600 dark:text-blue-400";
+      case "failed":
+        return "bg-destructive/10 text-destructive";
+      case "refunded":
+      case "partially_refunded":
+        return "bg-muted text-muted-foreground";
+      default:
+        return "bg-muted text-muted-foreground";
     }
   };
 
@@ -169,43 +202,43 @@ export default function BillingPage() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-foreground">Plans & Billing</h1>
-        <p className="text-muted-foreground">
+        <p className="mt-1 text-sm text-muted-foreground">
           Manage your CRM subscription and view usage.
         </p>
       </div>
 
-      {/* Current Plan */}
-      <Card className="border-border bg-card">
-        <CardHeader>
+      {/* Current Plan — prominent hero card */}
+      <Card className="border-border bg-card overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent pointer-events-none" />
+        <CardHeader className="relative">
           <CardTitle className="text-sm font-medium text-muted-foreground">
             Current Plan
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="relative">
           {currentPlan ? (
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-foreground">
-                  {currentPlan.name}
-                </h2>
-                <p className="text-muted-foreground">
+            <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <h2 className="text-2xl font-bold text-foreground">
+                    {currentPlan.name}
+                  </h2>
+                  <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${getStatusBadgeClasses(currentSub?.status || "")}`}>
+                    {getStatusLabel(currentSub?.status || "")}
+                  </span>
+                </div>
+                <p className="text-lg font-semibold text-foreground">
                   {formatPrice(
                     billingPeriod === "yearly"
                       ? currentPlan.price_yearly_cents
                       : currentPlan.price_monthly_cents,
                     currentPlan.currency
                   )}{" "}
-                  / {billingPeriod}
+                  <span className="text-sm font-normal text-muted-foreground">/ {billingPeriod}</span>
                 </p>
-                <div className="mt-2 flex items-center gap-2">
-                  <span className={`h-2 w-2 rounded-full ${getStatusColor(currentSub?.status || "")}`} />
-                  <span className="text-sm text-muted-foreground">
-                    {getStatusLabel(currentSub?.status || "")}
-                  </span>
-                </div>
                 {currentSub?.current_period_end && (
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Renews: {formatDate(currentSub.current_period_end)}
+                  <p className="text-sm text-muted-foreground">
+                    Renews on {formatDate(currentSub.current_period_end)}
                   </p>
                 )}
               </div>
@@ -214,10 +247,12 @@ export default function BillingPage() {
               </Button>
             </div>
           ) : (
-            <div className="text-center py-8">
-              <CreditCard className="mx-auto h-10 w-10 text-muted-foreground/50" />
-              <p className="mt-2 text-muted-foreground">No active plan</p>
-              <p className="text-sm text-muted-foreground/70">
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
+                <CreditCard className="h-7 w-7 text-muted-foreground/50" />
+              </div>
+              <p className="mt-4 text-base font-medium text-foreground">No active plan</p>
+              <p className="mt-1 text-sm text-muted-foreground">
                 Choose a plan to start using WhatsApp CRM.
               </p>
             </div>
@@ -232,8 +267,7 @@ export default function BillingPage() {
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Usage
             </CardTitle>
-          </CardHeader>
-          <CardContent>
+          </CardHeader>          <CardContent>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <UsageItem
                 icon={<Users className="h-4 w-4" />}
@@ -265,6 +299,123 @@ export default function BillingPage() {
                 used={usage.ai_requests}
                 limit={currentPlan.max_ai_requests_per_month}
               />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Usage History — month-over-month view of the same counters
+          the current-period meters show, so growth and seasonality
+          are visible without contacting support. */}
+      {usageHistory.length > 0 && (
+        <Card className="border-border bg-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <BarChart3 className="h-4 w-4 text-primary" />
+              Usage History
+            </CardTitle>
+            <CardDescription>
+              Monthly activity for the last {usageHistory.length}{' '}
+              {usageHistory.length === 1 ? 'month' : 'months'}.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    <th className="px-4 py-3">Month</th>
+                    <th className="px-4 py-3">Sent</th>
+                    <th className="px-4 py-3">Received</th>
+                    <th className="px-4 py-3">New Contacts</th>
+                    <th className="px-4 py-3">Broadcasts</th>
+                    <th className="px-4 py-3">Automations</th>
+                    <th className="px-4 py-3">AI Requests</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {usageHistory.map((row) => {
+                    const label = new Date(row.period_start).toLocaleDateString(
+                      'en-IN',
+                      { month: 'short', year: 'numeric' },
+                    );
+                    return (
+                      <tr key={row.id} className="transition-colors hover:bg-muted/50">
+                        <td className="whitespace-nowrap px-4 py-3 font-medium text-foreground">
+                          {label}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
+                          {row.messages_sent.toLocaleString()}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
+                          {row.messages_received.toLocaleString()}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
+                          {row.contacts_created.toLocaleString()}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
+                          {row.broadcasts_created.toLocaleString()}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
+                          {row.automations_executed.toLocaleString()}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
+                          {row.ai_requests.toLocaleString()}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Payment History */}
+      {payments.length > 0 && (
+        <Card className="border-border bg-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Receipt className="h-4 w-4 text-primary" />
+              Payment History
+            </CardTitle>
+            <CardDescription>Your most recent transactions.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    <th className="px-4 py-3">Date</th>
+                    <th className="px-4 py-3">Description</th>
+                    <th className="px-4 py-3">Amount</th>
+                    <th className="px-4 py-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {payments.map((p) => (
+                    <tr key={p.id} className="transition-colors hover:bg-muted/50">
+                      <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
+                        {formatDate(p.created_at)}
+                      </td>
+                      <td className="px-4 py-3 text-foreground">
+                        {p.description ?? "Subscription payment"}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 font-medium text-foreground">
+                        {formatPrice(p.amount_cents, p.currency)}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <span
+                          className={`inline-block rounded-md px-2 py-0.5 text-xs font-medium capitalize ${getPaymentStatusClasses(p.status)}`}
+                        >
+                          {p.status.replace(/_/g, " ")}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </CardContent>
         </Card>
@@ -376,7 +527,8 @@ export default function BillingPage() {
                 </div>
               )}
               <div className="rounded-lg bg-muted/50 p-4 text-sm text-muted-foreground">
-                Payment integration is coming soon. Your selected plan has been saved for checkout.
+                Online checkout is not available yet — no charge has been made
+                and nothing has been saved. Contact support to change your plan.
               </div>
               <div className="flex gap-2">
                 <Button variant="outline" className="flex-1" onClick={() => setSelectedPlan(null)}>

@@ -317,6 +317,12 @@ export interface WhatsAppConfig {
   access_token: string;
   verify_token?: string;
   status: 'connected' | 'disconnected';
+  /** Detailed health flag (migration 046), kept fresh by config saves and health checks. */
+  connection_status?: 'connected' | 'disconnected' | 'pending' | 'error' | null;
+  /** Human-readable phone number as reported by Meta. */
+  display_phone_number?: string | null;
+  /** WhatsApp Business display name as reported by Meta. */
+  business_name?: string | null;
   connected_at?: string;
   /**
    * Set when POST /{phone_number_id}/register last succeeded. NULL
@@ -381,6 +387,7 @@ export interface MessageTemplate {
 export interface Pipeline {
   id: string;
   user_id: string;
+  account_id: string;
   name: string;
   created_at: string;
 }

@@ -16,12 +16,19 @@ import {
 
 const PAGE_SIZE = 20;
 
-export default async function AdminUsersPage({
+type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
+
+interface Props {
+  basePath?: string;
+  searchParams?: SearchParams;
+}
+
+/** Shared by /admin and /super-admin � links derive from `basePath`. */
+export async function AdminUsersPage({
+  basePath = "/admin",
   searchParams,
-}: {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
-}) {
-  const params = await searchParams;
+}: Props = {}) {
+  const params = (await searchParams) ?? {};
   const supabase = await createClient();
 
   const q = typeof params.q === "string" ? params.q.trim() : "";
@@ -50,7 +57,7 @@ export default async function AdminUsersPage({
     const sp = new URLSearchParams();
     if (q) sp.set("q", q);
     if (p > 1) sp.set("page", String(p));
-    return `/admin/users?${sp.toString()}`;
+    return `${basePath}/users?${sp.toString()}`;
   }
 
   return (
@@ -86,7 +93,7 @@ export default async function AdminUsersPage({
               Search
             </Button>
             {q && (
-              <Link href="/admin/users" className="inline-flex">
+              <Link href={basePath + "/users"} className="inline-flex">
                 <Button type="button" variant="ghost" size="sm">
                   Clear
                 </Button>
@@ -238,4 +245,12 @@ function PlatformBadge({ role }: { role: string | null }) {
       {isSuperAdmin ? "Super Admin" : "User"}
     </span>
   );
+}
+
+export default async function UsersPage({
+  searchParams,
+}: {
+  searchParams?: SearchParams;
+}) {
+  return <AdminUsersPage basePath="/admin" searchParams={searchParams} />;
 }

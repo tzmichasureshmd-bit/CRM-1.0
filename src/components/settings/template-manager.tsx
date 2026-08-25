@@ -124,14 +124,19 @@ function emptyButton(type: TemplateButton['type']): TemplateButton {
   }
 }
 
-export function TemplateManager() {
+export function TemplateManager({
+  defaultNew = false,
+}: {
+  /** Seed with the create dialog already open (deep-link /templates?new=1). */
+  defaultNew?: boolean;
+} = {}) {
   const t = useTranslations('Settings.templates');
   const supabase = createClient();
   const { user, accountId, loading: authLoading } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(defaultNew);
   const [submitting, setSubmitting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [form, setForm] = useState<TemplateFormData>(emptyForm);

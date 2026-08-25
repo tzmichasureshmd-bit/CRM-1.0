@@ -16,12 +16,19 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export default async function SuperAdminPaymentsPage({
+type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
+
+interface AdminPaymentsPageProps {
+  basePath?: string;
+  searchParams?: SearchParams;
+}
+
+/** Shared by /admin and /super-admin — links derive from `basePath`. */
+export async function AdminPaymentsPage({
+  basePath = "/super-admin",
   searchParams,
-}: {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
-}) {
-  const params = await searchParams;
+}: AdminPaymentsPageProps = {}) {
+  const params = (await searchParams) ?? {};
   const supabase = await createClient();
 
   const statusFilter =
@@ -66,7 +73,7 @@ export default async function SuperAdminPaymentsPage({
   function statusUrl(s: string) {
     const sp = new URLSearchParams();
     if (s) sp.set("status", s);
-    return `/super-admin/payments?${sp.toString()}`;
+    return `${basePath}/payments?${sp.toString()}`;
   }
 
   const totalRevenue =
@@ -286,4 +293,12 @@ function PaymentStatusBadge({ status }: { status: string }) {
       {status.replace("_", " ")}
     </span>
   );
+}
+
+export default async function SuperAdminPaymentsPage({
+  searchParams,
+}: {
+  searchParams?: SearchParams;
+}) {
+  return <AdminPaymentsPage basePath="/super-admin" searchParams={searchParams} />;
 }

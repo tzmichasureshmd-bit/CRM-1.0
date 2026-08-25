@@ -69,6 +69,19 @@ export interface UploadAccountMediaResult {
 }
 
 /**
+ * Derive the media "kind" used by the media_assets registry and the
+ * Media Library filter chips. Falls back to "document" for anything
+ * that isn't recognisably image/video/audio — same default Meta uses
+ * when it treats unknown types as documents.
+ */
+export function mediaKindFromMime(mimeType: string): "image" | "video" | "audio" | "document" {
+  if (mimeType.startsWith("image/")) return "image";
+  if (mimeType.startsWith("video/")) return "video";
+  if (mimeType.startsWith("audio/")) return "audio";
+  return "document";
+}
+
+/**
  * Upload a file to an account-scoped Storage bucket and return its public
  * URL. Throws with a user-facing message on auth / account-resolution /
  * upload failure — callers surface it via a toast.
@@ -114,6 +127,26 @@ export async function uploadAccountMedia(
     data: { publicUrl },
   } = supabase.storage.from(bucket).getPublicUrl(path);
 
+  // Register the upload in the account's media library (migration 049).
+  // Best-effort: the send must not fail because the registry insert did —
+  // an unregistered file is a library nit, not a broken attachment.
+  try {
+    const accountId = profile.account_id as string;
+    await supabase.from("media_assets").insert({
+      account_id: accountId,
+      bucket,
+      path,
+      public_url: publicUrl,
+      file_name: file.name,
+      mime_type: file.type ?? "",
+      size_bytes: file.size,
+      kind: mediaKindFromMime(file.type ?? ""),
+      uploaded_by: user.id,
+    });
+  } catch (registryErr) {
+    console.warn("media_assets registry insert skipped:", registryErr);
+  }
+
   return { publicUrl, path };
 }
 
@@ -134,4 +167,17 @@ export async function deleteAccountMedia(
   const supabase = createClient();
   const { error } = await supabase.storage.from(bucket).remove([path]);
   if (error) throw new Error(error.message);
+
+  // Keep the media library (migration 049) in sync — GC'd or cancelled
+  // uploads shouldn't leave dead entries behind. Best-effort like the
+  // insert: the object is already gone, so a missed row delete must not
+  // fail the caller.
+  try {
+    await supabase
+      .from("media_assets")
+      .delete()
+      .match({ bucket, path });
+  } catch (registryErr) {
+    console.warn("media_assets cleanup skipped:", registryErr);
+  }
 }

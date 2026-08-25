@@ -16,12 +16,22 @@ import {
   Filter,
 } from "lucide-react";
 
-export default async function AdminSubscriptionsPage({
+type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
+
+interface AdminSubscriptionsPageProps {
+  basePath?: string;
+  searchParams?: SearchParams;
+}
+
+/**
+ * Shared by /admin and /super-admin — internal links derive from
+ * `basePath` so either tree stays self-contained.
+ */
+export async function AdminSubscriptionsPage({
+  basePath = "/admin",
   searchParams,
-}: {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
-}) {
-  const params = await searchParams;
+}: AdminSubscriptionsPageProps = {}) {
+  const params = (await searchParams) ?? {};
   const supabase = await createClient();
 
   const statusFilter =
@@ -92,7 +102,7 @@ export default async function AdminSubscriptionsPage({
   function statusUrl(s: string) {
     const sp = new URLSearchParams();
     if (s) sp.set("status", s);
-    return `/admin/subscriptions?${sp.toString()}`;
+    return `${basePath}/subscriptions?${sp.toString()}`;
   }
 
   return (
@@ -311,4 +321,12 @@ function StatusBadge({ status }: { status: string }) {
       {status.replace("_", " ")}
     </span>
   );
+}
+
+export default async function SubscriptionsPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
+  return <AdminSubscriptionsPage basePath="/admin" searchParams={searchParams} />;
 }

@@ -22,12 +22,17 @@ const statusColor: Record<string, string> = {
   error: "bg-destructive/10 text-destructive",
 };
 
-interface AutomationsPageProps {
-  searchParams: Promise<{ status?: string }>;
+interface AdminAutomationsPageProps {
+  basePath?: string;
+  searchParams?: Promise<{ status?: string }>;
 }
 
-export default async function AutomationsPage({ searchParams }: AutomationsPageProps) {
-  const params = await searchParams;
+/** Shared by /admin and /super-admin — links derive from `basePath`. */
+export async function AdminAutomationsPage({
+  basePath = "/admin",
+  searchParams,
+}: AdminAutomationsPageProps = {}) {
+  const params = (await searchParams) ?? { status: undefined };
   const supabase = await createClient();
   const statusFilter = params.status ?? "all";
 
@@ -35,7 +40,7 @@ export default async function AutomationsPage({ searchParams }: AutomationsPageP
     .from("automations")
     .select(
       `
-        id, name, status, trigger_type, created_at,
+        id, name, status, trigger_type, execution_count, created_at,
         accounts ( name )
       `,
       { count: "exact" }
@@ -63,11 +68,26 @@ export default async function AutomationsPage({ searchParams }: AutomationsPageP
     error: summaryResults[3].count ?? 0,
   };
 
+  // Platform-wide execution volume + failures (real counters written
+  // by the automation engine).
+  const [executionRows, failedRuns] = await Promise.all([
+    supabase.from("automations").select("execution_count"),
+    supabase
+      .from("automation_logs")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "failed"),
+  ]);
+  const totalExecutions = (executionRows.data ?? []).reduce(
+    (sum, row) => sum + ((row.execution_count as number | null) ?? 0),
+    0
+  );
+  const failedExecutions = failedRuns.count ?? 0;
+
   function filterUrl(status: string) {
     const sp = new URLSearchParams();
     if (status !== "all") sp.set("status", status);
     const qs = sp.toString();
-    return `/admin/automations${qs ? `?${qs}` : ""}`;
+    return `${basePath}/automations${qs ? `?${qs}` : ""}`;
   }
 
   if (error) {
@@ -100,7 +120,7 @@ export default async function AutomationsPage({ searchParams }: AutomationsPageP
       </div>
 
       {/* Summary Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <SummaryCard
           icon={<Workflow className="h-5 w-5" />}
           label="Total Automations"
@@ -130,6 +150,19 @@ export default async function AutomationsPage({ searchParams }: AutomationsPageP
           value={totals.error}
           active={statusFilter === "error"}
           href={filterUrl("error")}
+          iconColor="text-destructive"
+        />
+        <SummaryCard
+          icon={<PlayCircle className="h-5 w-5" />}
+          label="Total Executions"
+          value={totalExecutions}
+          active={false}
+        />
+        <SummaryCard
+          icon={<AlertTriangle className="h-5 w-5" />}
+          label="Failed Executions"
+          value={failedExecutions}
+          active={false}
           iconColor="text-destructive"
         />
       </div>
@@ -178,6 +211,7 @@ export default async function AutomationsPage({ searchParams }: AutomationsPageP
                     <th className="px-4 py-3">Name</th>
                     <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3">Trigger</th>
+                    <th className="px-4 py-3">Executions</th>
                     <th className="px-4 py-3">
                       <span className="inline-flex items-center gap-1">
                         Created <ArrowUpDown className="h-3 w-3" />
@@ -224,6 +258,9 @@ export default async function AutomationsPage({ searchParams }: AutomationsPageP
                           )}
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
+                          {(a.execution_count ?? 0).toLocaleString()}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
                           {a.created_at
                             ? new Date(a.created_at).toLocaleDateString()
                             : "—"}
@@ -253,32 +290,39 @@ function SummaryCard({
   label: string;
   value: number;
   active: boolean;
-  href: string;
+  href?: string;
   iconColor?: string;
 }) {
-  return (
-    <a href={href}>
-      <Card
-        className={`border-border bg-card transition-colors hover:bg-muted/50 ${
-          active ? "ring-2 ring-primary" : ""
-        }`}
-      >
-        <CardContent className="flex items-center gap-4 py-4">
-          <div
-            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 ${
-              iconColor ?? "text-primary"
-            }`}
-          >
-            {icon}
-          </div>
-          <div>
-            <p className="text-2xl font-bold text-foreground">
-              {value.toLocaleString()}
-            </p>
-            <p className="text-xs text-muted-foreground">{label}</p>
-          </div>
-        </CardContent>
-      </Card>
-    </a>
+  const card = (
+    <Card
+      className={`border-border bg-card transition-colors hover:bg-muted/50 ${
+        active ? "ring-2 ring-primary" : ""
+      }`}
+    >
+      <CardContent className="flex items-center gap-4 py-4">
+        <div
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 ${
+            iconColor ?? "text-primary"
+          }`}
+        >
+          {icon}
+        </div>
+        <div>
+          <p className="text-2xl font-bold text-foreground">
+            {value.toLocaleString()}
+          </p>
+          <p className="text-xs text-muted-foreground">{label}</p>
+        </div>
+      </CardContent>
+    </Card>
   );
+  return href ? <a href={href}>{card}</a> : card;
+}
+
+export default async function AutomationsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ status?: string }>;
+}) {
+  return <AdminAutomationsPage basePath="/admin" searchParams={searchParams} />;
 }

@@ -8,9 +8,7 @@ import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import {
   Activity,
   BarChart3,
-  Bot,
   Building2,
-  Code,
   CreditCard,
   DollarSign,
   FileStack,
@@ -19,10 +17,12 @@ import {
   LogOut,
   Menu,
   Radio,
-  Receipt,
   ScrollText,
   Settings,
+  Smartphone,
+  TrendingUp,
   Users,
+  Workflow,
   X,
   Zap,
 } from "lucide-react";
@@ -53,7 +53,7 @@ interface NavSection {
 function buildNavSections(basePath: string): NavSection[] {
   return [
     {
-      title: "Main",
+      title: "Platform",
       items: [
         { href: basePath, label: "Dashboard", icon: LayoutDashboard },
         { href: `${basePath}/businesses`, label: "Businesses", icon: Building2 },
@@ -61,34 +61,29 @@ function buildNavSections(basePath: string): NavSection[] {
       ],
     },
     {
-      title: "Platform",
+      title: "Commercial",
       items: [
-        { href: `${basePath}/subscriptions`, label: "Subscriptions", icon: CreditCard },
         { href: `${basePath}/plans`, label: "Plans", icon: FileStack },
+        { href: `${basePath}/subscriptions`, label: "Subscriptions", icon: CreditCard },
         { href: `${basePath}/payments`, label: "Payments", icon: DollarSign },
-        { href: `${basePath}/billing`, label: "Billing", icon: Receipt },
         { href: `${basePath}/usage`, label: "Usage", icon: BarChart3 },
       ],
     },
     {
-      title: "Communication",
+      title: "Monitoring",
       items: [
-        { href: `${basePath}/campaigns`, label: "Campaigns", icon: Radio },
-        { href: `${basePath}/automations`, label: "Automations", icon: Zap },
+        { href: `${basePath}/whatsapp`, label: "WhatsApp Health", icon: Smartphone },
+        { href: `${basePath}/campaigns`, label: "Campaign Monitoring", icon: Radio },
+        { href: `${basePath}/automations`, label: "Automation Monitoring", icon: Zap },
+        { href: `${basePath}/flows`, label: "Flow Monitoring", icon: Workflow },
+        { href: `${basePath}/analytics`, label: "Analytics", icon: TrendingUp },
+        { href: `${basePath}/health`, label: "Platform Health", icon: Activity },
       ],
     },
     {
-      title: "Intelligence",
-      items: [
-        { href: `${basePath}/ai-usage`, label: "AI Usage", icon: Bot },
-        { href: `${basePath}/api-usage`, label: "API Usage", icon: Code },
-      ],
-    },
-    {
-      title: "System",
+      title: "Administration",
       items: [
         { href: `${basePath}/audit`, label: "Audit Logs", icon: ScrollText },
-        { href: `${basePath}/health`, label: "Platform Health", icon: Activity },
         { href: `${basePath}/support`, label: "Support", icon: LifeBuoy },
         { href: `${basePath}/settings`, label: "Settings", icon: Settings },
       ],

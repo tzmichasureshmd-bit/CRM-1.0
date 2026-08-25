@@ -1,6 +1,7 @@
 import {
   Coins,
   FileText,
+  History,
   KeyRound,
   LayoutGrid,
   Palette,
@@ -33,6 +34,7 @@ export const SETTINGS_SECTIONS = [
   'company',
   'members',
   'roles',
+  'activity',
   'whatsapp',
   'email',
   'notifications',
@@ -63,6 +65,7 @@ export const SECTION_META: Record<SettingsSection, SectionMeta> = {
   company: { id: 'company', label: 'Company', icon: Building2, group: 'account' },
   members: { id: 'members', label: 'Team members', icon: UsersRound, group: 'workspace' },
   roles: { id: 'roles', label: 'Roles & permissions', icon: UserCog, group: 'workspace' },
+  activity: { id: 'activity', label: 'Activity log', icon: History, group: 'workspace' },
   whatsapp: { id: 'whatsapp', label: 'WhatsApp', icon: PlugZap, group: 'workspace' },
   email: { id: 'email', label: 'Email', icon: Mail, group: 'workspace' },
   notifications: { id: 'notifications', label: 'Notifications', icon: Bell, group: 'workspace' },

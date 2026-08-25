@@ -842,7 +842,6 @@ export function MessageThread({
         return;
       }
 
-      // Notify the newly-assigned agent if it's someone else.
       if (agentId && agentId !== user?.id && accountId) {
         void supabase.from("notifications").insert({
           account_id: accountId,
@@ -854,6 +853,21 @@ export function MessageThread({
           contact_id: contact?.id,
           actor_user_id: user?.id ?? null,
         });
+      }
+
+      if (accountId && conversation.contact_id) {
+        fetch("/api/automations/engine", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            trigger_type: "conversation_assigned",
+            contact_id: conversation.contact_id,
+            context: {
+              conversation_id: conversation.id,
+              assigned_agent_id: agentId,
+            },
+          }),
+        }).catch(() => {});
       }
 
       onAssignChange(conversation.id, agentId);

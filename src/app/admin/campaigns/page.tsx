@@ -24,12 +24,17 @@ const statusColor: Record<string, string> = {
   failed: "bg-destructive/10 text-destructive",
 };
 
-interface CampaignsPageProps {
-  searchParams: Promise<{ status?: string }>;
+interface AdminCampaignsPageProps {
+  basePath?: string;
+  searchParams?: Promise<{ status?: string }>;
 }
 
-export default async function CampaignsPage({ searchParams }: CampaignsPageProps) {
-  const params = await searchParams;
+/** Shared by /admin and /super-admin — links derive from `basePath`. */
+export async function AdminCampaignsPage({
+  basePath = "/admin",
+  searchParams,
+}: AdminCampaignsPageProps = {}) {
+  const params = (await searchParams) ?? { status: undefined };
   const supabase = await createClient();
   const statusFilter = params.status ?? "all";
 
@@ -37,7 +42,7 @@ export default async function CampaignsPage({ searchParams }: CampaignsPageProps
     .from("broadcasts")
     .select(
       `
-        id, name, status, recipient_count, sent_count, created_at,
+        id, name, status, recipient_count, sent_count, delivered_count, read_count, failed_count, created_at,
         accounts ( name )
       `,
       { count: "exact" }
@@ -69,7 +74,7 @@ export default async function CampaignsPage({ searchParams }: CampaignsPageProps
     const sp = new URLSearchParams();
     if (status !== "all") sp.set("status", status);
     const qs = sp.toString();
-    return `/admin/campaigns${qs ? `?${qs}` : ""}`;
+    return `${basePath}/campaigns${qs ? `?${qs}` : ""}`;
   }
 
   if (error) {
@@ -92,6 +97,21 @@ export default async function CampaignsPage({ searchParams }: CampaignsPageProps
 
   const allBroadcasts = broadcasts ?? [];
 
+  // Aggregate delivery performance across the listed window (real
+  // counters maintained by the broadcast engine's recompute RPC).
+  const agg = allBroadcasts.reduce(
+    (acc, b) => {
+      acc.sent += b.sent_count ?? 0;
+      acc.delivered += b.delivered_count ?? 0;
+      acc.read += b.read_count ?? 0;
+      acc.failed += b.failed_count ?? 0;
+      return acc;
+    },
+    { sent: 0, delivered: 0, read: 0, failed: 0 }
+  );
+  const pct = (part: number, whole: number) =>
+    whole > 0 ? `${((part / whole) * 100).toFixed(1)}%` : "—";
+
   return (
     <div className="space-y-6">
       <div>
@@ -99,6 +119,31 @@ export default async function CampaignsPage({ searchParams }: CampaignsPageProps
         <p className="text-muted-foreground">
           Platform-wide broadcast and campaign overview.
         </p>
+      </div>
+
+      {/* Delivery performance across the listed window */}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border border-border bg-card px-4 py-3 text-sm">
+        <span className="font-medium text-foreground">
+          Message volume: {agg.sent.toLocaleString()} sent
+        </span>
+        <span className="text-muted-foreground">
+          Delivery rate:{" "}
+          <span className="font-medium text-foreground">
+            {pct(agg.delivered, agg.sent)}
+          </span>
+        </span>
+        <span className="text-muted-foreground">
+          Read rate:{" "}
+          <span className="font-medium text-foreground">
+            {pct(agg.read, agg.sent)}
+          </span>
+        </span>
+        <span className="text-muted-foreground">
+          Failure rate:{" "}
+          <span className="font-medium text-destructive">
+            {pct(agg.failed, agg.sent)}
+          </span>
+        </span>
       </div>
 
       {/* Summary Cards */}
@@ -181,6 +226,9 @@ export default async function CampaignsPage({ searchParams }: CampaignsPageProps
                     <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3">Recipients</th>
                     <th className="px-4 py-3">Sent</th>
+                    <th className="px-4 py-3">Delivered</th>
+                    <th className="px-4 py-3">Read</th>
+                    <th className="px-4 py-3">Failed</th>
                     <th className="px-4 py-3">
                       <span className="inline-flex items-center gap-1">
                         Created <ArrowUpDown className="h-3 w-3" />
@@ -221,6 +269,15 @@ export default async function CampaignsPage({ searchParams }: CampaignsPageProps
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
                           {(b.sent_count ?? 0).toLocaleString()}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
+                          {(b.delivered_count ?? 0).toLocaleString()}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
+                          {(b.read_count ?? 0).toLocaleString()}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
+                          {(b.failed_count ?? 0).toLocaleString()}
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
                           {b.created_at
@@ -280,4 +337,12 @@ function SummaryCard({
       </Card>
     </a>
   );
+}
+
+export default async function CampaignsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ status?: string }>;
+}) {
+  return <AdminCampaignsPage basePath="/admin" searchParams={searchParams} />;
 }

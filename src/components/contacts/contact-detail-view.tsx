@@ -99,6 +99,10 @@ export function ContactDetailView({
   // Deals tab
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loadingDeals, setLoadingDeals] = useState(false);
+  const [newDealTitle, setNewDealTitle] = useState('');
+  const [newDealValue, setNewDealValue] = useState('');
+  const [showDealForm, setShowDealForm] = useState(false);
+  const [savingDeal, setSavingDeal] = useState(false);
 
   // Documents tab — media shared with this contact across all conversations
   const [documents, setDocuments] = useState<Message[]>([]);
@@ -112,6 +116,7 @@ export function ContactDetailView({
   const [followUps, setFollowUps] = useState<FollowUp[]>([]);
   const [loadingFollowUps, setLoadingFollowUps] = useState(false);
   const [newFollowUpTitle, setNewFollowUpTitle] = useState('');
+  const [newFollowUpDate, setNewFollowUpDate] = useState('');
   const [addingFollowUp, setAddingFollowUp] = useState(false);
 
   const fetchContact = useCallback(async () => {
@@ -198,6 +203,66 @@ export function ContactDetailView({
     setLoadingDeals(false);
   }, [contactId, supabase]);
 
+  async function createDeal() {
+    if (!contactId || !newDealTitle.trim()) return;
+    setSavingDeal(true);
+
+    try {
+      const { data: pipelines, error: pipeErr } = await supabase
+        .from('pipelines')
+        .select('id')
+        .limit(1)
+        .single();
+
+      if (pipeErr || !pipelines) {
+        toast.error(t('dealsTab.noPipelines'));
+        setSavingDeal(false);
+        return;
+      }
+
+      const { data: stages, error: stageErr } = await supabase
+        .from('pipeline_stages')
+        .select('id')
+        .eq('pipeline_id', pipelines.id)
+        .order('position')
+        .limit(1)
+        .single();
+
+      if (stageErr || !stages) {
+        toast.error(t('dealsTab.noPipelines'));
+        setSavingDeal(false);
+        return;
+      }
+
+      const { error } = await supabase.from('deals').insert({
+        title: newDealTitle.trim(),
+        value: newDealValue ? Number(newDealValue) : 0,
+        currency: defaultCurrency,
+        contact_id: contactId,
+        pipeline_id: pipelines.id,
+        stage_id: stages.id,
+        user_id: (await supabase.auth.getUser()).data.user?.id,
+        account_id: accountId,
+        status: 'open',
+      });
+
+      if (error) {
+        toast.error(t('dealsTab.toastDealFailed'));
+      } else {
+        toast.success(t('dealsTab.toastDealCreated'));
+        setNewDealTitle('');
+        setNewDealValue('');
+        setShowDealForm(false);
+        fetchDeals();
+        onUpdated();
+      }
+    } catch {
+      toast.error(t('dealsTab.toastDealFailed'));
+    }
+
+    setSavingDeal(false);
+  }
+
   // Documents tab — fetch all media messages for this contact's conversations
   const fetchDocuments = useCallback(async () => {
     if (!contactId) return;
@@ -279,12 +344,13 @@ export function ContactDetailView({
     const res = await fetch('/api/follow-ups', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contact_id: contactId, title: newFollowUpTitle.trim() }),
+      body: JSON.stringify({ contact_id: contactId, title: newFollowUpTitle.trim(), due_date: newFollowUpDate || null }),
     });
     if (res.ok) {
       const data = await res.json();
       setFollowUps((prev) => [data, ...prev]);
       setNewFollowUpTitle('');
+      setNewFollowUpDate('');
     } else {
       toast.error(t('toastUpdateFailed'));
     }
@@ -948,10 +1014,60 @@ export function ContactDetailView({
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="size-5 animate-spin text-primary" />
                   </div>
-                ) : deals.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">{t('dealsTab.noDeals')}</p>
                 ) : (
                   <div className="space-y-2">
+                    {!showDealForm && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowDealForm(true)}
+                        className="w-full border-dashed border-border text-muted-foreground hover:text-foreground h-8 text-xs"
+                      >
+                        <Plus className="size-3.5 mr-1" />
+                        {t('dealsTab.createDeal')}
+                      </Button>
+                    )}
+                    {showDealForm && (
+                      <div className="rounded-lg border border-border bg-muted/50 p-3 space-y-2">
+                        <Input
+                          value={newDealTitle}
+                          onChange={(e) => setNewDealTitle(e.target.value)}
+                          placeholder={t('dealsTab.dealTitlePlaceholder')}
+                          className="bg-background border-border text-foreground placeholder:text-muted-foreground h-8 text-sm"
+                        />
+                        <div className="flex gap-2">
+                          <div className="relative flex-1">
+                            <DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 size-3 text-muted-foreground" />
+                            <Input
+                              type="number"
+                              value={newDealValue}
+                              onChange={(e) => setNewDealValue(e.target.value)}
+                              placeholder={t('dealsTab.dealValuePlaceholder')}
+                              className="bg-background border-border text-foreground placeholder:text-muted-foreground h-8 text-sm pl-6"
+                            />
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={createDeal}
+                            disabled={!newDealTitle.trim() || savingDeal}
+                            className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                          >
+                            {savingDeal ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => { setShowDealForm(false); setNewDealTitle(''); setNewDealValue(''); }}
+                            className="text-muted-foreground hover:text-foreground"
+                          >
+                            <X className="size-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                    {deals.length === 0 && !showDealForm && (
+                      <p className="text-xs text-muted-foreground">{t('dealsTab.noDeals')}</p>
+                    )}
                     {deals.map((deal) => (
                       <div
                         key={deal.id}
@@ -1050,22 +1166,30 @@ export function ContactDetailView({
                     ))}
                   </div>
                 )}
-                <div className="mt-3 flex gap-2">
-                  <Input
-                    value={newFollowUpTitle}
-                    onChange={(e) => setNewFollowUpTitle(e.target.value)}
-                    placeholder={t('followUpsTab.addFollowUpPlaceholder', { fallback: 'Add a follow-up...' })}
-                    onKeyDown={(e) => { if (e.key === 'Enter') addFollowUp(); }}
-                    className="bg-muted border-border text-foreground placeholder:text-muted-foreground h-8 text-sm"
+                <div className="mt-3 space-y-2">
+                  <div className="flex gap-2">
+                    <Input
+                      value={newFollowUpTitle}
+                      onChange={(e) => setNewFollowUpTitle(e.target.value)}
+                      placeholder={t('followUpsTab.addFollowUpPlaceholder', { fallback: 'Add a follow-up...' })}
+                      onKeyDown={(e) => { if (e.key === 'Enter') addFollowUp(); }}
+                      className="bg-muted border-border text-foreground placeholder:text-muted-foreground h-8 text-sm"
+                    />
+                    <Button
+                      onClick={addFollowUp}
+                      disabled={!newFollowUpTitle.trim() || addingFollowUp}
+                      size="sm"
+                      className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                    >
+                      {addingFollowUp ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
+                    </Button>
+                  </div>
+                  <input
+                    type="datetime-local"
+                    value={newFollowUpDate}
+                    onChange={(e) => setNewFollowUpDate(e.target.value)}
+                    className="w-full rounded-md border border-border bg-muted px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/50"
                   />
-                  <Button
-                    onClick={addFollowUp}
-                    disabled={!newFollowUpTitle.trim() || addingFollowUp}
-                    size="sm"
-                    className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                  >
-                    {addingFollowUp ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
-                  </Button>
                 </div>
               </TabsContent>
             </Tabs>

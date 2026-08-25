@@ -599,6 +599,28 @@ async function processMessage(
   if (!contactOutcome) return
   const contactRecord = contactOutcome.contact
 
+  if (contactOutcome.wasCreated) {
+    void (async () => {
+      const { data: tag } = await supabaseAdmin()
+        .from('tags')
+        .select('id')
+        .eq('account_id', accountId)
+        .ilike('name', 'WhatsApp Lead')
+        .maybeSingle()
+      if (tag) {
+        const { error } = await supabaseAdmin()
+          .from('contact_tags')
+          .upsert(
+            { contact_id: contactRecord.id, tag_id: tag.id },
+            { onConflict: 'contact_id,tag_id', ignoreDuplicates: true }
+          )
+        if (error && !error.message.includes('unique')) {
+          console.error('[webhook] auto-tag failed:', error.message)
+        }
+      }
+    })()
+  }
+
   // Find or create conversation
   const convResult = await findOrCreateConversation(
     accountId,

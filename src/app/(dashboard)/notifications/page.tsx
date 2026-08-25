@@ -168,8 +168,12 @@ export default function NotificationsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Notifications</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-            All notifications — assignments, new messages, mentions, and WhatsApp status changes.
+          <p className="mt-1 text-sm text-muted-foreground">
+            {unreadIds.length > 0 ? (
+              <>You have <span className="font-medium text-foreground">{unreadIds.length}</span> unread notification{unreadIds.length === 1 ? '' : 's'}.</>
+            ) : (
+              <>All notifications — assignments, new messages, mentions, and WhatsApp status changes.</>
+            )}
           </p>
         </div>
         <Button
@@ -188,14 +192,14 @@ export default function NotificationsPage() {
       </div>
 
       {notifications.length === 0 ? (
-        <div className="flex h-48 flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/40">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-            <Bell className="h-6 w-6 text-primary" />
+        <div className="flex h-64 flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/20">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+            <Bell className="h-7 w-7 text-primary" />
           </div>
-          <p className="mt-3 text-sm font-medium text-foreground">
+          <p className="mt-4 text-base font-medium text-foreground">
             No notifications yet
           </p>
-            <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 max-w-sm text-center text-sm text-muted-foreground">
             You&apos;ll see alerts here when conversations are assigned to you, new messages arrive, or your WhatsApp connection needs attention.
           </p>
         </div>
@@ -212,14 +216,14 @@ export default function NotificationsPage() {
                   className={cn(
                     "flex w-full items-start gap-3 rounded-xl border p-4 text-left transition-colors",
                     isUnread
-                      ? "border-primary/30 bg-primary/5 hover:border-primary/50"
+                      ? "border-primary/20 bg-primary/[0.03] hover:border-primary/40 hover:bg-primary/[0.06]"
                       : "border-border bg-card hover:border-border/70",
                   )}
                 >
                   <div
                     className={cn(
-                      "flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg",
-                      isUnread ? "bg-primary/15" : "bg-muted",
+                      "flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl",
+                      isUnread ? "bg-primary/10" : "bg-muted",
                     )}
                     aria-hidden
                   >

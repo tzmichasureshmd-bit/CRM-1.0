@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import {
   Card,
@@ -60,27 +61,14 @@ function LoginPageInner() {
       return;
     }
 
-    // Check if user is a super_admin so we can route them to /super-admin
-    // instead of the normal customer dashboard.
-    let destination = inviteToken
+    // Always land in the customer CRM. Super Admin access is a
+    // deliberate, separate flow entered via the "Super Admin" button
+    // (/super-admin/login) — never auto-triggered from the customer
+    // login, even for users whose profile carries the super_admin
+    // platform role.
+    const destination = inviteToken
       ? `/join/${encodeURIComponent(inviteToken)}`
       : "/dashboard";
-
-    if (!inviteToken) {
-      try {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("platform_role, role")
-          .eq("user_id", (await supabase.auth.getUser()).data.user?.id ?? "")
-          .maybeSingle();
-
-        if (profile?.platform_role === "super_admin" || (profile as Record<string, unknown>)?.role === "super_admin") {
-          destination = "/super-admin";
-        }
-      } catch {
-        // Profile fetch failed — fall through to /dashboard.
-      }
-    }
 
     // Full-page navigation (not router.push) so the browser issues a
     // fresh top-level request that carries the just-written Supabase
@@ -148,13 +136,14 @@ function LoginPageInner() {
                   {t('forgotPassword')}
                 </Link>
               </div>
-              <Input
+              <PasswordInput
                 id="password"
-                type="password"
                 placeholder={t('passwordPlaceholder')}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                autoComplete="current-password"
+                toggleLabels={{ show: t('showPassword'), hide: t('hidePassword') }}
                 className="border-border bg-muted text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/20"
               />
             </div>

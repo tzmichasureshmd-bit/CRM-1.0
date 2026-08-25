@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import {
   Card,
@@ -14,6 +15,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ShieldCheck } from "lucide-react";
+import { verifySuperAdminRole } from "./actions";
 
 export default function SuperAdminLoginPage() {
   const [email, setEmail] = useState("");
@@ -44,85 +46,24 @@ export default function SuperAdminLoginPage() {
         return;
       }
 
-      console.log("[SUPER ADMIN] Authenticated user ID:", authData.user.id);
-      console.log("[SUPER ADMIN] Authenticated email:", authData.user.email);
+      // ── Step 2: Verify Super Admin authorization SERVER-SIDE ─────
+      // The role verdict comes from the server action — the same trust
+      // level as the /super-admin layout gate — so a tampered client
+      // cannot talk its way past this form.
+      const result = await verifySuperAdminRole();
 
-      // ── Step 2: Fetch profile — query ALL role-related columns ────
-      // We select both `platform_role` (the proper column from migration 045)
-      // and the legacy `role` column, so we can diagnose exactly what
-      // the database returns and distinguish between:
-      //   a) platform_role column doesn't exist (migration 045 not applied)
-      //   b) platform_role exists but is 'user' (default, never set to super_admin)
-      //   c) legacy role column has the value instead
-      console.log("[SUPER ADMIN] Profile query started");
-
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("platform_role, role, email")
-        .eq("user_id", authData.user.id)
-        .maybeSingle();
-
-      console.log("[SUPER ADMIN] Profile query completed");
-      console.log("[SUPER ADMIN] Profile result:", profile);
-      console.log("[SUPER ADMIN] Profile error:", profileError?.message ?? "none");
-      console.log("[SUPER ADMIN] platform_role value:", profile?.platform_role);
-      console.log("[SUPER ADMIN] legacy role value:", (profile as Record<string, unknown>)?.role);
-
-      if (profileError) {
+      if (!result.authorized) {
+        // Authenticated but not authorized: end the session so the
+        // visitor leaves with no half-open Supabase session, and show
+        // the denial clearly. Never redirect into /super-admin here.
         await supabase.auth.signOut();
-        // Distinguish column-missing errors from other failures
-        const msg = profileError.message;
-        if (msg.includes("platform_role") && msg.includes("column")) {
-          setError(
-            "The 'platform_role' column does not exist in the profiles table. " +
-              "Please run database migration 045 to add the platform_role column.",
-          );
-        } else {
-          setError(`Failed to verify admin access: ${msg}`);
-        }
+        setError(result.reason ?? "You do not have Super Admin access.");
         return;
       }
 
-      if (!profile) {
-        await supabase.auth.signOut();
-        setError(
-          "No profile found for this user. " +
-            "Every authenticated user must have a profile row in the profiles table.",
-        );
-        return;
-      }
-
-      // ── Step 3: Check the Super Admin role ────────────────────────
-      // Prefer platform_role (the proper column). Fall back to legacy role column
-      // if platform_role is undefined (column doesn't exist in DB).
-      const platformRole = profile.platform_role as string | undefined;
-      const legacyRole = (profile as Record<string, unknown>)?.role as string | undefined;
-
-      console.log("[SUPER ADMIN] Detected platform_role:", platformRole ?? "COLUMN MISSING");
-      console.log("[SUPER ADMIN] Detected legacy role:", legacyRole ?? "COLUMN MISSING");
-      console.log("[SUPER ADMIN] Expected Super Admin role: super_admin");
-
-      if (platformRole === "super_admin" || legacyRole === "super_admin") {
-        // Role matches — proceed to dashboard
-        console.log("[SUPER ADMIN] Role check PASSED, redirecting to /super-admin");
-        window.location.href = "/super-admin";
-        return;
-      }
-
-      // Role does not match — show a user-friendly error (no info leak)
-      await supabase.auth.signOut();
-
-      if (platformRole === undefined) {
-        setError(
-          "Super Admin access is not configured for this account. " +
-            "Please contact an existing Super Admin.",
-        );
-      } else {
-        setError(
-          "You are authenticated, but you do not have Super Admin access. " +
-            "Please contact an existing Super Admin to request access.",
-        );
-      }
+      // Full-page navigation so the freshly written auth cookies reach
+      // the middleware gating /super-admin/*.
+      window.location.href = "/super-admin";
     } catch (err) {
       console.error("[SUPER ADMIN LOGIN]", err);
       setError(
@@ -176,13 +117,13 @@ export default function SuperAdminLoginPage() {
               <Label htmlFor="password" className="text-muted-foreground">
                 Password
               </Label>
-              <Input
+              <PasswordInput
                 id="password"
-                type="password"
-                placeholder="••••••••"
+                placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                autoComplete="current-password"
                 className="border-border bg-muted text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/20"
               />
             </div>

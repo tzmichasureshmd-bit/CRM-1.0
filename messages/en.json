@@ -9,6 +9,8 @@
     "passwordLabel": "Password",
     "forgotPassword": "Forgot password?",
     "passwordPlaceholder": "Enter your password",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
     "signingIn": "Signing in...",
     "signIn": "Sign in",
     "noAccount": "Don't have an account?",
@@ -26,6 +28,10 @@
     "contacts": "Contacts",
     "pipelines": "Pipelines",
     "broadcasts": "Broadcasts",
+    "campaigns": "Campaigns",
+    "templates": "Templates",
+    "mediaLibrary": "Media Library",
+    "apiDeveloper": "API / Developer",
     "automations": "Automations",
     "flows": "Flows",
     "aiAgents": "AI Agents",
@@ -43,7 +49,12 @@
     "defaultAvatar": "Avatar",
     "menuProfile": "Profile",
     "menuSettings": "Settings",
-    "menuSignOut": "Sign out"
+    "menuSignOut": "Sign out",
+    "sectionConversations": "Conversations",
+    "sectionMarketing": "Marketing",
+    "sectionAutomation": "Automation",
+    "sectionGrowth": "Growth",
+    "sectionSystem": "System"
   },
   "Header": {
     "dashboard": "Dashboard",
@@ -53,8 +64,15 @@
     "pipelines": "Pipelines",
     "broadcasts": "Broadcasts",
     "automations": "Automations",
+    "flows": "Flows",
+    "aiAgents": "AI Agents",
+    "campaigns": "Campaigns",
+    "templates": "Templates",
+    "reports": "Reports",
     "billing": "Plans & Billing",
     "settings": "Settings",
+    "mediaLibrary": "Media Library",
+    "apiDeveloper": "API / Developer",
     "openMenu": "Open menu",
     "openAccountMenu": "Open account menu",
     "defaultUser": "User",
@@ -86,7 +104,13 @@
       "openDeals": "{count} open {count, plural, =1 {deal} other {deals}}",
       "noChange": "No change {suffix}",
       "whatsappNotConnected": "WhatsApp is not connected. Connect your account to start messaging.",
-      "connectNow": "Connect now"
+      "connectNow": "Connect now",
+      "totalContacts": "Total Contacts",
+      "totalConversations": "Total Conversations",
+      "openDealsCountLabel": "Open Deals",
+      "unassignedConversations": "Unassigned Conversations",
+      "overdueFollowUps": "Overdue Follow-ups",
+      "there": "there"
     },
     "quickActions": {
       "newContact": "New Contact",
@@ -315,11 +339,25 @@
        "leadStatus": "Lead status",
        "followUps": "Follow-ups",
        "noFollowUps": "No follow-ups scheduled",
-       "addFollowUpPlaceholder": "Add a follow-up...",
-       "markComplete": "Mark complete",
+        "addFollowUpPlaceholder": "Add a follow-up...",
+        "dueDate": "Due date",
+        "markComplete": "Mark complete",
        "markPending": "Mark pending",
-       "deleteFollowUp": "Delete follow-up"
-     },
+       "deleteFollowUp": "Delete follow-up",
+       "createDeal": "Create Deal",
+       "dealTitlePlaceholder": "Deal title",
+       "dealValuePlaceholder": "Value",
+       "cancel": "Cancel",
+       "toastDealCreated": "Deal created",
+        "toastDealFailed": "Failed to create deal",
+         "addTag": "Add tag",
+         "removeTag": "Remove tag",
+         "noAvailableTags": "No tags available",
+         "editContact": "Edit contact",
+         "saveChanges": "Save",
+         "toastContactUpdated": "Contact updated",
+         "toastContactUpdateFailed": "Failed to update contact"
+       },
     "aiBanner": {
       "pausedTitle": "AI assistant is paused here",
       "activeText": "AI assistant is replying automatically",
@@ -462,11 +500,18 @@
         "noNotes": "No notes yet."
       },
       "dealsTab": {
-        "noDeals": "No deals yet"
+        "noDeals": "No deals yet",
+        "createDeal": "Create Deal",
+        "dealTitlePlaceholder": "Deal title",
+        "dealValuePlaceholder": "Value",
+        "toastDealCreated": "Deal created",
+        "toastDealFailed": "Failed to create deal",
+        "noPipelines": "No pipelines found. Create one in Pipelines."
       },
       "followUpsTab": {
         "noFollowUps": "No follow-ups yet",
-        "addFollowUpPlaceholder": "Add a follow-up..."
+        "addFollowUpPlaceholder": "Add a follow-up...",
+        "dueDate": "Due date"
       },
       "tagsTab": {
         "clickTagDesc": "Click a tag to add or remove it from this contact.",
@@ -1525,6 +1570,30 @@
         }
       }
     },
+    "activity": {
+      "title": "Activity log",
+      "description": "A running record of important account events — new contacts, broadcasts, team changes, and WhatsApp connection changes. Visible to admins and the owner.",
+      "loadError": "Failed to load activity",
+      "networkError": "Could not reach the server",
+      "emptyTitle": "No activity yet",
+      "emptyDesc": "Events like created contacts, launched broadcasts, and connection changes will appear here as they happen.",
+      "pageIndicator": "Page {page} of {totalPages}",
+      "adminOnlyTitle": "Admins only",
+      "adminOnlyDesc": "The activity log is available to admins and the account owner.",
+      "unknownActor": "A teammate",
+      "system": "System",
+      "contactCreated": "added a contact",
+      "contactCreatedNamed": "added contact {name}",
+      "broadcastCreated": "created a broadcast",
+      "broadcastCreatedNamed": "created broadcast {name}",
+      "invitationCreated": "created an invite link for a {role}",
+      "invitationCreatedLabeled": "created an invite link labeled “{label}” for a {role}",
+      "memberJoined": "joined the workspace as {role}, or was added to it",
+      "roleChanged": "changed a member's role from {from} to {to}",
+      "whatsappConnected": "connected WhatsApp",
+      "whatsappConnectedTo": "connected WhatsApp number {target}",
+      "whatsappDisconnected": "disconnected WhatsApp"
+    },
     "company": {
       "title": "Company information",
       "description": "Basic details about your business. This information may be visible to your team.",
@@ -1654,6 +1723,7 @@
       "company": "Company",
       "members": "Team members",
       "roles": "Roles & permissions",
+      "activity": "Activity log",
       "whatsapp": "WhatsApp",
       "email": "Email",
       "notifications": "Notifications",

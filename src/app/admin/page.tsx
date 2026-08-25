@@ -16,11 +16,24 @@ import {
   ScrollText,
   FileText,
   ArrowRight,
+  Radio,
+  Zap,
+  DollarSign,
 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminPage() {
+interface AdminDashboardProps {
+  /** Route prefix of the tree rendering this dashboard ("​/admin" or "/super-admin"). */
+  basePath?: string;
+}
+
+/**
+ * Platform-wide dashboard. Shared by the /admin and /super-admin trees —
+ * every internal link is derived from `basePath` so both trees stay
+ * self-contained (no cross-tree bounce on navigation).
+ */
+export async function AdminDashboard({ basePath = "/admin" }: AdminDashboardProps) {
   const supabase = await createClient();
 
   const { data: user } = await supabase.auth.getUser();
@@ -32,25 +45,56 @@ export default async function AdminPage() {
 
   const [
     accountsResult,
+    activeAccountsResult,
+    suspendedAccountsResult,
     usersResult,
     contactsResult,
     messagesResult,
-    activeSubscriptionsResult,
+    inboundMessagesResult,
     conversationsResult,
+    broadcastsResult,
+    sendingBroadcastsResult,
+    automationsResult,
+    activeAutomationsResult,
+    activeSubscriptionsResult,
+    trialingSubscriptionsResult,
+    pastDueSubscriptionsResult,
+    failedPaymentsResult,
+    revenueResult,
     recentAccountsResult,
     recentAuditResult,
   ] = await Promise.all([
     supabase.from("accounts").select("id", { count: "exact", head: true }),
+    supabase.from("accounts").select("id", { count: "exact", head: true }).eq("status", "active"),
+    supabase.from("accounts").select("id", { count: "exact", head: true }).eq("status", "suspended"),
     supabase.from("profiles").select("id", { count: "exact", head: true }),
     supabase.from("contacts").select("id", { count: "exact", head: true }),
-    supabase.from("messages").select("id", { count: "exact", head: true }),
+    // Outbound = sent by an agent/bot; inbound = sent by the customer.
+    supabase.from("messages").select("id", { count: "exact", head: true }).in("sender_type", ["agent", "bot"]),
+    supabase.from("messages").select("id", { count: "exact", head: true }).eq("sender_type", "customer"),
+    supabase
+      .from("conversations")
+      .select("id", { count: "exact", head: true }),
+    supabase.from("broadcasts").select("id", { count: "exact", head: true }),
+    supabase.from("broadcasts").select("id", { count: "exact", head: true }).in("status", ["sending", "scheduled"]),
+    supabase.from("automations").select("id", { count: "exact", head: true }),
+    supabase.from("automations").select("id", { count: "exact", head: true }).eq("is_active", true),
     supabase
       .from("business_subscriptions")
       .select("id", { count: "exact", head: true })
       .eq("status", "active"),
     supabase
-      .from("conversations")
-      .select("id", { count: "exact", head: true }),
+      .from("business_subscriptions")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "trialing"),
+    supabase
+      .from("business_subscriptions")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "past_due"),
+    supabase.from("payments").select("id", { count: "exact", head: true }).eq("status", "failed"),
+    // Revenue = sum of succeeded payments. Head-count queries can't sum,
+    // so pull just the amount column for succeeded rows.
+    supabase.from("payments").select("amount_cents").eq("status", "succeeded"),
     supabase
       .from("accounts")
       .select("id, name, slug, status, created_at")
@@ -63,52 +107,116 @@ export default async function AdminPage() {
       .limit(5),
   ]);
 
+  const totalRevenueCents = (revenueResult.data ?? []).reduce(
+    (sum, row) => sum + ((row.amount_cents as number | null) ?? 0),
+    0
+  );
+
+  const formatMoney = (cents: number) =>
+    `$${(cents / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+
   const stats = [
     {
       label: "Total Accounts",
       value: accountsResult.count ?? 0,
       icon: Building2,
-      href: "/admin/businesses",
+      href: `${basePath}/businesses`,
+    },
+    {
+      label: "Active",
+      value: activeAccountsResult.count ?? 0,
+      icon: Building2,
+      href: `${basePath}/businesses`,
+    },
+    {
+      label: "Suspended",
+      value: suspendedAccountsResult.count ?? 0,
+      icon: Building2,
+      href: `${basePath}/businesses`,
     },
     {
       label: "Total Users",
       value: usersResult.count ?? 0,
       icon: Users,
-      href: "/admin/users",
+      href: `${basePath}/users`,
     },
     {
       label: "Total Contacts",
       value: contactsResult.count ?? 0,
       icon: MessageSquare,
-      href: "/admin/businesses",
-    },
-    {
-      label: "Total Messages",
-      value: messagesResult.count ?? 0,
-      icon: FileText,
-      href: "/admin",
-    },
-    {
-      label: "Active Subscriptions",
-      value: activeSubscriptionsResult.count ?? 0,
-      icon: CreditCard,
-      href: "/admin/subscriptions",
+      href: `${basePath}/usage`,
     },
     {
       label: "Total Conversations",
       value: conversationsResult.count ?? 0,
       icon: MessageSquare,
-      href: "/admin",
+      href: `${basePath}/usage`,
+    },
+    {
+      label: "Messages Sent",
+      value: messagesResult.count ?? 0,
+      icon: FileText,
+      href: `${basePath}/usage`,
+    },
+    {
+      label: "Messages Received",
+      value: inboundMessagesResult.count ?? 0,
+      icon: FileText,
+      href: `${basePath}/usage`,
+    },
+    {
+      label: "Campaigns (Sending)",
+      value: `${broadcastsResult.count ?? 0} (${sendingBroadcastsResult.count ?? 0})`,
+      icon: Radio,
+      href: `${basePath}/campaigns`,
+    },
+    {
+      label: "Automations (Active)",
+      value: `${automationsResult.count ?? 0} (${activeAutomationsResult.count ?? 0})`,
+      icon: Zap,
+      href: `${basePath}/automations`,
+    },
+    {
+      label: "Active Subscriptions",
+      value: activeSubscriptionsResult.count ?? 0,
+      icon: CreditCard,
+      href: `${basePath}/subscriptions`,
+    },
+    {
+      label: "Trials",
+      value: trialingSubscriptionsResult.count ?? 0,
+      icon: CreditCard,
+      href: `${basePath}/subscriptions?status=trialing`,
+    },
+    {
+      label: "Past Due",
+      value: pastDueSubscriptionsResult.count ?? 0,
+      icon: CreditCard,
+      href: `${basePath}/subscriptions?status=past_due`,
+    },
+    {
+      label: "Failed Payments",
+      value: failedPaymentsResult.count ?? 0,
+      icon: DollarSign,
+      href: `${basePath}/payments?status=failed`,
+    },
+    {
+      label: "Revenue",
+      value: formatMoney(totalRevenueCents),
+      icon: DollarSign,
+      href: `${basePath}/payments`,
     },
   ];
 
   const quickLinks = [
-    { label: "Businesses", href: "/admin/businesses", icon: Building2 },
-    { label: "Users", href: "/admin/users", icon: Users },
-    { label: "Plans", href: "/admin/plans", icon: FileText },
-    { label: "Audit Logs", href: "/admin/audit", icon: ScrollText },
-    { label: "Platform Health", href: "/admin/health", icon: Activity },
-    { label: "Subscriptions", href: "/admin/subscriptions", icon: CreditCard },
+    { label: "Businesses", href: `${basePath}/businesses`, icon: Building2 },
+    { label: "Users", href: `${basePath}/users`, icon: Users },
+    { label: "Plans", href: `${basePath}/plans`, icon: FileText },
+    { label: "Payments", href: `${basePath}/payments`, icon: DollarSign },
+    { label: "WhatsApp Monitor", href: `${basePath}/whatsapp`, icon: Activity },
+    { label: "Audit Logs", href: `${basePath}/audit`, icon: ScrollText },
+    { label: "Platform Health", href: `${basePath}/health`, icon: Activity },
+    { label: "Subscriptions", href: `${basePath}/subscriptions`, icon: CreditCard },
   ];
 
   const statusColor: Record<string, string> = {
@@ -127,7 +235,7 @@ export default async function AdminPage() {
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {stats.map((stat) => (
           <Link key={stat.label} href={stat.href}>
             <Card className="border-border bg-card transition-colors hover:bg-muted/50">
@@ -141,7 +249,9 @@ export default async function AdminPage() {
               </CardHeader>
               <CardContent>
                 <p className="text-2xl font-bold text-foreground">
-                  {stat.value.toLocaleString()}
+                  {typeof stat.value === "number"
+                    ? stat.value.toLocaleString()
+                    : stat.value}
                 </p>
               </CardContent>
             </Card>
@@ -153,7 +263,7 @@ export default async function AdminPage() {
         <h3 className="mb-3 text-lg font-semibold text-foreground">
           Quick Links
         </h3>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {quickLinks.map((link) => (
             <Link key={link.href + link.label} href={link.href}>
               <Card className="border-border bg-card transition-colors hover:bg-muted/50">
@@ -186,7 +296,7 @@ export default async function AdminPage() {
                 {recentAccountsResult.data.map((account) => (
                   <Link
                     key={account.id}
-                    href={`/admin/businesses/${account.id}`}
+                    href={`${basePath}/businesses/${account.id}`}
                     className="flex items-center justify-between rounded-lg border border-border p-3 transition-colors hover:bg-muted/50"
                   >
                     <div className="min-w-0">
@@ -257,4 +367,8 @@ export default async function AdminPage() {
       </div>
     </div>
   );
+}
+
+export default function AdminPage() {
+  return <AdminDashboard basePath="/admin" />;
 }

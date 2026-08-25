@@ -18,12 +18,19 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminUsagePage({
+type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
+
+interface AdminUsagePageProps {
+  basePath?: string;
+  searchParams?: SearchParams;
+}
+
+/** Shared by /admin and /super-admin — links derive from `basePath`. */
+export async function AdminUsagePage({
+  basePath = "/admin",
   searchParams,
-}: {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
-}) {
-  const params = await searchParams;
+}: AdminUsagePageProps = {}) {
+  const params = (await searchParams) ?? {};
   const supabase = await createClient();
 
   const periodFilter =
@@ -114,7 +121,7 @@ export default async function AdminUsagePage({
   function periodUrl(p: string) {
     const sp = new URLSearchParams();
     if (p) sp.set("period", p);
-    return `/admin/usage?${sp.toString()}`;
+    return `${basePath}/usage?${sp.toString()}`;
   }
 
   return (
@@ -306,4 +313,12 @@ function SummaryCard({
       </CardContent>
     </Card>
   );
+}
+
+export default async function UsagePage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
+  return <AdminUsagePage basePath="/admin" searchParams={searchParams} />;
 }

@@ -9,6 +9,45 @@ Versions follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Pre-1.0, `MINOR` bumps cover new modules; `PATCH` bumps cover bug fixes
 and polish.
 
+## [0.8.2] — 2026-08-24
+
+Brings three platform-grade capabilities into the customer workspace,
+mirroring what Super Admin already had: an **account activity log**, a
+**usage history** view on Billing, and **truthful WhatsApp connection
+health** that survives between page visits.
+
+> **Migration required:** apply `supabase/migrations/050_customer_activity_log.sql`
+> (adds a customer-side RLS read policy on the shared `audit_log` table —
+> admins and owners only, scoped to their own account — plus triggers that
+> record contact/broadcast/invitation/member/WhatsApp events automatically).
+
+### Added
+
+- **Activity log (Settings → Activity).** A paginated feed of important
+  account events — contacts created, broadcasts launched, invite links
+  generated, members joining or changing role, and WhatsApp connect /
+  disconnect moments — with who did it and when. Visible to **admins and
+  the owner** only; enforced by both the API route and a new row-level
+  security policy, so agents can never read it even via direct API calls.
+  Events are captured by database triggers, so nothing is missed no matter
+  how the change was made (app, API, or SQL).
+- **Usage history on Billing.** The billing page now shows a month-by-month
+  table of the last six months — messages sent/received, new contacts,
+  broadcasts, automation runs, and AI requests — next to the current-month
+  meters, so growth and seasonality are visible without contacting support.
+- **WhatsApp identity in Settings.** After a successful connection, the
+  WhatsApp panel shows the business display name and phone number Meta
+  reports for the connected number, letting users confirm they wired the
+  right account without leaving the page.
+
+### Improved
+
+- **Connection health stays truthful.** The detailed WhatsApp connection
+  state (`connected` / `error`) is now refreshed every time credentials are
+  saved or a health check runs — not only at save time — so monitoring
+  surfaces catch tokens that rot or numbers Meta starts rejecting long
+  after the initial setup.
+
 ## [0.8.1] — 2026-07-10
 
 Fixes inbound chats fragmenting into multiple threads for the same
