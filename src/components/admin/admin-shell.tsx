@@ -84,6 +84,10 @@ function buildNavSections(basePath: string): NavSection[] {
       title: "Administration",
       items: [
         { href: `${basePath}/audit`, label: "Audit Logs", icon: ScrollText },
+        { href: `${basePath}/wallets`, label: "Wallets", icon: DollarSign },
+        { href: `${basePath}/pricing-rules`, label: "Pricing Rules", icon: DollarSign },
+        { href: `${basePath}/automation-management`, label: "Automation Mgmt", icon: Zap },
+        { href: `${basePath}/system-health`, label: "System Health", icon: Activity },
         { href: `${basePath}/support`, label: "Support", icon: LifeBuoy },
         { href: `${basePath}/settings`, label: "Settings", icon: Settings },
       ],

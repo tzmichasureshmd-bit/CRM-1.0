@@ -35,6 +35,15 @@
     "automations": "Automations",
     "flows": "Flows",
     "aiAgents": "AI Agents",
+    "automationFlows": "Automation Flows",
+    "botFlowBuilder": "Bot Flow Builder",
+    "aiFollowups": "AI Follow-ups",
+    "bulkAiCalls": "Bulk AI Calls",
+    "quickReplies": "Quick Replies",
+    "keyboardTriggers": "Keyboard Triggers",
+    "appointments": "Appointments",
+    "tickets": "Tickets",
+    "saveMoney": "Save Money",
     "settings": "Settings",
     "billing": "Plans & Billing",
     "beta": "Beta",
@@ -53,6 +62,7 @@
     "sectionConversations": "Conversations",
     "sectionMarketing": "Marketing",
     "sectionAutomation": "Automation",
+    "sectionSaveMoney": "Save Money",
     "sectionGrowth": "Growth",
     "sectionSystem": "System"
   },
@@ -64,6 +74,14 @@
     "pipelines": "Pipelines",
     "broadcasts": "Broadcasts",
     "automations": "Automations",
+    "automationFlows": "Automation Flows",
+    "botFlowBuilder": "Bot Flow Builder",
+    "aiFollowups": "AI Follow-ups",
+    "bulkAiCalls": "Bulk AI Calls",
+    "quickReplies": "Quick Replies",
+    "keyboardTriggers": "Keyboard Triggers",
+    "appointments": "Appointments",
+    "tickets": "Tickets",
     "flows": "Flows",
     "aiAgents": "AI Agents",
     "campaigns": "Campaigns",
@@ -73,6 +91,7 @@
     "settings": "Settings",
     "mediaLibrary": "Media Library",
     "apiDeveloper": "API / Developer",
+    "saveMoney": "Save Money",
     "openMenu": "Open menu",
     "openAccountMenu": "Open account menu",
     "defaultUser": "User",
@@ -1095,6 +1114,78 @@
         "matchExact": "Exact",
         "closeConversationHint": "Sets the conversation status to \"closed\". No configuration needed."
       }
+    }
+  },
+  "AiCalls": {
+    "title": "Bulk AI Calls",
+    "subtitle": "Create and manage AI-powered calling campaigns.",
+    "createCampaign": "New Campaign",
+    "emptyTitle": "No campaigns yet",
+    "emptyDesc": "Create your first AI call campaign to start reaching out to contacts.",
+    "analytics": {
+      "totalCalls": "Total Calls",
+      "completedCalls": "Completed",
+      "failedCalls": "Failed",
+      "avgDuration": "Avg Duration"
+    },
+    "tabs": {
+      "campaigns": "Campaigns",
+      "callRecords": "Call Records"
+    },
+    "table": {
+      "campaign": "Campaign",
+      "status": "Status",
+      "calls": "Calls",
+      "completed": "Completed",
+      "interested": "Interested",
+      "created": "Created",
+      "actions": "Actions"
+    },
+    "actions": {
+      "start": "Start",
+      "pause": "Pause",
+      "resume": "Resume",
+      "delete": "Delete"
+    },
+    "records": {
+      "emptyTitle": "No call records yet",
+      "emptyDesc": "Start a campaign to begin calling contacts.",
+      "table": {
+        "campaign": "Campaign",
+        "contact": "Contact",
+        "phone": "Phone",
+        "status": "Status",
+        "outcome": "Outcome",
+        "duration": "Duration",
+        "sentiment": "Sentiment",
+        "followUp": "Follow-up"
+      }
+    },
+    "dialog": {
+      "createTitle": "Create AI Call Campaign",
+      "createDesc": "Set up a new AI-powered calling campaign.",
+      "cancel": "Cancel",
+      "create": "Create Campaign"
+    },
+    "form": {
+      "name": "Campaign Name",
+      "namePlaceholder": "e.g. Q1 Lead Outreach",
+      "description": "Description",
+      "descriptionPlaceholder": "Optional description for this campaign",
+      "voiceAgentId": "Voice Agent ID",
+      "voiceAgentIdPlaceholder": "ID from your voice provider",
+      "callObjective": "Call Objective",
+      "callObjectivePlaceholder": "Describe the goal of this campaign...",
+      "callingHoursStart": "Start Time",
+      "callingHoursEnd": "End Time",
+      "callingDays": "Calling Days",
+      "maxCalls": "Max Calls",
+      "maxRetries": "Max Retries",
+      "retryDelay": "Retry Delay (hrs)",
+      "selectContacts": "Select Contacts",
+      "selectAll": "Select All",
+      "selectedCount": "{count} selected",
+      "noContacts": "No contacts available. Add contacts first."
     }
   },
   "Flows": {

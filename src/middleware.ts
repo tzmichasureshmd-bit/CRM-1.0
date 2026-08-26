@@ -101,7 +101,7 @@ export async function middleware(request: NextRequest) {
     const pathname = request.nextUrl.pathname
     const isProtectedSuperAdmin = pathname.startsWith('/super-admin') && pathname !== '/super-admin/login'
     const isProtectedAdmin = pathname.startsWith('/admin') && pathname !== '/admin/login'
-    const isOtherProtected = ['/dashboard', '/inbox', '/contacts', '/pipelines', '/broadcasts', '/automations', '/settings'].some(path => pathname.startsWith(path))
+    const isOtherProtected = ['/dashboard', '/inbox', '/contacts', '/pipelines', '/broadcasts', '/automations', '/save-money', '/settings'].some(path => pathname.startsWith(path))
     if (isProtectedSuperAdmin || isProtectedAdmin || isOtherProtected) {
       const url = request.nextUrl.clone()
       if (isProtectedSuperAdmin) {

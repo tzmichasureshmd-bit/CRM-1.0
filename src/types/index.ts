@@ -797,3 +797,395 @@ export interface AuditLogEntry {
   ip_address?: string;
   created_at: string;
 }
+
+// ============================================================
+// Tickets (migration 051)
+// ============================================================
+
+export type TicketStatus = "open" | "in_progress" | "waiting" | "resolved" | "closed";
+export type TicketPriority = "low" | "medium" | "high" | "urgent";
+
+export interface Ticket {
+  id: string;
+  account_id: string;
+  ticket_number: number;
+  contact_id?: string;
+  conversation_id?: string;
+  subject: string;
+  description?: string;
+  status: TicketStatus;
+  priority: TicketPriority;
+  assigned_agent_id?: string;
+  tags: string[];
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+  resolved_at?: string;
+  closed_at?: string;
+}
+
+export interface TicketComment {
+  id: string;
+  account_id: string;
+  ticket_id: string;
+  user_id?: string;
+  content: string;
+  is_internal: boolean;
+  created_at: string;
+}
+
+// ============================================================
+// Appointments (migration 051)
+// ============================================================
+
+export type AppointmentStatus =
+  | "scheduled"
+  | "confirmed"
+  | "rescheduled"
+  | "cancelled"
+  | "completed"
+  | "no_show";
+
+export interface Appointment {
+  id: string;
+  account_id: string;
+  contact_id?: string;
+  conversation_id?: string;
+  agent_id?: string;
+  title: string;
+  description?: string;
+  service?: string;
+  appointment_date: string;
+  appointment_time: string;
+  duration_minutes: number;
+  status: AppointmentStatus;
+  notes?: string;
+  reminder_sent: boolean;
+  reminder_24h_sent: boolean;
+  reminder_1h_sent: boolean;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+  completed_at?: string;
+  cancelled_at?: string;
+}
+
+// ============================================================
+// AI Follow-ups (migration 051)
+// ============================================================
+
+export type AiFollowupTriggerType =
+  | "manual"
+  | "new_contact"
+  | "tag_added"
+  | "deal_created"
+  | "no_response"
+  | "keyword"
+  | "webhook"
+  | "scheduled";
+
+export type AiFollowupStatus = "draft" | "active" | "paused" | "archived";
+export type AiFollowupExecutionStatus = "active" | "completed" | "stopped" | "failed" | "waiting";
+
+export interface AiFollowup {
+  id: string;
+  account_id: string;
+  user_id: string;
+  name: string;
+  description?: string;
+  status: AiFollowupStatus;
+  trigger_type: AiFollowupTriggerType;
+  trigger_config: Record<string, unknown>;
+  max_followups: number;
+  delay_hours: number;
+  working_hours_only: boolean;
+  working_hours_start: string;
+  working_hours_end: string;
+  stop_on_reply: boolean;
+  stop_on_opt_out: boolean;
+  ai_provider?: string;
+  ai_model?: string;
+  ai_system_prompt?: string;
+  ai_temperature: number;
+  ai_max_tokens: number;
+  template_id?: string;
+  use_template: boolean;
+  execution_count: number;
+  last_executed_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AiFollowupExecution {
+  id: string;
+  account_id: string;
+  followup_id: string;
+  contact_id: string;
+  status: AiFollowupExecutionStatus;
+  current_step: number;
+  total_steps: number;
+  last_message_id?: string;
+  last_sent_at?: string;
+  next_action_at?: string;
+  ai_generated_message?: string;
+  stop_reason?: string;
+  error_message?: string;
+  vars: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+  completed_at?: string;
+}
+
+// ============================================================
+// AI Call Campaigns (migration 051)
+// ============================================================
+
+export type AiCallCampaignStatus = "draft" | "running" | "paused" | "completed" | "failed";
+export type AiCallRecordStatus =
+  | "queued"
+  | "calling"
+  | "completed"
+  | "no_answer"
+  | "busy"
+  | "failed"
+  | "retry";
+export type AiCallOutcome =
+  | "interested"
+  | "not_interested"
+  | "call_later"
+  | "converted"
+  | "no_outcome";
+
+export interface AiCallCampaign {
+  id: string;
+  account_id: string;
+  user_id: string;
+  name: string;
+  description?: string;
+  status: AiCallCampaignStatus;
+  voice_agent_id?: string;
+  call_objective?: string;
+  calling_hours_start: string;
+  calling_hours_end: string;
+  calling_days: number[];
+  max_calls: number;
+  max_retries: number;
+  retry_delay_hours: number;
+  contact_filter: Record<string, unknown>;
+  contact_ids: string[];
+  total_calls: number;
+  completed_calls: number;
+  failed_calls: number;
+  interested_count: number;
+  not_interested_count: number;
+  converted_count: number;
+  last_called_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AiCallRecord {
+  id: string;
+  account_id: string;
+  campaign_id?: string;
+  contact_id: string;
+  phone_number: string;
+  status: AiCallRecordStatus;
+  outcome?: AiCallOutcome;
+  started_at?: string;
+  ended_at?: string;
+  duration_seconds?: number;
+  transcript?: string;
+  ai_summary?: string;
+  ai_sentiment?: string;
+  next_action?: string;
+  followup_required: boolean;
+  retry_count: number;
+  error_message?: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================================
+// Wallet (migration 051)
+// ============================================================
+
+export type WalletTransactionType =
+  | "credit_purchase"
+  | "campaign_usage"
+  | "ai_usage"
+  | "voice_usage"
+  | "refund"
+  | "adjustment"
+  | "subscription_payment";
+
+export type WalletTransactionStatus = "pending" | "completed" | "failed" | "refunded";
+
+export interface Wallet {
+  id: string;
+  account_id: string;
+  balance_cents: number;
+  reserved_cents: number;
+  used_cents: number;
+  currency: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WalletTransaction {
+  id: string;
+  account_id: string;
+  wallet_id: string;
+  type: WalletTransactionType;
+  amount_cents: number;
+  balance_before_cents: number;
+  balance_after_cents: number;
+  reference_type?: string;
+  reference_id?: string;
+  description?: string;
+  status: WalletTransactionStatus;
+  metadata: Record<string, unknown>;
+  created_by?: string;
+  created_at: string;
+}
+
+// ============================================================
+// Pricing Rules (migration 051)
+// ============================================================
+
+export type TemplateCategory = "marketing" | "utility" | "authentication";
+
+export interface PricingRule {
+  id: string;
+  account_id: string;
+  category: TemplateCategory;
+  rate_cents: number;
+  currency: string;
+  destination: string;
+  description?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================================
+// Smart Broadcasts (migration 051)
+// ============================================================
+
+export type SmartBroadcastStatus =
+  | "draft"
+  | "scheduled"
+  | "sending"
+  | "sent"
+  | "paused"
+  | "completed"
+  | "failed";
+
+export type SmartBroadcastAudienceType =
+  | "all"
+  | "tags"
+  | "segment"
+  | "contacts"
+  | "uploaded";
+
+export interface SmartBroadcast {
+  id: string;
+  account_id: string;
+  user_id: string;
+  name: string;
+  template_id?: string;
+  template_category?: string;
+  status: SmartBroadcastStatus;
+  audience_type: SmartBroadcastAudienceType;
+  audience_config: Record<string, unknown>;
+  audience_count: number;
+  sent_count: number;
+  delivered_count: number;
+  read_count: number;
+  failed_count: number;
+  variable_mapping: Record<string, unknown>;
+  scheduled_at?: string;
+  started_at?: string;
+  completed_at?: string;
+  estimated_cost_cents: number;
+  actual_cost_cents: number;
+  meta_category?: string;
+  error_message?: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================================
+// Keyboard Shortcuts (migration 051)
+// ============================================================
+
+export interface KeyboardShortcut {
+  id: string;
+  account_id: string;
+  user_id: string;
+  action_key: string;
+  shortcut: string;
+  description?: string;
+  is_enabled: boolean;
+  created_at: string;
+}
+
+// ============================================================
+// Workflow Templates (migration 051)
+// ============================================================
+
+export interface WorkflowTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  category: string;
+  trigger_type: string;
+  trigger_config: Record<string, unknown>;
+  nodes: Record<string, unknown>[];
+  edges: Record<string, unknown>[];
+  is_builtin: boolean;
+  is_active: boolean;
+  usage_count: number;
+  created_at: string;
+}
+
+// ============================================================
+// Automation Execution Logs (migration 051)
+// ============================================================
+
+export type ExecutionLogStatus = "pending" | "running" | "completed" | "failed" | "skipped" | "waiting";
+export type WorkflowType = "automation" | "flow" | "ai_followup";
+
+export interface AutomationExecutionLog {
+  id: string;
+  account_id: string;
+  workflow_id: string;
+  workflow_type: WorkflowType;
+  execution_id: string;
+  node_id?: string;
+  node_type?: string;
+  status: ExecutionLogStatus;
+  input?: Record<string, unknown>;
+  output?: Record<string, unknown>;
+  error_message?: string;
+  duration_ms?: number;
+  started_at: string;
+  completed_at?: string;
+}
+
+// ============================================================
+// Cost Estimate (for Smart Broadcast pre-send)
+// ============================================================
+
+export interface CostEstimate {
+  recipients: number;
+  category: TemplateCategory;
+  rate_cents: number;
+  estimated_meta_cost_cents: number;
+  service_fee_cents: number;
+  total_estimated_cents: number;
+  currency: string;
+}

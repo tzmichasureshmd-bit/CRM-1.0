@@ -26,6 +26,14 @@ const pageTitles: Record<string, string> = {
   "/pipelines": "pipelines",
   "/broadcasts": "broadcasts",
   "/automations": "automations",
+  "/automations/flows": "automationFlows",
+  "/automations/bot-builder": "botFlowBuilder",
+  "/automations/followups": "aiFollowups",
+  "/automations/calls": "bulkAiCalls",
+  "/automations/quick-replies": "quickReplies",
+  "/automations/keyboard-triggers": "keyboardTriggers",
+  "/automations/appointments": "appointments",
+  "/automations/tickets": "tickets",
   "/flows": "flows",
   "/agents": "aiAgents",
   "/campaigns": "campaigns",
@@ -35,6 +43,7 @@ const pageTitles: Record<string, string> = {
   "/settings": "settings",
   "/media-library": "mediaLibrary",
   "/api": "apiDeveloper",
+  "/save-money": "saveMoney",
 };
 
 function getPageTitleKey(pathname: string): string {
