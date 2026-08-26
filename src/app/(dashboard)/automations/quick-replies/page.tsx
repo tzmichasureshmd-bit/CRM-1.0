@@ -130,6 +130,7 @@ export default function QuickRepliesPage() {
   }, [accountId, t])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load()
   }, [load])
 

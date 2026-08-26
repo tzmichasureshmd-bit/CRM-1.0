@@ -147,6 +147,7 @@ export default function KeyboardTriggersPage() {
   }, [accountId, t])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load()
   }, [load])
 
