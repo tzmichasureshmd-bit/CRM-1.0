@@ -333,14 +333,14 @@ function EmptyState({
   t: ReturnType<typeof useTranslations>;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-card/50 px-6 py-16 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
+    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/60 bg-muted/20 px-6 py-16 text-center">
+      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/50">
         <Workflow className="h-6 w-6 text-muted-foreground" />
       </div>
-      <h2 className="mt-4 text-base font-medium text-foreground">
+      <h3 className="mt-4 text-sm font-semibold text-foreground">
         {t("emptyTitle")}
-      </h2>
-      <p className="mt-1 max-w-md text-sm text-muted-foreground">
+      </h3>
+      <p className="mt-1 max-w-md text-xs text-muted-foreground leading-relaxed">
         {t("emptyDesc")}
       </p>
       <GatedButton
@@ -375,10 +375,12 @@ function FlowCard({
         ? Archive
         : PauseCircle;
   return (
-    <div className="flex flex-col rounded-lg border border-border bg-card p-4 transition-colors hover:border-border">
+    <div className="group flex flex-col rounded-xl border border-border/60 bg-card p-5 transition-all duration-200 hover:border-border hover:shadow-md hover:shadow-black/5">
       <div className="flex items-start justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <Workflow className="h-4 w-4 shrink-0 text-primary" />
+        <div className="flex min-w-0 items-center gap-2.5">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 transition-transform group-hover:scale-105">
+            <Workflow className="h-4 w-4 text-primary" />
+          </div>
           <h3 className="truncate text-sm font-semibold text-foreground">
             {flow.name}
           </h3>
@@ -395,31 +397,33 @@ function FlowCard({
         </Badge>
       </div>
 
-      <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">
+      <p className="mt-3 line-clamp-2 text-xs text-muted-foreground leading-relaxed">
         {flow.description || triggerSummary}
       </p>
 
-      <div className="mt-4 flex items-center gap-3 text-[11px] text-muted-foreground">
-        <span className="inline-flex items-center gap-1">
-          <MessageSquare className="h-3 w-3" />
-          {t("runCount", { count: flow.execution_count })}
-        </span>
-      </div>
+      <div className="mt-auto pt-4">
+        <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+          <span className="inline-flex items-center gap-1">
+            <MessageSquare className="h-3 w-3" />
+            {t("runCount", { count: flow.execution_count })}
+          </span>
+        </div>
 
-      <div className="mt-4 flex items-center justify-end gap-2 border-t border-border pt-3">
-        <Button variant="ghost" size="sm" onClick={onEdit}>
-          <Pencil className="h-3.5 w-3.5" />
-          {t("edit")}
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onDelete}
-          className="text-red-400 hover:bg-red-500/10 hover:text-red-300"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-          {t("delete")}
-        </Button>
+        <div className="mt-3 flex items-center justify-end gap-2 border-t border-border/60 pt-3">
+          <Button variant="ghost" size="sm" onClick={onEdit} className="gap-1.5">
+            <Pencil className="h-3.5 w-3.5" />
+            {t("edit")}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onDelete}
+            className="gap-1.5 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            {t("delete")}
+          </Button>
+        </div>
       </div>
     </div>
   );

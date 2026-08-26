@@ -213,57 +213,61 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <OnboardingBanner />
 
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
             {getGreeting()}, {firstName}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {t('description')}
           </p>
         </div>
-        {whatsappConnected !== null && (
-          <div className="flex items-center gap-2 text-xs">
-            {whatsappConnected ? (
-              <>
-                <span className="flex h-2 w-2">
-                  <span className="absolute inline-flex h-2 w-2 animate-ping rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+        <div className="flex items-center gap-3">
+          {whatsappConnected !== null && (
+            <div className="flex items-center gap-2 text-xs">
+              {whatsappConnected ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/5 px-2.5 py-1 text-xs font-medium text-emerald-500">
+                  <span className="flex h-1.5 w-1.5">
+                    <span className="absolute inline-flex h-1.5 w-1.5 animate-ping rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  </span>
+                  Connected
                 </span>
-                <span className="text-emerald-500 font-medium">WhatsApp Connected</span>
-              </>
-            ) : (
-              <Link
-                href="/settings?tab=whatsapp"
-                className="flex items-center gap-1.5 text-amber-400 hover:text-amber-300 transition-colors"
-              >
-                <WifiOff className="h-3.5 w-3.5" />
-                <span className="font-medium">Connect WhatsApp</span>
-              </Link>
-            )}
-          </div>
-        )}
+              ) : (
+                <Link
+                  href="/settings?tab=whatsapp"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/20 bg-amber-500/5 px-2.5 py-1 text-xs font-medium text-amber-400 transition-colors hover:bg-amber-500/10"
+                >
+                  <WifiOff className="h-3 w-3" />
+                  Connect WhatsApp
+                </Link>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {whatsappConnected === false && (
-        <div className="flex items-center gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/10">
-            <WifiOff className="h-4 w-4 text-amber-400" />
+        <div className="relative overflow-hidden rounded-xl border border-amber-500/20 bg-gradient-to-r from-amber-500/5 to-amber-500/[0.02] px-5 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/10">
+              <WifiOff className="h-5 w-5 text-amber-400" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-foreground">
+                {t('whatsappNotConnected')}
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Connect your WhatsApp Business account to start receiving and sending messages.
+              </p>
+            </div>
+            <Link
+              href="/settings?tab=whatsapp"
+              className="shrink-0 rounded-lg bg-amber-500/10 px-4 py-2 text-xs font-semibold text-amber-400 transition-all hover:bg-amber-500/20 hover:shadow-sm"
+            >
+              {t('connectNow')}
+            </Link>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-foreground">
-              {t('whatsappNotConnected')}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Connect your WhatsApp Business account to start receiving and sending messages.
-            </p>
-          </div>
-          <Link
-            href="/settings?tab=whatsapp"
-            className="shrink-0 rounded-lg bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-400 transition-colors hover:bg-amber-500/20"
-          >
-            {t('connectNow')}
-          </Link>
         </div>
       )}
 
@@ -276,6 +280,7 @@ export default function DashboardPage() {
               title={t('activeConversations')}
               value={metrics.activeConversations.current.toLocaleString()}
               icon={MessageSquare}
+              iconBg="bg-blue-500/10 text-blue-500"
               delta={{
                 sign: metrics.activeConversations.previous,
                 label: deltaLabel(
@@ -289,6 +294,7 @@ export default function DashboardPage() {
               title={t('newContactsToday')}
               value={metrics.newContactsToday.current.toLocaleString()}
               icon={UserPlus}
+              iconBg="bg-emerald-500/10 text-emerald-500"
               delta={{
                 sign:
                   metrics.newContactsToday.current - metrics.newContactsToday.previous,
@@ -303,12 +309,14 @@ export default function DashboardPage() {
               title={t('openDealsValue')}
               value={formatCurrency(metrics.openDealsValue, defaultCurrency)}
               icon={DollarSign}
+              iconBg="bg-amber-500/10 text-amber-500"
               subtitle={t('openDeals', { count: metrics.openDealsCount })}
             />
             <MetricCard
               title={t('messagesSentToday')}
               value={metrics.messagesSentToday.current.toLocaleString()}
               icon={Send}
+              iconBg="bg-violet-500/10 text-violet-500"
               delta={{
                 sign:
                   metrics.messagesSentToday.current - metrics.messagesSentToday.previous,
@@ -325,54 +333,69 @@ export default function DashboardPage() {
 
       <QuickActions />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          icon={Users}
-          label={t('totalContacts')}
-          value={totalContacts}
-          loading={metricsLoading}
-        />
-        <StatCard
-          icon={MessageSquare}
-          label={t('totalConversations')}
-          value={totalConversations}
-          loading={metricsLoading}
-        />
-        <StatCard
-          icon={Calendar}
-          label={t('todaysFollowUps')}
-          value={metrics?.followUpsToday.current ?? null}
-          loading={metricsLoading}
-        />
-        <StatCard
-          icon={TrendingUp}
-          label={t('openDealsCountLabel')}
-          value={metrics?.openDealsCount ?? null}
-          loading={metricsLoading}
-        />
+      <div className="rounded-xl border border-border/60 bg-card p-5">
+        <h2 className="mb-4 text-sm font-semibold text-foreground">{t('overview')}</h2>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <StatCard
+            icon={Users}
+            label={t('totalContacts')}
+            value={totalContacts}
+            loading={metricsLoading}
+          />
+          <StatCard
+            icon={MessageSquare}
+            label={t('totalConversations')}
+            value={totalConversations}
+            loading={metricsLoading}
+          />
+          <StatCard
+            icon={Calendar}
+            label={t('todaysFollowUps')}
+            value={metrics?.followUpsToday.current ?? null}
+            loading={metricsLoading}
+          />
+          <StatCard
+            icon={TrendingUp}
+            label={t('openDealsCountLabel')}
+            value={metrics?.openDealsCount ?? null}
+            loading={metricsLoading}
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Link href="/inbox?filter=unassigned" className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 hover:bg-muted/50 transition-colors">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-orange-500/10">
-            <Users className="h-4 w-4 text-orange-500" />
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">{t('unassignedConversations')}</p>
-            <p className="text-lg font-bold tabular-nums text-foreground">
-              {unassignedCount !== null ? unassignedCount.toLocaleString() : '—'}
-            </p>
+        <Link
+          href="/inbox?filter=unassigned"
+          className="group relative overflow-hidden rounded-xl border border-border/60 bg-card p-5 transition-all duration-200 hover:border-orange-500/20 hover:shadow-md hover:shadow-orange-500/5"
+        >
+          <div className="absolute inset-0 bg-gradient-to-br from-orange-500/[0.03] to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+          <div className="relative flex items-center gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-orange-500/10 transition-transform group-hover:scale-105">
+              <Users className="h-5 w-5 text-orange-500" />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">{t('unassignedConversations')}</p>
+              <p className="text-2xl font-bold tabular-nums text-foreground">
+                {unassignedCount !== null ? unassignedCount.toLocaleString() : '—'}
+              </p>
+            </div>
           </div>
         </Link>
-        <Link href="/inbox?filter=followups" className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 hover:bg-muted/50 transition-colors">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-500/10">
-            <Calendar className="h-4 w-4 text-red-500" />
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">{t('overdueFollowUps')}</p>
-            <p className="text-lg font-bold tabular-nums text-foreground">
-              {overdueFollowUpsCount !== null ? overdueFollowUpsCount.toLocaleString() : '—'}
-            </p>
+        <Link
+          href="/inbox?filter=followups"
+          className="group relative overflow-hidden rounded-xl border border-border/60 bg-card p-5 transition-all duration-200 hover:border-red-500/20 hover:shadow-md hover:shadow-red-500/5"
+        >
+          <div className="absolute inset-0 bg-gradient-to-br from-red-500/[0.03] to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+          <div className="relative flex items-center gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-red-500/10 transition-transform group-hover:scale-105">
+              <Calendar className="h-5 w-5 text-red-500" />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">{t('overdueFollowUps')}</p>
+              <p className="text-2xl font-bold tabular-nums text-foreground">
+                {overdueFollowUpsCount !== null ? overdueFollowUpsCount.toLocaleString() : '—'}
+              </p>
+            </div>
           </div>
         </Link>
       </div>
@@ -430,12 +453,12 @@ function StatCard({
   loading: boolean
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-4">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+    <div className="flex items-center gap-3 rounded-lg border border-transparent bg-muted/30 p-3 transition-colors hover:bg-muted/50">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-background text-muted-foreground shadow-sm">
         <Icon className="h-4 w-4" />
       </div>
       <div>
-        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className="text-xs font-medium text-muted-foreground">{label}</p>
         {loading ? (
           <div className="mt-1 h-5 w-12 animate-pulse rounded bg-muted" />
         ) : (

@@ -122,6 +122,7 @@
       "vsYesterday": "vs yesterday",
       "openDeals": "{count} open {count, plural, =1 {deal} other {deals}}",
       "noChange": "No change {suffix}",
+      "overview": "Overview",
       "whatsappNotConnected": "WhatsApp is not connected. Connect your account to start messaging.",
       "connectNow": "Connect now",
       "totalContacts": "Total Contacts",
@@ -132,10 +133,19 @@
       "there": "there"
     },
     "quickActions": {
+      "title": "Quick Actions",
       "newContact": "New Contact",
+      "newContactDesc": "Add a contact",
       "newDeal": "New Deal",
+      "newDealDesc": "Create a deal",
       "newBroadcast": "New Broadcast",
-      "newAutomation": "New Automation"
+      "newBroadcastDesc": "Send bulk messages",
+      "newAutomation": "New Automation",
+      "newAutomationDesc": "Build a workflow",
+      "openInbox": "Open Inbox",
+      "openInboxDesc": "View conversations",
+      "buildBotFlow": "Bot Flow",
+      "buildBotFlowDesc": "Visual bot builder"
     },
     "activityFeed": {
       "title": "Recent Activity",

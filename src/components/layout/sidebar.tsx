@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useTotalUnread } from "@/hooks/use-total-unread";
@@ -11,10 +11,9 @@ import {
   Bell,
   Bot,
   Calendar,
+  ChevronDown,
   Crown,
-  DollarSign,
   GitBranch,
-  Headphones,
   Images,
   Layers,
   LayoutDashboard,
@@ -38,43 +37,10 @@ import {
   Workflow,
   X,
   Zap,
-  FileText,
   Timer,
-  Banknote,
   BarChart3,
-  ShoppingCart,
 } from "lucide-react";
 import type { AccountRole } from "@/lib/auth/roles";
-
-const ROLE_CHIP: Record<
-  AccountRole,
-  { icon: typeof Crown; labelKey: string; className: string }
-> = {
-  owner: {
-    icon: Crown,
-    labelKey: "roleOwner",
-    className:
-      "border-amber-500/40 bg-amber-500/10 text-amber-300",
-  },
-  admin: {
-    icon: Shield,
-    labelKey: "roleAdmin",
-    className:
-      "border-primary/40 bg-primary/10 text-primary",
-  },
-  agent: {
-    icon: UserCog,
-    labelKey: "roleAgent",
-    className:
-      "border-border bg-muted text-foreground",
-  },
-  viewer: {
-    icon: User,
-    labelKey: "roleViewer",
-    className:
-      "border-border bg-card text-muted-foreground",
-  },
-};
 import {
   Avatar,
   AvatarFallback,
@@ -88,6 +54,32 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+const ROLE_CHIP: Record<
+  AccountRole,
+  { icon: typeof Crown; labelKey: string; className: string }
+> = {
+  owner: {
+    icon: Crown,
+    labelKey: "roleOwner",
+    className: "border-amber-500/40 bg-amber-500/10 text-amber-300",
+  },
+  admin: {
+    icon: Shield,
+    labelKey: "roleAdmin",
+    className: "border-primary/40 bg-primary/10 text-primary",
+  },
+  agent: {
+    icon: UserCog,
+    labelKey: "roleAgent",
+    className: "border-border bg-muted text-foreground",
+  },
+  viewer: {
+    icon: User,
+    labelKey: "roleViewer",
+    className: "border-border bg-card text-muted-foreground",
+  },
+};
+
 interface NavItem {
   href: string;
   labelKey: string;
@@ -96,22 +88,19 @@ interface NavItem {
 }
 
 interface NavSection {
-  labelKey?: string;
+  labelKey: string;
   items: NavItem[];
+  defaultOpen?: boolean;
 }
 
 const navSections: NavSection[] = [
-  {
-    items: [
-      { href: "/dashboard", labelKey: "dashboard", icon: LayoutDashboard },
-    ],
-  },
   {
     labelKey: "sectionConversations",
     items: [
       { href: "/inbox", labelKey: "inbox", icon: MessageSquare },
       { href: "/contacts", labelKey: "contacts", icon: Users },
     ],
+    defaultOpen: true,
   },
   {
     labelKey: "sectionMarketing",
@@ -120,6 +109,7 @@ const navSections: NavSection[] = [
       { href: "/broadcasts", labelKey: "broadcasts", icon: Radio },
       { href: "/templates", labelKey: "templates", icon: Layers },
     ],
+    defaultOpen: true,
   },
   {
     labelKey: "sectionAutomation",
@@ -134,18 +124,14 @@ const navSections: NavSection[] = [
       { href: "/automations/appointments", labelKey: "appointments", icon: Calendar },
       { href: "/automations/tickets", labelKey: "tickets", icon: Ticket },
     ],
-  },
-  {
-    labelKey: "sectionSaveMoney",
-    items: [
-      { href: "/save-money", labelKey: "saveMoney", icon: PiggyBank },
-    ],
+    defaultOpen: true,
   },
   {
     labelKey: "sectionGrowth",
     items: [
       { href: "/pipelines", labelKey: "pipelines", icon: GitBranch },
-      { href: "/reports", labelKey: "reports", icon: FileText },
+      { href: "/reports", labelKey: "reports", icon: BarChart3 },
+      { href: "/save-money", labelKey: "saveMoney", icon: PiggyBank },
     ],
   },
   {
@@ -168,6 +154,24 @@ interface SidebarProps {
   onClose?: () => void;
 }
 
+const SECTION_STORAGE_KEY = "wacrm-sidebar-sections";
+
+function loadSectionState(): Record<string, boolean> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(SECTION_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveSectionState(state: Record<string, boolean>) {
+  try {
+    localStorage.setItem(SECTION_STORAGE_KEY, JSON.stringify(state));
+  } catch {}
+}
+
 import { useTranslations } from "next-intl";
 
 export function Sidebar({ open = false, onClose }: SidebarProps) {
@@ -181,8 +185,26 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
     !!account?.name &&
     account.name !== profile?.full_name;
 
+  const [sectionsOpen, setSectionsOpen] = useState<Record<string, boolean>>(() => {
+    const saved = loadSectionState();
+    const initial: Record<string, boolean> = {};
+    for (const section of navSections) {
+      initial[section.labelKey] = saved[section.labelKey] ?? (section.defaultOpen ?? false);
+    }
+    return initial;
+  });
+
+  useEffect(() => {
+    saveSectionState(sectionsOpen);
+  }, [sectionsOpen]);
+
+  const toggleSection = useCallback((key: string) => {
+    setSectionsOpen((prev) => ({ ...prev, [key]: !prev[key] }));
+  }, []);
+
   useEffect(() => {
     onClose?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
   useEffect(() => {
@@ -222,6 +244,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
         )}
         aria-label="Primary"
       >
+        {/* Logo / Brand */}
         <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border px-4">
           <Link href="/dashboard" className="flex items-center gap-2.5">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm shadow-primary/20">
@@ -247,76 +270,139 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 py-3">
-          {navSections.map((section, sIdx) => {
-            const items = section.items;
-            return (
-              <div key={sIdx} className={cn(sIdx > 0 && "mt-3")}>
-                {section.labelKey && (
-                  <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-                    {t(section.labelKey)}
-                  </p>
-                )}
-                <ul className="flex flex-col gap-0.5">
-                  {items.map((item) => {
-                    const isActive =
-                      pathname === item.href ||
-                      (item.href !== "/dashboard" && pathname.startsWith(item.href));
+          {/* Dashboard - always visible, no section */}
+          <ul className="flex flex-col gap-0.5">
+            {[
+              { href: "/dashboard", labelKey: "dashboard", icon: LayoutDashboard },
+            ].map((item) => {
+              const isActive = pathname === item.href;
+              return (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    className={cn(
+                      "group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150",
+                      isActive
+                        ? "bg-primary/10 text-primary shadow-sm shadow-primary/5"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    )}
+                  >
+                    <item.icon className="h-4 w-4 shrink-0 transition-colors" />
+                    <span className="flex-1">{t(item.labelKey as string)}</span>
+                    {isActive && (
+                      <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                    )}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
 
-                    const showUnreadDot =
-                      item.href === "/inbox" && totalUnread > 0 && !isActive;
+          <div className="my-3 border-t border-border/60" />
 
-                    const showNotificationBadge =
-                      item.href === "/notifications" && unreadNotifications > 0;
-
-                    return (
-                      <li key={item.href}>
-                        <Link
-                          href={item.href}
-                          className={cn(
-                            "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                            isActive
-                              ? "bg-primary/10 text-primary"
-                              : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                          )}
-                        >
-                          <item.icon className="h-4 w-4" />
-                          <span className="flex-1">{t(item.labelKey as string)}</span>
-                          {item.beta && (
-                            <span
-                              aria-label={t("beta")}
-                              className="rounded-full border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-300"
+          {/* Collapsible sections */}
+          <div className="flex flex-col gap-1">
+            {navSections.map((section) => {
+              const isOpen = sectionsOpen[section.labelKey] ?? false;
+              const hasActiveChild = section.items.some(
+                (item) => pathname === item.href || pathname.startsWith(item.href + "/"),
+              );
+              return (
+                <div key={section.labelKey}>
+                  <button
+                    type="button"
+                    onClick={() => toggleSection(section.labelKey)}
+                    className={cn(
+                      "flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider transition-colors",
+                      hasActiveChild
+                        ? "text-primary/80 hover:text-primary"
+                        : "text-muted-foreground/60 hover:text-muted-foreground",
+                    )}
+                    aria-expanded={isOpen}
+                  >
+                    <ChevronDown
+                      className={cn(
+                        "h-3 w-3 shrink-0 transition-transform duration-200",
+                        isOpen && "rotate-180",
+                      )}
+                    />
+                    <span className="flex-1 text-left">{t(section.labelKey)}</span>
+                    {section.items.some((item) => item.href === "/inbox" && totalUnread > 0) && (
+                      <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-foreground">
+                        {totalUnread > 9 ? "9+" : totalUnread}
+                      </span>
+                    )}
+                  </button>
+                  <div
+                    className={cn(
+                      "overflow-hidden transition-all duration-200 ease-in-out",
+                      isOpen ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0",
+                    )}
+                  >
+                    <ul className="flex flex-col gap-0.5 py-1 pl-2">
+                      {section.items.map((item) => {
+                        const isActive =
+                          pathname === item.href ||
+                          (item.href !== "/dashboard" && pathname.startsWith(item.href));
+                        const showUnreadDot =
+                          item.href === "/inbox" && totalUnread > 0 && !isActive;
+                        const showNotificationBadge =
+                          item.href === "/notifications" && unreadNotifications > 0;
+                        return (
+                          <li key={item.href}>
+                            <Link
+                              href={item.href}
+                              className={cn(
+                                "group flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-150",
+                                isActive
+                                  ? "bg-primary/10 text-primary shadow-sm shadow-primary/5"
+                                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                              )}
                             >
-                              {t("beta")}
-                            </span>
-                          )}
-                          {showUnreadDot && (
-                            <span
-                              aria-label={t("unreadConversations", { count: totalUnread })}
-                              className="relative flex h-2 w-2"
-                            >
-                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
-                              <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
-                            </span>
-                          )}
-                          {showNotificationBadge && (
-                            <span
-                              aria-label={t("unreadNotifications", { count: unreadNotifications })}
-                              className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground"
-                            >
-                              {unreadNotifications > 9 ? "9+" : unreadNotifications}
-                            </span>
-                          )}
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            );
-          })}
+                              <item.icon className="h-4 w-4 shrink-0 transition-colors" />
+                              <span className="flex-1">{t(item.labelKey as string)}</span>
+                              {item.beta && (
+                                <span
+                                  aria-label={t("beta")}
+                                  className="rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-300"
+                                >
+                                  {t("beta")}
+                                </span>
+                              )}
+                              {showUnreadDot && (
+                                <span
+                                  aria-label={t("unreadConversations", { count: totalUnread })}
+                                  className="relative flex h-2 w-2"
+                                >
+                                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+                                  <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+                                </span>
+                              )}
+                              {showNotificationBadge && (
+                                <span
+                                  aria-label={t("unreadNotifications", { count: unreadNotifications })}
+                                  className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground"
+                                >
+                                  {unreadNotifications > 9 ? "9+" : unreadNotifications}
+                                </span>
+                              )}
+                              {isActive && (
+                                <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                              )}
+                            </Link>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
 
-          <div className="my-3 border-t border-border" />
+          <div className="my-3 border-t border-border/60" />
 
+          {/* Bottom nav items */}
           <ul className="flex flex-col gap-0.5">
             {bottomNavItems.map((item) => {
               const isActive = pathname.startsWith(item.href);
@@ -325,14 +411,17 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
                   <Link
                     href={item.href}
                     className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                      "group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150",
                       isActive
-                        ? "bg-primary/10 text-primary"
+                        ? "bg-primary/10 text-primary shadow-sm shadow-primary/5"
                         : "text-muted-foreground hover:bg-muted hover:text-foreground",
                     )}
                   >
-                    <item.icon className="h-4 w-4" />
+                    <item.icon className="h-4 w-4 shrink-0 transition-colors" />
                     {t(item.labelKey as string)}
+                    {isActive && (
+                      <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />
+                    )}
                   </Link>
                 </li>
               );
@@ -340,6 +429,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
           </ul>
         </nav>
 
+        {/* User section */}
         <div className="shrink-0 border-t border-border p-3">
           {showAccountStrip && account?.name ? (
             <div className="mb-2 flex items-center gap-2 px-3 text-xs text-muted-foreground">

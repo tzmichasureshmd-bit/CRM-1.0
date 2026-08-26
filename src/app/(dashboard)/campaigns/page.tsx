@@ -17,6 +17,8 @@ import {
   FileEdit,
   Clock,
 } from 'lucide-react';
+import { PageHeader } from '@/components/shared/page-header';
+import { EmptyState } from '@/components/shared/empty-state';
 
 // Campaign command center. The sending engine behind campaigns is the
 // platform's broadcast infrastructure (broadcasts + broadcast_recipients)
@@ -115,24 +117,19 @@ export default function CampaignsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold text-foreground">
-            <Megaphone className="h-6 w-6 text-primary" />
-            Campaigns
-          </h1>
-          <p className="text-muted-foreground">
-            Performance overview of every WhatsApp campaign you have run.
-          </p>
-        </div>
-        <Link
-          href="/broadcasts/new"
-          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-        >
-          <Plus className="h-4 w-4" />
-          New Campaign
-        </Link>
-      </div>
+      <PageHeader
+        title="Campaigns"
+        description="Performance overview of every WhatsApp campaign you have run."
+        action={
+          <Link
+            href="/broadcasts/new"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            <Plus className="h-4 w-4" />
+            New Campaign
+          </Link>
+        }
+      />
 
       {/* KPI cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -182,21 +179,20 @@ export default function CampaignsPage() {
             </Button>
           </div>
         ) : campaigns.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 py-16 text-center">
-            <Megaphone className="h-10 w-10 text-muted-foreground/50" />
-            <p className="text-sm font-medium text-foreground">No campaigns yet</p>
-            <p className="max-w-sm text-xs text-muted-foreground">
-              Create your first campaign to send an approved template to a
-              targeted audience and track delivery end-to-end.
-            </p>
-            <Link
-              href="/broadcasts/new"
-              className="mt-2 inline-flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-            >
-              <Plus className="mr-1 h-3.5 w-3.5" />
-              Create campaign
-            </Link>
-          </div>
+          <EmptyState
+            icon={Megaphone}
+            title="No campaigns yet"
+            description="Create your first campaign to send an approved template to a targeted audience and track delivery end-to-end."
+            action={
+              <Link
+                href="/broadcasts/new"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+              >
+                <Plus className="h-4 w-4" />
+                Create campaign
+              </Link>
+            }
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -281,17 +277,20 @@ function KpiCard({
   sub?: string;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-muted-foreground">{label}</span>
-        <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${iconClass}`}>
-          {icon}
+    <div className="group relative overflow-hidden rounded-xl border border-border/60 bg-card p-5 transition-all duration-200 hover:border-border hover:shadow-md hover:shadow-black/5">
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.02] to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+      <div className="relative">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium text-muted-foreground">{label}</span>
+          <div className={`flex h-9 w-9 items-center justify-center rounded-xl transition-transform group-hover:scale-110 ${iconClass}`}>
+            {icon}
+          </div>
         </div>
+        <p className="mt-3 text-2xl font-bold tracking-tight text-foreground">
+          {typeof value === 'number' ? value.toLocaleString() : value}
+        </p>
+        {sub && <p className="mt-1 text-xs text-muted-foreground">{sub}</p>}
       </div>
-      <p className="mt-2 text-2xl font-bold text-foreground">
-        {typeof value === 'number' ? value.toLocaleString() : value}
-      </p>
-      {sub && <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>}
     </div>
   );
 }
