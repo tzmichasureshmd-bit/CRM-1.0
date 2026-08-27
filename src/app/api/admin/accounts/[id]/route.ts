@@ -51,6 +51,9 @@ export async function GET(
       .from("whatsapp_config")
       .select("id, phone_number_id, status, connected_at, registered_at")
       .eq("account_id", id)
+      .order("is_primary", { ascending: false })
+      .order("updated_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     // Counts

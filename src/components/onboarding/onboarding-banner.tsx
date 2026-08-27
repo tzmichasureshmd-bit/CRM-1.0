@@ -60,9 +60,8 @@ export function OnboardingBanner() {
       const { data: whatsapp } = await supabase
         .from("whatsapp_config")
         .select("id")
-        .eq("user_id", user.id)
-        .limit(1)
-        .single();
+        .eq("account_id", accountId)
+        .limit(1);
 
       const { count: contactCount } = await supabase
         .from("contacts")
@@ -85,7 +84,7 @@ export function OnboardingBanner() {
         .eq("account_id", accountId);
 
       const hasPlan = !!sub;
-      const hasWhatsApp = !!whatsapp;
+      const hasWhatsApp = !!whatsapp && whatsapp.length > 0;
       const hasContacts = (contactCount ?? 0) > 0;
       const hasTeam = (memberCount ?? 0) > 1;
       const hasTemplate = (templateCount ?? 0) > 0;

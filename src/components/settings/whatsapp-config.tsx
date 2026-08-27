@@ -48,6 +48,7 @@ export function WhatsAppConfig() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [showToken, setShowToken] = useState(false);
@@ -183,6 +184,11 @@ export function WhatsAppConfig() {
   }, [authLoading, profileLoading, user?.id, accountId, fetchConfig]);
 
   async function handleSave() {
+    // Prevent duplicate submissions while a save is in flight.
+    if (saving) return;
+
+    setSaveError(null);
+
     if (!phoneNumberId.trim()) {
       toast.error('Phone Number ID is required');
       return;
@@ -204,22 +210,25 @@ export function WhatsAppConfig() {
         waba_id: wabaId.trim() || null,
         verify_token: verifyToken.trim() || null,
         // Optional — only sent when the user filled it in. The server
-        // requires it on first save or when changing numbers; for a
-        // simple token rotation, leaving it blank skips re-register.
+        // requires it on first save or when registering a brand-new
+        // number. For an existing number, leaving it blank tells the
+        // server to reuse the stored (encrypted) token — which is exactly
+        // what a PIN-only re-register needs to finish inbound wiring.
         pin: pin.trim() || null,
       };
 
       if (tokenEdited && accessToken !== MASKED_TOKEN && accessToken.trim()) {
         payload.access_token = accessToken.trim();
-      } else if (config) {
-        // Existing config — reuse stored encrypted token by decrypting on the
-        // server. But our POST handler requires an access_token to verify
-        // with Meta. If the user didn't change the token, we need to signal
-        // that. Simplest: require token re-entry if they're updating.
-        toast.error('Please re-enter the Access Token to save changes');
+      } else if (!config) {
+        // Brand-new connection always needs a real access token.
+        toast.error('Access Token is required for initial setup');
+        setSaveError('Access Token is required for initial setup');
         setSaving(false);
         return;
       }
+      // Existing config with no fresh token → server reuses the stored
+      // (encrypted) token. This lets the user re-send the 2FA PIN to
+      // complete registration without re-entering the whole token.
 
       const res = await fetch('/api/whatsapp/config', {
         method: 'POST',
@@ -227,30 +236,26 @@ export function WhatsAppConfig() {
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        toast.error(data.error || 'Failed to save configuration');
+        // Surface the real server error (400/401/403/409/500) instead of
+        // swallowing it — never claim success on a failed save.
+        const message = data.error || data.message || `Failed to save configuration (HTTP ${res.status})`;
+        console.error('WhatsApp config save failed:', { status: res.status, data });
+        toast.error(message, { duration: 12000 });
+        setSaveError(message);
         setSaving(false);
         return;
       }
 
-      // The route now returns a structured outcome:
-      //   * registered=true   → number is live, events will flow
-      //   * registered=false  → credentials saved but /register
-      //                         failed; UI shows the specific error
-      //                         and a retry path. registration_error
-      //                         is human-readable from Meta.
+      // Save succeeded (the database operation completed) — only now do
+      // we show success feedback.
       if (data.registered === false && data.registration_error) {
-        toast.error(
-          `Saved, but Meta couldn't register the number: ${data.registration_error}`,
-          { duration: 12000 },
-        );
+        const message = `Saved, but Meta couldn't register the number: ${data.registration_error}`;
+        toast.error(message, { duration: 12000 });
+        setSaveError(message);
       } else if (data.registration_skipped) {
-        // Credentials saved + verified, but /register was skipped
-        // because no PIN was supplied (e.g. a Meta test number).
-        // Don't claim the number is "Live" — point at the
-        // Registration status banner instead.
         toast.success(
           'Credentials saved and verified. Inbound registration was skipped (no PIN) — see Registration status below.',
           { duration: 10000 },
@@ -262,16 +267,15 @@ export function WhatsAppConfig() {
             ? `Live — ${data.phone_info.verified_name} can now receive events.`
             : 'WhatsApp connected. Events will start flowing within a minute.',
         );
-        // Clear the PIN so subsequent saves don't accidentally
-        // re-register (which would void the active subscription if
-        // the PIN became stale).
         setPin('');
       }
 
       if (accountId) await fetchConfig(accountId);
     } catch (err) {
       console.error('Save error:', err);
-      toast.error('Failed to save configuration');
+      const message = err instanceof Error ? err.message : 'Failed to save configuration';
+      toast.error(message, { duration: 12000 });
+      setSaveError(message);
     } finally {
       setSaving(false);
     }
@@ -426,6 +430,24 @@ export function WhatsAppConfig() {
                     </>
                   )}
                 </Button>
+              </div>
+            </div>
+          </Alert>
+        )}
+
+        {/* Save error — the real API error surfaced inline so it isn't
+            lost on a transient toast. */}
+        {saveError && (
+          <Alert className="bg-red-950/40 border-red-600/40">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="size-5 text-red-400 mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <AlertTitle className="text-red-200 mb-1">
+                  {t('saveFailed')}
+                </AlertTitle>
+                <AlertDescription className="text-red-100/90 text-sm">
+                  {saveError}
+                </AlertDescription>
               </div>
             </div>
           </Alert>

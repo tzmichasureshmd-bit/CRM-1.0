@@ -8,41 +8,58 @@ import {
 } from '@/lib/whatsapp/meta-api'
 import { encrypt, decrypt } from '@/lib/whatsapp/encryption'
 
+/**
+ * Safe structured logging helper. Never logs secrets: no access
+ * tokens, no authorization headers, no app secrets, no passwords.
+ */
+function logError(context: string, operation: string, opts: {
+  userId?: string | null
+  accountId?: string | null
+  message: string
+  code?: string | null
+  hint?: string | null
+  details?: string | null
+}) {
+  console.error(`[${context}]`, {
+    operation,
+    userId: opts.userId ?? null,
+    accountId: opts.accountId ?? null,
+    message: opts.message,
+    code: opts.code ?? null,
+    hint: opts.hint ?? null,
+    details: opts.details ?? null,
+  })
+}
+
 async function resolveAccountId(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
 ): Promise<string | null> {
-  console.log('[resolveAccountId] Called with userId:', userId)
-
   const { data, error } = await supabase
     .from('profiles')
     .select('*')
     .eq('user_id', userId)
-    .maybeSingle();
-
-  console.log('[resolveAccountId] profiles query result:', {
-    hasData: !!data,
-    account_id: data?.account_id ?? null,
-    error: error ?? null,
-    userId: data?.user_id ?? null,
-  })
+    .maybeSingle()
 
   if (error) {
-    console.error('[resolveAccountId] profile fetch error:', error)
+    logError('resolveAccountId', 'fetch profile', {
+      userId,
+      message: error.message,
+      code: error.code,
+      hint: error.hint,
+      details: error.details,
+    })
     return null
   }
 
   if (!data) {
-    console.log('[resolveAccountId] No profile row found for user_id:', userId, '— creating profile + account')
     return await createProfileAndAccount(supabase, userId)
   }
 
   if (data.account_id) {
-    console.log('[resolveAccountId] Found account_id:', data.account_id)
     return data.account_id
   }
 
-  console.log('[resolveAccountId] account_id is null for user_id:', userId, '— linking to existing or creating account')
   return await linkOrCreateAccount(supabase, userId, data)
 }
 
@@ -50,54 +67,71 @@ async function createProfileAndAccount(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
 ): Promise<string | null> {
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!serviceRoleKey) {
-    console.error('[resolveAccountId] SUPABASE_SERVICE_ROLE_KEY is not set');
-    return null;
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    logError('resolveAccountId', 'createAccount', {
+      userId,
+      message: 'SUPABASE_SERVICE_ROLE_KEY is not set',
+    })
+    return null
   }
 
-  let admin;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let admin: any
   try {
-    admin = supabaseAdmin();
+    admin = createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
+    )
   } catch (err) {
-    console.error('[resolveAccountId] supabaseAdmin() threw:', err);
-    return null;
+    logError('resolveAccountId', 'createAccount', {
+      userId,
+      message: err instanceof Error ? err.message : 'admin client threw',
+    })
+    return null
   }
 
-  let accountId: string;
-
+  let accountId: string
   try {
     const { data: existingAccount, error: lookupErr } = await admin
       .from('accounts')
       .select('id')
       .eq('owner_user_id', userId)
-      .maybeSingle();
+      .maybeSingle()
 
     if (lookupErr) {
-      console.error('[resolveAccountId] failed to lookup existing account:', lookupErr);
-      return null;
+      logError('resolveAccountId', 'lookup account', {
+        userId,
+        message: lookupErr.message,
+        code: lookupErr.code,
+      })
+      return null
     }
 
     if (existingAccount?.id) {
-      accountId = existingAccount.id;
-      console.log('[resolveAccountId] Found existing account for user (no profile):', accountId);
+      accountId = existingAccount.id
     } else {
       const { data: account, error: accountErr } = await admin
         .from('accounts')
         .insert({ name: 'My account', owner_user_id: userId })
         .select('id')
-        .maybeSingle();
+        .maybeSingle()
 
       if (accountErr || !account?.id) {
-        console.error('[resolveAccountId] failed to create account:', accountErr);
-        return null;
+        logError('resolveAccountId', 'create account', {
+          userId,
+          message: accountErr?.message ?? 'no account id returned',
+          code: accountErr?.code,
+        })
+        return null
       }
-      accountId = account.id;
-      console.log('[resolveAccountId] Created new account', accountId, 'for user', userId);
+      accountId = account.id
     }
   } catch (err) {
-    console.error('[resolveAccountId] exception creating/looking up account:', err);
-    return null;
+    logError('resolveAccountId', 'create account', {
+      userId,
+      message: err instanceof Error ? err.message : 'unknown error',
+    })
+    return null
   }
 
   try {
@@ -109,35 +143,42 @@ async function createProfileAndAccount(
         email: '',
         account_id: accountId,
         account_role: 'owner',
-      });
+      })
 
     if (profileErr) {
-      // If the profile already exists (unique constraint on user_id),
-      // that's actually fine — just link the existing profile to the account.
       if (profileErr.code === '23505') {
-        console.log('[resolveAccountId] Profile already exists for user, linking to account:', accountId);
         const { error: updateErr } = await supabase
           .from('profiles')
           .update({ account_id: accountId, account_role: 'owner' })
-          .eq('user_id', userId);
+          .eq('user_id', userId)
 
         if (updateErr) {
-          console.error('[resolveAccountId] failed to link existing profile:', updateErr);
-          return null;
+          logError('resolveAccountId', 'link existing profile', {
+            userId,
+            message: updateErr.message,
+            code: updateErr.code,
+          })
+          return null
         }
-        console.log('[resolveAccountId] Linked existing profile to account:', accountId);
-        return accountId;
+        return accountId
       }
-      console.error('[resolveAccountId] failed to create profile:', profileErr);
-      return null;
+
+      logError('resolveAccountId', 'create profile', {
+        userId,
+        message: profileErr.message,
+        code: profileErr.code,
+      })
+      return null
     }
   } catch (err) {
-    console.error('[resolveAccountId] exception creating profile:', err);
-    return null;
+    logError('resolveAccountId', 'create profile', {
+      userId,
+      message: err instanceof Error ? err.message : 'unknown error',
+    })
+    return null
   }
 
-  console.log('[resolveAccountId] Created account', accountId, 'and profile for user', userId);
-  return accountId;
+  return accountId
 }
 
 async function linkOrCreateAccount(
@@ -145,88 +186,113 @@ async function linkOrCreateAccount(
   userId: string,
   profileData: { full_name?: string | null; email?: string | null },
 ): Promise<string | null> {
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!serviceRoleKey) {
-    console.error('[resolveAccountId] SUPABASE_SERVICE_ROLE_KEY is not set');
-    return null;
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    logError('resolveAccountId', 'link account', {
+      userId,
+      message: 'SUPABASE_SERVICE_ROLE_KEY is not set',
+    })
+    return null
   }
 
-  let admin;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let admin: any
   try {
-    admin = supabaseAdmin();
+    admin = createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
+    )
   } catch (err) {
-    console.error('[resolveAccountId] supabaseAdmin() threw:', err);
-    return null;
+    logError('resolveAccountId', 'link account', {
+      userId,
+      message: err instanceof Error ? err.message : 'admin client threw',
+    })
+    return null
   }
 
-  const accountName = profileData.full_name || profileData.email || 'My account';
+  const accountName = profileData.full_name || profileData.email || 'My account'
 
-  let accountId: string;
+  let accountId: string
   try {
     const { data: existingAccount, error: lookupErr } = await admin
       .from('accounts')
       .select('id')
       .eq('owner_user_id', userId)
-      .maybeSingle();
+      .maybeSingle()
 
     if (lookupErr) {
-      console.error('[resolveAccountId] failed to lookup existing account:', lookupErr);
-      return null;
+      logError('resolveAccountId', 'lookup account', {
+        userId,
+        message: lookupErr.message,
+        code: lookupErr.code,
+      })
+      return null
     }
 
-    if (existingAccount) {
-      accountId = existingAccount.id;
-      console.log('[resolveAccountId] Found existing account:', accountId, 'for user:', userId);
+    if (existingAccount?.id) {
+      accountId = existingAccount.id
     } else {
       const { data: account, error: accountErr } = await admin
         .from('accounts')
         .insert({ name: accountName, owner_user_id: userId })
         .select('id')
-        .maybeSingle();
+        .maybeSingle()
 
       if (accountErr || !account?.id) {
-        console.error('[resolveAccountId] failed to create account:', accountErr);
-        return null;
+        logError('resolveAccountId', 'create account', {
+          userId,
+          message: accountErr?.message ?? 'no account id returned',
+          code: accountErr?.code,
+        })
+        return null
       }
-      accountId = account.id;
+      accountId = account.id
     }
   } catch (err) {
-    console.error('[resolveAccountId] exception creating/looking up account:', err);
-    return null;
+    logError('resolveAccountId', 'create account', {
+      userId,
+      message: err instanceof Error ? err.message : 'unknown error',
+    })
+    return null
   }
 
-  const accountRole = 'owner';
-  const { error: updateErr } = await supabase
-    .from('profiles')
-    .update({ account_id: accountId, account_role: accountRole })
-    .eq('user_id', userId);
+  try {
+    const { error: updateErr } = await supabase
+      .from('profiles')
+      .update({ account_id: accountId, account_role: 'owner' })
+      .eq('user_id', userId)
 
-  if (updateErr) {
-    console.error('[resolveAccountId] failed to link profile:', updateErr);
-    return null;
+    if (updateErr) {
+      logError('resolveAccountId', 'link profile', {
+        userId,
+        message: updateErr.message,
+        code: updateErr.code,
+      })
+      return null
+    }
+  } catch (err) {
+    logError('resolveAccountId', 'link profile', {
+      userId,
+      message: err instanceof Error ? err.message : 'unknown error',
+    })
+    return null
   }
 
-  console.log('[resolveAccountId] Linked profile to account:', accountId, 'for user:', userId);
-  return accountId;
+  return accountId
 }
 
-// Lazy-initialised service-role client. We need it to detect a
-// phone_number_id already claimed by a *different* user — under RLS,
-// the user's own session can't see other users' rows, so the conflict
-// would be invisible without the service role.
+// Lazy-initialised service-role client, used only to detect a
+// phone_number_id already claimed by a *different* account — under RLS
+// the user's own session can't see other users' rows.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _adminClient: any = null
 function supabaseAdmin() {
   if (!_adminClient) {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-    console.log('[supabaseAdmin] URL set:', !!url, 'KEY set:', !!key)
     if (!url) {
-      console.error('[supabaseAdmin] NEXT_PUBLIC_SUPABASE_URL is not set')
       throw new Error('NEXT_PUBLIC_SUPABASE_URL is not set')
     }
     if (!key) {
-      console.error('[supabaseAdmin] SUPABASE_SERVICE_ROLE_KEY is not set')
       throw new Error('SUPABASE_SERVICE_ROLE_KEY is not set')
     }
     _adminClient = createAdminClient(url, key)
@@ -234,11 +300,149 @@ function supabaseAdmin() {
   return _adminClient
 }
 
-// Best-effort persistence of the detailed connection-health flag
-// (added in migration 046) so account/monitoring views stay truthful
-// between saves — a token can rot or Meta can start rejecting calls
-// long after the last POST. Fire-and-forget: a failed status write
-// must never break the health check itself.
+/**
+ * GET /api/whatsapp/config
+ *
+ * Authenticates the user, resolves their account, and returns the
+ * LIST of connected WhatsApp numbers for that account, each with its
+ * live per-number health (verified against Meta). With multi-number
+ * support an account can own many rows — one per phone_number_id.
+ *
+ * Never throws a 500 simply because no configuration exists yet.
+ *
+ * Response shape:
+ *   { numbers: [...], connected: bool, primary_phone_number_id: string|null }
+ *   { error: '...' }                          (401 / 500)
+ */
+export async function GET() {
+  try {
+    const supabase = await createClient()
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const accountId = await resolveAccountId(supabase, user.id)
+
+    if (!accountId) {
+      return NextResponse.json(
+        { numbers: [], connected: false, reason: 'no_account' },
+        { status: 200 },
+      )
+    }
+
+    // One row per phone number — return the whole list for this account.
+    const { data: rows, error: listError } = await supabase
+      .from('whatsapp_config')
+      .select(
+        'id, phone_number_id, waba_id, access_token, status, connection_status, is_primary, display_phone_number, business_name, registered_at, subscribed_apps_at, last_registration_error',
+      )
+      .eq('account_id', accountId)
+      .order('is_primary', { ascending: false })
+      .order('updated_at', { ascending: false })
+
+    if (listError) {
+      logError('GET /api/whatsapp/config', 'fetch configs', {
+        userId: user.id,
+        accountId,
+        message: listError.message,
+        code: listError.code,
+        details: listError.details,
+      })
+      return NextResponse.json(
+        { error: 'Unable to read your WhatsApp configuration. Please try again.' },
+        { status: 500 },
+      )
+    }
+
+    // Best-effort per-number health check against Meta (decrypt token,
+    // verify the number exists for that token).
+    const numbers = []
+    for (const row of rows ?? []) {
+      let accessToken: string | null = null
+      try {
+        accessToken = decrypt(row.access_token)
+      } catch {
+        void persistConnectionStatus(supabase, row.id, 'error')
+        numbers.push({
+          id: row.id,
+          phone_number_id: row.phone_number_id,
+          waba_id: row.waba_id,
+          display_phone_number: row.display_phone_number,
+          business_name: row.business_name,
+          is_primary: Boolean(row.is_primary),
+          status: row.status,
+          connection_status: 'error',
+          connected: false,
+          needs_reset: true,
+          registered_at: row.registered_at,
+          subscribed_apps_at: row.subscribed_apps_at,
+          last_registration_error: row.last_registration_error,
+        })
+        continue
+      }
+
+      let connected = false
+      let errorMessage: string | null = null
+      if (accessToken) {
+        try {
+          const phoneInfo = await verifyPhoneNumber({
+            phoneNumberId: row.phone_number_id,
+            accessToken,
+          })
+          await persistConnectionStatus(supabase, row.id, 'connected')
+          connected = Boolean(phoneInfo)
+        } catch (err) {
+          errorMessage = err instanceof Error ? err.message : 'unknown error'
+          await persistConnectionStatus(supabase, row.id, 'error')
+        }
+      }
+
+      numbers.push({
+        id: row.id,
+        phone_number_id: row.phone_number_id,
+        waba_id: row.waba_id,
+        display_phone_number: row.display_phone_number,
+        business_name: row.business_name,
+        is_primary: Boolean(row.is_primary),
+        status: row.status,
+        connection_status: connected ? 'connected' : 'error',
+        connected,
+        error: errorMessage,
+        registered_at: row.registered_at,
+        subscribed_apps_at: row.subscribed_apps_at,
+        last_registration_error: row.last_registration_error,
+      })
+    }
+
+    const primary =
+      numbers.find((n: { is_primary: boolean }) => n.is_primary) ?? numbers[0] ?? null
+
+    return NextResponse.json({
+      numbers,
+      connected: numbers.length > 0,
+      primary_phone_number_id: primary?.phone_number_id ?? null,
+    })
+  } catch (error) {
+    logError('GET /api/whatsapp/config', 'route handler', {
+      message: error instanceof Error ? error.message : 'unknown error',
+    })
+    return NextResponse.json(
+      { error: 'Internal server error. Please try again.' },
+      { status: 500 },
+    )
+  }
+}
+
+/**
+ * Best-effort persistence of the connection-health flag. Fire-and-forget:
+ * a failed status write must never break the health check itself.
+ */
 async function persistConnectionStatus(
   supabase: Awaited<ReturnType<typeof createClient>>,
   configId: string,
@@ -254,134 +458,38 @@ async function persistConnectionStatus(
   }
 }
 
-/**
- * GET /api/whatsapp/config
- *
- * Used by the "Test API Connection" button and by the page to check
- * whether the saved config is healthy. Returns 200 in all non-auth cases
- * so the UI can render an appropriate message rather than show a 500.
- *
- * Response shape:
- *   { connected: true,  phone_info: {...} }
- *   { connected: false, reason: 'no_config',        message: '...' }
- *   { connected: false, reason: 'token_corrupted',  message: '...', needs_reset: true }
- *   { connected: false, reason: 'meta_api_error',   message: '...' }
- */
-export async function GET() {
-  try {
-    const supabase = await createClient()
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    console.log('[whatsapp/config GET] getUser result:', {
-      hasUser: !!user,
-      userId: user?.id ?? null,
-      authError: authError ?? null,
-    })
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    console.log('[whatsapp/config GET] Resolving account_id for user:', user.id)
-    const accountId = await resolveAccountId(supabase, user.id)
-    console.log('[whatsapp/config GET] resolveAccountId returned:', accountId)
-    if (!accountId) {
-      return NextResponse.json(
-        {
-          connected: false,
-          reason: 'no_account',
-          message: 'Your profile is not linked to an account.',
-        },
-        { status: 200 },
-      )
-    }
-
-    const { data: config, error: configError } = await supabase
-      .from('whatsapp_config')
-      .select('id, phone_number_id, access_token, status')
-      .eq('account_id', accountId)
-      .maybeSingle()
-
-    if (configError) {
-      console.error('Error fetching whatsapp_config:', configError)
-      return NextResponse.json(
-        { connected: false, reason: 'db_error', message: 'Failed to fetch configuration' },
-        { status: 200 }
-      )
-    }
-
-    if (!config) {
-      return NextResponse.json(
-        {
-          connected: false,
-          reason: 'no_config',
-          message: 'No WhatsApp configuration saved yet. Fill in the form and click Save Configuration.',
-        },
-        { status: 200 }
-      )
-    }
-
-    // Try to decrypt the stored token with the current ENCRYPTION_KEY.
-    // If this fails, the key changed (or was never consistent across envs).
-    let accessToken: string
-    try {
-      accessToken = decrypt(config.access_token)
-    } catch (err) {
-      console.error('[whatsapp/config GET] Token decryption failed:', err)
-      void persistConnectionStatus(supabase, config.id, 'error')
-      return NextResponse.json(
-        {
-          connected: false,
-          reason: 'token_corrupted',
-          needs_reset: true,
-          message:
-            'The stored access token cannot be decrypted with the current ENCRYPTION_KEY. This usually means the key changed, or it differs between environments (local vs Hostinger vs Vercel). Click "Reset Configuration" below, then re-save.',
-        },
-        { status: 200 }
-      )
-    }
-
-    // Validate credentials against Meta
-    try {
-      const phoneInfo = await verifyPhoneNumber({
-        phoneNumberId: config.phone_number_id,
-        accessToken,
-      })
-      void persistConnectionStatus(supabase, config.id, 'connected')
-      return NextResponse.json({ connected: true, phone_info: phoneInfo })
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown Meta API error'
-      console.error('[whatsapp/config GET] Meta API verification failed:', message)
-      void persistConnectionStatus(supabase, config.id, 'error')
-      return NextResponse.json(
-        {
-          connected: false,
-          reason: 'meta_api_error',
-          message: `Meta API rejected the credentials: ${message}`,
-        },
-        { status: 200 }
-      )
-    }
-  } catch (error) {
-  console.error('Error in WhatsApp config GET:', error)
-  return NextResponse.json(
-    { connected: false, reason: 'unknown', message: 'Internal server error', detail: error instanceof Error ? error.message : String(error) },
-    { status: 500 }
-  )
-}
+interface NumberPayload {
+  phone_number_id?: unknown
+  waba_id?: unknown
+  access_token?: unknown
+  verify_token?: unknown
+  pin?: unknown
+  is_primary?: unknown
+  set_primary?: unknown
 }
 
 /**
  * POST /api/whatsapp/config
  *
- * Saves or updates the WhatsApp config for the authenticated user.
- * Verifies credentials with Meta first, then encrypts and stores.
+ * Saves (creates or updates) ONE WhatsApp phone number for the
+ * authenticated user's account. Multi-number aware: each save upserts
+ * a single row keyed on `phone_number_id`, so an account can connect
+ * many numbers (each row keeps its own encrypted token — the same
+ * Meta System User token may be shared across numbers under the same
+ * WABA, which is valid and supported; uniqueness is enforced on
+ * phone_number_id, NOT on access_token).
+ *
+ * Flow: auth → account → validate → cross-account duplicate (409) →
+ * Meta verify (400 on rejection) → encrypt → persist → register/WABA
+ * subscribe (best effort).
+ *
+ * Returns meaningful 400/401/403/409/500 codes and never echoes an
+ * access token.
  */
 export async function POST(request: Request) {
+  let userId: string | null = null
+  let accountId: string | null = null
+
   try {
     const supabase = await createClient()
 
@@ -390,315 +498,472 @@ export async function POST(request: Request) {
       error: authError,
     } = await supabase.auth.getUser()
 
-    console.log('[whatsapp/config POST] getUser result:', {
-      hasUser: !!user,
-      userId: user?.id ?? null,
-      authError: authError ?? null,
-    })
-
     if (authError || !user) {
-      console.log('[whatsapp/config POST] Unauthorized: authError=', authError, 'user=', user)
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    userId = user.id
 
-    console.log('[whatsapp/config POST] Resolving account_id for user:', user.id)
-    const accountId = await resolveAccountId(supabase, user.id)
-    console.log('[whatsapp/config POST] resolveAccountId returned:', accountId)
+    accountId = await resolveAccountId(supabase, user.id)
 
     if (!accountId) {
-      console.error('[whatsapp/config POST] resolveAccountId failed for user:', user.id)
+      logError('POST /api/whatsapp/config', 'resolve account', {
+        userId,
+        message: 'could not resolve account_id',
+      })
       return NextResponse.json(
         {
           error: 'Account setup failed',
-          message: 'We could not set up your account automatically. Please refresh the page and try again. If the problem persists, contact support.',
+          message:
+            'We could not set up your account automatically. Please refresh the page and try again. If the problem persists, contact support.',
         },
         { status: 500 },
       )
     }
 
-    const body = await request.json()
-    const { phone_number_id, waba_id, access_token, verify_token, pin } = body
-
-    if (!access_token || !phone_number_id) {
+    let body: Record<string, unknown>
+    try {
+      body = await request.json()
+    } catch {
       return NextResponse.json(
-        { error: 'access_token and phone_number_id are required' },
-        { status: 400 }
+        { error: 'Invalid request body. Expected JSON.' },
+        { status: 400 },
       )
     }
 
-    if (pin !== undefined && pin !== null && pin !== '') {
-      if (typeof pin !== 'string' || !/^\d{6}$/.test(pin)) {
-        return NextResponse.json(
-          { error: 'PIN must be exactly 6 digits.' },
-          { status: 400 }
-        )
-      }
+    const {
+      phone_number_id,
+      waba_id,
+      access_token,
+      verify_token,
+      pin,
+      is_primary,
+      set_primary,
+    } = body as NumberPayload
+
+    if (typeof phone_number_id !== 'string' || phone_number_id.trim() === '') {
+      return NextResponse.json(
+        { error: 'phone_number_id must be a non-empty string' },
+        { status: 400 },
+      )
+    }
+    // access_token is required for a brand-new number, but OPTIONAL when
+    // updating an existing row (e.g. re-sending the 2FA PIN to finish
+    // registration). When omitted, the server reuses the stored encrypted
+    // token. See the `existing` lookup + token resolution below.
+    if (
+      access_token !== undefined &&
+      access_token !== null &&
+      (typeof access_token !== 'string' || access_token.trim() === '')
+    ) {
+      return NextResponse.json(
+        { error: 'access_token must be a non-empty string' },
+        { status: 400 },
+      )
+    }
+    if (waba_id !== undefined && waba_id !== null && typeof waba_id !== 'string') {
+      return NextResponse.json({ error: 'waba_id must be a string' }, { status: 400 })
+    }
+    if (
+      pin !== undefined &&
+      pin !== null &&
+      pin !== '' &&
+      (typeof pin !== 'string' || !/^\d{6}$/.test(pin))
+    ) {
+      return NextResponse.json({ error: 'PIN must be exactly 6 digits.' }, { status: 400 })
     }
 
-    // Reject if another account has already claimed this phone_number_id.
-    // wacrm is single-tenant-per-WhatsApp-number — letting two accounts
-    // bind the same number causes the webhook's `.single()` lookup to
-    // throw PGRST116 ("multiple rows"), silently dropping every
-    // inbound message. See issue #136. Post-multi-user we key on
-    // account_id (not user_id) since teammates inside the same account
-    // all share one config; the conflict is between accounts.
-    let adminClient
+    // Reject if ANOTHER account has already claimed this phone_number_id
+    // (instance-level: each phone number can only be connected once).
+    // Uses the service-role client because RLS hides other accounts' rows.
+    let adminClient: ReturnType<typeof supabaseAdmin>
     try {
       adminClient = supabaseAdmin()
     } catch (err) {
-      console.error('[whatsapp/config POST] supabaseAdmin() threw:', err)
-      return NextResponse.json(
-        { error: 'Server is not configured to check number conflicts.' },
-        { status: 500 }
-      )
-    }
-    const { data: claimed, error: claimedError } = await adminClient
-      .from('whatsapp_config')
-      .select('account_id')
-      .eq('phone_number_id', phone_number_id)
-      .neq('account_id', accountId)
-      .maybeSingle()
-
-    if (claimedError) {
-      console.error('[whatsapp/config POST] claimedError:', {
-        message: claimedError.message,
-        code: claimedError.code,
-        details: claimedError.details,
-        hint: claimedError.hint,
-        table: claimedError.table,
-        column: claimedError.column,
-        errno: claimedError.errno,
-        fullError: JSON.stringify(claimedError, null, 2),
+      logError('POST /api/whatsapp/config', 'admin client', {
+        userId,
+        accountId,
+        message: err instanceof Error ? err.message : 'unknown error',
       })
       return NextResponse.json(
-        { error: 'Failed to validate configuration' },
-        { status: 500 }
+        { error: 'Server is not configured to check number conflicts.' },
+        { status: 500 },
       )
     }
 
-    if (claimed) {
+    try {
+      const { data: claimed, error: claimedError } = await adminClient
+        .from('whatsapp_config')
+        .select('account_id')
+        .eq('phone_number_id', phone_number_id)
+        .neq('account_id', accountId)
+        .limit(1)
+
+      if (claimedError) {
+        logError('POST /api/whatsapp/config', 'conflict check', {
+          userId,
+          accountId,
+          message: claimedError.message,
+          code: claimedError.code,
+          hint: claimedError.hint,
+          details: claimedError.details,
+        })
+        return NextResponse.json(
+          { error: 'Failed to validate configuration' },
+          { status: 500 },
+        )
+      }
+
+      if (Array.isArray(claimed) && claimed.length > 0) {
+        return NextResponse.json(
+          {
+            error:
+              'This WhatsApp phone number is already connected to another account on this instance. Each phone number can only be connected to one account.',
+            code: 'phone_number_already_connected',
+          },
+          { status: 409 },
+        )
+      }
+    } catch (err) {
+      logError('POST /api/whatsapp/config', 'conflict check', {
+        userId,
+        accountId,
+        message: err instanceof Error ? err.message : 'unknown error',
+      })
+      return NextResponse.json({ error: 'Failed to validate configuration' }, { status: 500 })
+    }
+
+    const trimmedNumber = phone_number_id.trim()
+
+    // Does this account already have a row for this exact number? That
+    // decides update vs insert, whether this is the account's FIRST
+    // number (which is automatically made primary), and whether we can
+    // reuse the stored encrypted access token (a PIN-only re-register
+    // sends no access_token).
+    let existing:
+      | { id: string; is_primary: boolean | null; access_token: string | null; verify_token: string | null }
+      | null = null
+    try {
+      const result = await supabase
+        .from('whatsapp_config')
+        .select('id, is_primary, access_token, verify_token')
+        .eq('account_id', accountId)
+        .eq('phone_number_id', trimmedNumber)
+        .limit(1)
+      if (result.error) {
+        logError('POST /api/whatsapp/config', 'fetch existing', {
+          userId,
+          accountId,
+          message: result.error.message,
+          code: result.error.code,
+          details: result.error.details,
+        })
+        return NextResponse.json(
+          { error: 'Failed to load your current configuration.' },
+          { status: 500 },
+        )
+      }
+      existing = Array.isArray(result.data) && result.data.length > 0 ? result.data[0] : null
+    } catch (err) {
+      logError('POST /api/whatsapp/config', 'fetch existing', {
+        userId,
+        accountId,
+        message: err instanceof Error ? err.message : 'unknown error',
+      })
+      return NextResponse.json({ error: 'Failed to load your current configuration.' }, { status: 500 })
+    }
+
+    // Resolve which token drives the Meta checks below. A re-save (e.g.
+    // supplying/repairing the 2FA PIN to finish registration) may omit
+    // access_token — reuse the stored encrypted token in that case. A
+    // brand-new number must supply one.
+    const freshToken = typeof access_token === 'string' && access_token.trim() !== ''
+    let effectiveToken: string
+    try {
+      if (freshToken) {
+        effectiveToken = access_token.trim()
+      } else if (existing) {
+        if (!existing.access_token) {
+          return NextResponse.json(
+            { error: 'No stored token to reuse. Please enter the Access Token.' },
+            { status: 400 },
+          )
+        }
+        effectiveToken = decrypt(existing.access_token)
+      } else {
+        return NextResponse.json(
+          { error: 'access_token must be a non-empty string' },
+          { status: 400 },
+        )
+      }
+    } catch (err) {
+      logError('POST /api/whatsapp/config', 'resolve token', {
+        userId,
+        accountId,
+        message: err instanceof Error ? err.message : 'unknown error',
+      })
       return NextResponse.json(
-        {
-          error:
-            'This WhatsApp phone number is already linked to another account on this instance. Each phone number can only be connected to one wacrm user.',
-        },
-        { status: 409 }
+        { error: 'Unable to decrypt the stored token. Re-enter the Access Token.' },
+        { status: 400 },
       )
     }
 
-    // Verify credentials with Meta BEFORE saving
-    let phoneInfo
+    // Verify the credentials with Meta BEFORE saving. `verifyPhoneNumber`
+    // calls GET /{phone_number_id} with this token — Meta returns 200 only
+    // when the token (System User) has access to the number's WABA. A
+    // rejection here is exactly the "token has no access to this number /
+    // WABA" case, so surface Meta's own message.
+    let phoneInfo: { display_phone_number?: string; verified_name?: string } | null = null
     try {
       phoneInfo = await verifyPhoneNumber({
         phoneNumberId: phone_number_id,
-        accessToken: access_token,
+        accessToken: effectiveToken,
       })
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown Meta API error'
-      console.error('Meta API verification failed during save:', message)
+      const message = err instanceof Error ? err.message : 'unknown error'
+      logError('POST /api/whatsapp/config', 'meta verify', {
+        userId,
+        accountId,
+        message,
+      })
       return NextResponse.json(
-        { error: `Meta API error: ${message}` },
-        { status: 400 }
+        {
+          error:
+            'Access token does not have access to this WhatsApp phone number / WhatsApp Business Account.',
+          meta_error: message,
+          code: 'token_waba_access_denied',
+        },
+        { status: 400 },
       )
     }
 
-    // Encrypt sensitive tokens before storing
+    // Encrypt sensitive tokens before storing. For a PIN-only re-register
+    // (no fresh token) we KEEP the stored encrypted token rather than
+    // overwriting it with a re-encryption of the same value.
     let encryptedAccessToken: string
     let encryptedVerifyToken: string | null
     try {
-      encryptedAccessToken = encrypt(access_token)
-      encryptedVerifyToken = verify_token ? encrypt(verify_token) : null
+      if (freshToken) {
+        encryptedAccessToken = encrypt(access_token.trim())
+        encryptedVerifyToken = verify_token ? encrypt(String(verify_token)) : null
+      } else if (existing) {
+        encryptedAccessToken = existing.access_token as string
+        encryptedVerifyToken = verify_token
+          ? encrypt(String(verify_token))
+          : existing.verify_token
+      } else {
+        throw new Error('no token to store')
+      }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown encryption error'
-      console.error('Encryption failed:', message)
+      logError('POST /api/whatsapp/config', 'encrypt', {
+        userId,
+        accountId,
+        message: err instanceof Error ? err.message : 'unknown error',
+      })
       return NextResponse.json(
         {
           error:
             'Failed to encrypt token. Check that ENCRYPTION_KEY is a valid 64-character hex string in your environment variables.',
         },
-        { status: 500 }
+        { status: 500 },
       )
     }
 
-    // Look up any pre-existing row for this account so we know whether
-    // this number is already registered with Meta — if so we can skip
-    // /register when the user didn't provide a PIN this time around.
-    const { data: existing } = await supabase
-      .from('whatsapp_config')
-      .select('id, registered_at, phone_number_id')
-      .eq('account_id', accountId)
-      .maybeSingle()
-
-    const sameNumber =
-      existing?.phone_number_id === phone_number_id &&
-      existing?.registered_at != null
-
-    // Step 1: register the phone number for inbound webhooks.
-    //
-    // Attempted on first save AND whenever the user supplies a fresh
-    // PIN (e.g. they rotated the 2FA PIN in Meta Manager). Skipped
-    // when the same number is already registered and no PIN was
-    // supplied — re-registering an already-active number with a
-    // stale PIN would actually fail and undo the active subscription.
-    let registeredAt: string | null = existing?.registered_at ?? null
-    let registrationError: string | null = null
-    // True when registration was deliberately skipped because no PIN
-    // was supplied (see below). Distinct from registrationError — this
-    // is not a failure, just an incomplete-but-valid save.
-    let registrationSkipped = false
-
-    const needsRegistration = !sameNumber || (typeof pin === 'string' && pin.length > 0)
-    if (needsRegistration) {
-      if (!pin) {
-        // No PIN provided. Meta TEST numbers (Developer Console) are
-        // pre-registered by Meta and expose no two-step verification
-        // PIN to set, so requiring one made them impossible to connect
-        // (issue #242). The /register + PIN step only matters for
-        // production numbers under a shared WABA (issue #136), so treat
-        // it as best-effort: skip it, save the (already Meta-verified)
-        // credentials as connected, and leave registered_at null. The
-        // UI surfaces a separate "Not registered" banner with a path to
-        // add a PIN later for users who do need inbound webhook routing.
-        registrationSkipped = true
-      } else {
-        try {
-          await registerPhoneNumber({
-            phoneNumberId: phone_number_id,
-            accessToken: access_token,
-            pin,
-          })
-          registeredAt = new Date().toISOString()
-        } catch (err) {
-          registrationError =
-            err instanceof Error ? err.message : 'Unknown Meta API error'
-          console.error('Phone number /register failed:', registrationError)
-          // We deliberately fall through and still save the row so the
-          // user can retry without re-entering everything. The UI
-          // surfaces `last_registration_error` so they see WHY it's
-          // not actually live yet.
-        }
+    // Count the account's configs to decide first-number / primary logic.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let accountConfigCount = 0
+    try {
+      const { count, error: countError } = await supabase
+        .from('whatsapp_config')
+        .select('id', { count: 'exact', head: true })
+        .eq('account_id', accountId)
+      if (countError) {
+        logError('POST /api/whatsapp/config', 'count configs', {
+          userId,
+          accountId,
+          message: countError.message,
+          code: countError.code,
+        })
+        return NextResponse.json({ error: 'Failed to load your current configuration.' }, { status: 500 })
       }
+      accountConfigCount = count ?? 0
+    } catch (err) {
+      logError('POST /api/whatsapp/config', 'count configs', {
+        userId,
+        accountId,
+        message: err instanceof Error ? err.message : 'unknown error',
+      })
+      return NextResponse.json({ error: 'Failed to load your current configuration.' }, { status: 500 })
     }
 
-    // Step 2: subscribe the WABA to this app. Idempotent on Meta's
-    // side, so we call on every save and persist the timestamp.
-    // Skipped only when there's no waba_id (legacy rows from before
-    // we required it).
+    const requestPrimary = is_primary === true || set_primary === true
+    // If this is the account's first number, force it to be primary.
+    const becomesPrimary = requestPrimary || accountConfigCount === 0
+    const now = new Date().toISOString()
+
+    // Register the number for inbound webhooks (best effort, needs PIN).
+    let registeredAt: string | null = null
+    let registrationError: string | null = null
+    let registrationSkipped = false
+    if (pin && typeof pin === 'string' && pin.length > 0) {
+      try {
+        await registerPhoneNumber({
+          phoneNumberId: trimmedNumber,
+          accessToken: effectiveToken,
+          pin,
+        })
+        registeredAt = now
+      } catch (err) {
+        registrationError = err instanceof Error ? err.message : 'Unknown Meta API error'
+        logError('POST /api/whatsapp/config', 'register number', {
+          userId,
+          accountId,
+          message: registrationError,
+        })
+      }
+    } else {
+      registrationSkipped = true
+    }
+
+    // Subscribe the WABA to this app (idempotent, best effort).
     let subscribedAppsAt: string | null = null
-    if (waba_id) {
+    if (waba_id && typeof waba_id === 'string' && waba_id.trim()) {
       try {
         await subscribeWabaToApp({
-          wabaId: waba_id,
-          accessToken: access_token,
+          wabaId: waba_id.trim(),
+          accessToken: effectiveToken,
         })
-        subscribedAppsAt = new Date().toISOString()
+        subscribedAppsAt = now
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err)
-        console.warn('WABA subscribed_apps failed (non-fatal):', message)
-        // Subscription failures are rare once the App has the right
-        // permissions; we don't block save on them — the diagnostic
-        // endpoint surfaces this state too.
+        logError('POST /api/whatsapp/config', 'subscribe waba', {
+          userId,
+          accountId,
+          message: err instanceof Error ? err.message : String(err),
+        })
       }
     }
 
-    // Persist everything in one shot. If /register failed we still
-    // store the credentials and the error so the UI can guide the
-    // user through a retry.
-    //
-    // `connection_status` (+ display metadata) feeds the account
-    // health views — Settings shows it back to the user and the
-    // platform's WhatsApp monitoring reads it. 'error' marks a save
-    // whose Meta verification passed but webhook registration failed.
     const baseRow = {
-      phone_number_id,
-      waba_id: waba_id || null,
+      phone_number_id: trimmedNumber,
+      waba_id: waba_id && typeof waba_id === 'string' ? waba_id.trim() : null,
       access_token: encryptedAccessToken,
       verify_token: encryptedVerifyToken,
       status: registrationError ? 'disconnected' : 'connected',
-      connection_status:
-        registrationError ? 'error' : 'connected',
+      connection_status: registrationError ? 'error' : 'connected',
       display_phone_number: phoneInfo?.display_phone_number ?? null,
       business_name: phoneInfo?.verified_name ?? null,
-      connected_at: registrationError ? null : new Date().toISOString(),
-      registered_at: registrationError ? null : registeredAt,
+      connected_at: registrationError ? null : now,
+      registered_at: registeredAt,
       subscribed_apps_at: subscribedAppsAt ?? null,
       last_registration_error: registrationError,
-      updated_at: new Date().toISOString(),
+      updated_at: now,
     }
 
-    if (existing) {
-      const { error: updateError } = await supabase
-        .from('whatsapp_config')
-        .update(baseRow)
-        .eq('account_id', accountId)
-
-      if (updateError) {
-        console.error('Error updating whatsapp_config:', updateError)
-        return NextResponse.json(
-          { error: 'Failed to update configuration' },
-          { status: 500 }
-        )
-      }
-    } else {
-      // Insert with both columns: `account_id` is the tenancy key
-      // (NOT NULL post-017, UNIQUE so duplicates trip the constraint
-      // up-front), `user_id` is the audit column identifying which
-      // member of the account saved the config.
-      const { error: insertError } = await supabase
-        .from('whatsapp_config')
-        .insert({
-          account_id: accountId,
-          user_id: user.id,
-          ...baseRow,
-        })
-
-      if (insertError) {
-        console.error('Error inserting whatsapp_config:', insertError)
-        return NextResponse.json(
-          { error: 'Failed to save configuration' },
-          { status: 500 }
-        )
-      }
+    // Persist: upsert on phone_number_id so create + update are atomic
+    // and keyed by the number, not by account.
+    const persistenceBody: Record<string, unknown> = {
+      account_id: accountId,
+      user_id: user.id,
+      ...baseRow,
+      is_primary: becomesPrimary,
     }
 
-    if (registrationError) {
-      // Save succeeded but the number isn't actually live. Return
-      // 200 with a structured error so the UI can show the specific
-      // remediation step instead of a generic toast.
-      return NextResponse.json({
-        success: false,
-        saved: true,
-        registered: false,
-        registration_error: registrationError,
-        phone_info: phoneInfo,
+    const { data: saved, error: saveError } = await supabase
+      .from('whatsapp_config')
+      .upsert(persistenceBody, { onConflict: 'phone_number_id' })
+      .select('id, phone_number_id, is_primary, status, connection_status, registered_at, subscribed_apps_at, last_registration_error')
+      .single()
+
+    if (saveError) {
+      logError('POST /api/whatsapp/config', 'save', {
+        userId,
+        accountId,
+        message: saveError.message,
+        code: saveError.code,
+        hint: saveError.hint,
+        details: saveError.details,
       })
+      // Distinguish a DB constraint violation (e.g. duplicate number raced
+      // in from elsewhere) from a generic failure.
+      if (saveError.code === '23505') {
+        return NextResponse.json(
+          {
+            error:
+              'This WhatsApp phone number is already connected. Duplicate connections are not allowed.',
+            code: 'phone_number_already_connected',
+          },
+          { status: 409 },
+        )
+      }
+      return NextResponse.json(
+        { error: 'Unable to save WhatsApp configuration. Please try again.' },
+        { status: 500 },
+      )
+    }
+
+    // If this save promoted a NEW primary, demote any other primary rows
+    // for the account (partial unique index allows only one is_primary).
+    if (becomesPrimary && saved && saved.id) {
+      const { error: demoteError } = await supabase
+        .from('whatsapp_config')
+        .update({ is_primary: false })
+        .eq('account_id', accountId)
+        .eq('is_primary', true)
+        .neq('id', saved.id)
+      if (demoteError) {
+        logError('POST /api/whatsapp/config', 'demote primary', {
+          userId,
+          accountId,
+          message: demoteError.message,
+          code: demoteError.code,
+        })
+      }
     }
 
     return NextResponse.json({
       success: true,
       saved: true,
       registered: registeredAt != null,
-      // Credentials are valid and saved, but inbound webhook
-      // registration was skipped because no PIN was supplied (e.g. a
-      // Meta test number). The UI shows the "Not registered" banner
-      // rather than claiming the number is fully live.
       registration_skipped: registrationSkipped,
       phone_info: phoneInfo,
+      config: {
+        id: saved?.id,
+        phone_number_id: saved?.phone_number_id ?? trimmedNumber,
+        is_primary: Boolean(saved?.is_primary ?? becomesPrimary),
+        status: saved?.status,
+        connection_status: saved?.connection_status,
+        registered_at: saved?.registered_at,
+        subscribed_apps_at: saved?.subscribed_apps_at,
+        last_registration_error: saved?.last_registration_error ?? registrationError,
+      },
     })
   } catch (error) {
-    console.error('Error in WhatsApp config POST:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    logError('POST /api/whatsapp/config', 'route handler', {
+      userId,
+      accountId,
+      message: error instanceof Error ? error.message : 'unknown error',
+    })
+    return NextResponse.json(
+      { error: 'Unable to save WhatsApp configuration. Please try again.' },
+      { status: 500 },
+    )
   }
 }
 
 /**
  * DELETE /api/whatsapp/config
  *
- * Removes the authenticated user's WhatsApp configuration row.
- * Used by the "Reset Configuration" button to recover from a corrupted
- * encrypted token (mismatched ENCRYPTION_KEY across environments).
+ * Removes ONE WhatsApp number from the account. Which number is removed
+ * is given by a query parameter:
+ *   ?phone_number_id=...  the number's phone_number_id, or
+ *   ?id=...               the config row id.
+ *
+ * If the removed number was the account's primary, another connected
+ * number (if any) is promoted to primary so outbound sends keep working.
  */
-export async function DELETE() {
+export async function DELETE(request: Request) {
+  let userId: string | null = null
+  let accountId: string | null = null
+
   try {
     const supabase = await createClient()
 
@@ -710,31 +975,97 @@ export async function DELETE() {
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    userId = user.id
 
-    const accountId = await resolveAccountId(supabase, user.id)
+    accountId = await resolveAccountId(supabase, user.id)
     if (!accountId) {
+      return NextResponse.json({ error: 'Your profile is not linked to an account.' }, { status: 403 })
+    }
+
+    const url = new URL(request.url)
+    const phoneNumberId = url.searchParams.get('phone_number_id')
+    const configId = url.searchParams.get('id')
+
+    if (!phoneNumberId && !configId) {
       return NextResponse.json(
-        { error: 'Your profile is not linked to an account.' },
-        { status: 403 },
+        { error: 'Specify which number to disconnect with ?phone_number_id= or ?id=.' },
+        { status: 400 },
       )
+    }
+
+    // Resolve which row we're deleting and whether it was primary.
+    let target: { id: string; is_primary: boolean | null } | null = null
+    try {
+      const query = supabase
+        .from('whatsapp_config')
+        .select('id, is_primary')
+        .eq('account_id', accountId)
+      if (configId) {
+        query.eq('id', configId)
+      } else {
+        query.eq('phone_number_id', phoneNumberId)
+      }
+      const { data, error } = await query.limit(1)
+      if (error) {
+        logError('DELETE /api/whatsapp/config', 'fetch target', {
+          userId,
+          accountId,
+          message: error.message,
+          code: error.code,
+        })
+        return NextResponse.json({ error: 'Failed to delete configuration. Please try again.' }, { status: 500 })
+      }
+      target = Array.isArray(data) && data.length > 0 ? data[0] : null
+    } catch (err) {
+      logError('DELETE /api/whatsapp/config', 'fetch target', {
+        userId,
+        accountId,
+        message: err instanceof Error ? err.message : 'unknown error',
+      })
+      return NextResponse.json({ error: 'Failed to delete configuration. Please try again.' }, { status: 500 })
+    }
+
+    if (!target) {
+      return NextResponse.json({ success: true }) // nothing to delete
     }
 
     const { error: deleteError } = await supabase
       .from('whatsapp_config')
       .delete()
+      .eq('id', target.id)
       .eq('account_id', accountId)
 
     if (deleteError) {
-      console.error('Error deleting whatsapp_config:', deleteError)
-      return NextResponse.json(
-        { error: 'Failed to delete configuration' },
-        { status: 500 }
-      )
+      logError('DELETE /api/whatsapp/config', 'delete', {
+        userId,
+        accountId,
+        message: deleteError.message,
+        code: deleteError.code,
+      })
+      return NextResponse.json({ error: 'Failed to delete configuration. Please try again.' }, { status: 500 })
+    }
+
+    // If we removed the account's primary, promote the next available
+    // number (if any) so outbound sends keep working.
+    if (target.is_primary) {
+      const { data, error: promoteError } = await supabase
+        .from('whatsapp_config')
+        .select('id')
+        .eq('account_id', accountId)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+      if (!promoteError && Array.isArray(data) && data.length > 0) {
+        await supabase.from('whatsapp_config').update({ is_primary: true }).eq('id', data[0].id)
+      }
     }
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error in WhatsApp config DELETE:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    logError('DELETE /api/whatsapp/config', 'route handler', {
+      userId,
+      accountId,
+      message: error instanceof Error ? error.message : 'unknown error',
+    })
+    return NextResponse.json({ error: 'Internal server error. Please try again.' }, { status: 500 })
   }
 }

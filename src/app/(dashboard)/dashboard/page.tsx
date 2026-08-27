@@ -186,9 +186,9 @@ export default function DashboardPage() {
         .from('whatsapp_config')
         .select('status')
         .eq('account_id', accountId)
-        .maybeSingle()
+        .limit(1)
 
-      setWhatsappConnected(data?.status === 'connected')
+      setWhatsappConnected(data?.[0]?.status === 'connected')
     }
     void checkConnection()
   }, [accountId])

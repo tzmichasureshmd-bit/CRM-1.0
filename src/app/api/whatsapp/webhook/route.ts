@@ -257,7 +257,9 @@ async function processWebhook(body: { entry?: WhatsAppWebhookEntry[] }) {
 
       const phoneNumberId = value.metadata.phone_number_id
       console.log(
-        '[WhatsApp Webhook] Incoming message(s) detected — count:',
+        '[WhatsApp Webhook] Incoming message(s) detected — waba_id:',
+        entry.id,
+        'count:',
         value.messages.length,
         'phone_number_id:',
         phoneNumberId
@@ -305,6 +307,27 @@ async function processWebhook(body: { entry?: WhatsAppWebhookEntry[] }) {
       for (let i = 0; i < value.messages.length; i++) {
         const message = value.messages[i]
         const contact = value.contacts[i] || value.contacts[0]
+
+        // SAFE inbound log — no access tokens, no auth headers, no
+        // secrets. Every field is an identifier Meta already discloses
+        // to the account owner (WABA/number/message/sender ids, type,
+        // timestamp), used to trace a specific message end-to-end.
+        console.log(
+          '[WhatsApp Webhook] Inbound message — waba_id:',
+          entry.id,
+          'phone_number_id:',
+          phoneNumberId,
+          'account_id:',
+          config.account_id,
+          'message_id:',
+          message.id,
+          'sender_wa_id:',
+          message.from,
+          'type:',
+          message.type,
+          'timestamp:',
+          message.timestamp
+        )
 
         await processMessage(
           message,

@@ -247,12 +247,15 @@ export async function sendMessageToConversation(
     );
   }
 
-  // WhatsApp config, account-scoped.
+  // WhatsApp config, account-scoped. When an account has multiple
+  // numbers, pick the most recently updated one for outbound sends.
   const { data: config, error: configError } = await db
     .from('whatsapp_config')
     .select('*')
     .eq('account_id', accountId)
-    .single();
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
   if (configError || !config) {
     throw new SendMessageError(

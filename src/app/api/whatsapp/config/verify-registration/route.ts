@@ -59,6 +59,8 @@ export async function GET() {
     .from('whatsapp_config')
     .select('*')
     .eq('account_id', accountId)
+    .order('updated_at', { ascending: false })
+    .limit(1)
     .maybeSingle()
 
   if (!config) {

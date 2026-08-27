@@ -9,6 +9,7 @@ import {
 } from '@/lib/whatsapp/meta-api'
 import type { InteractiveMessagePayload } from '@/lib/whatsapp/interactive'
 import { decrypt } from '@/lib/whatsapp/encryption'
+import { getAccountPrimaryConfig } from '@/lib/whatsapp/account-config'
 import {
   sanitizePhoneForMeta,
   isValidE164,
@@ -82,11 +83,7 @@ export async function engineSendText(
     throw new Error(`contact phone invalid: ${contact.phone}`)
   }
 
-  const { data: config, error: configErr } = await db
-    .from('whatsapp_config')
-    .select('*')
-    .eq('account_id', args.accountId)
-    .single()
+  const { data: config, error: configErr } = await getAccountPrimaryConfig(db, args.accountId)
   if (configErr || !config) {
     throw new Error('WhatsApp not configured for this account')
   }
@@ -192,11 +189,7 @@ export async function engineSendMedia(
     throw new Error(`contact phone invalid: ${contact.phone}`)
   }
 
-  const { data: config, error: configErr } = await db
-    .from('whatsapp_config')
-    .select('*')
-    .eq('account_id', args.accountId)
-    .single()
+  const { data: config, error: configErr } = await getAccountPrimaryConfig(db, args.accountId)
   if (configErr || !config) {
     throw new Error('WhatsApp not configured for this account')
   }
@@ -344,11 +337,7 @@ async function sendInteractiveViaMeta(
     throw new Error(`contact phone invalid: ${contact.phone}`)
   }
 
-  const { data: config, error: configErr } = await db
-    .from('whatsapp_config')
-    .select('*')
-    .eq('account_id', input.accountId)
-    .single()
+  const { data: config, error: configErr } = await getAccountPrimaryConfig(db, input.accountId)
   if (configErr || !config) {
     throw new Error('WhatsApp not configured for this account')
   }

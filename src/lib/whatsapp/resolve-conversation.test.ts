@@ -48,6 +48,9 @@ function makeDb(script: Script): SupabaseClient {
     eq: () => builder,
     order: () => builder,
     limit: () => {
+      // whatsapp_config uses `.limit(1).maybeSingle()` (the multi-row
+      // schema) — keep chaining so `.maybeSingle()` resolves the row.
+      if (table === 'whatsapp_config') return builder;
       // Only the conversation lookup terminates on `.limit(1)`.
       if (table === 'conversations' && mode === 'select') {
         const row = script.existingConversationByCall

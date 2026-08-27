@@ -1790,6 +1790,7 @@
       "webhookUrl": "Webhook Callback URL",
       "saving": "Saving...",
       "saveConfig": "Save Configuration",
+      "saveFailed": "Save failed",
       "testing": "Testing...",
       "testConnection": "Test API Connection",
       "setupInstructions": "Setup Instructions",
