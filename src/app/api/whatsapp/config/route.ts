@@ -336,14 +336,31 @@ export async function GET() {
       )
     }
 
-    // One row per phone number — return the whole list for this account.
+    // is_primary may not exist in this environment yet (migration 053).
+    // Detect once so we never 500 with 42703 against an older schema
+    // (this was the production bug). We always select the stable base
+    // columns and, when the column exists, read the primary flags via a
+    // separate type-safe query instead of an interpolated SELECT string.
+    const hasIsPrimary = await supportsIsPrimary(supabase)
+    const primaryPhoneNumberIds = new Set<string>()
+    if (hasIsPrimary) {
+      const { data: primaries } = await supabase
+        .from('whatsapp_config')
+        .select('phone_number_id, is_primary')
+        .eq('account_id', accountId)
+        .eq('is_primary', true)
+      for (const p of primaries ?? []) {
+        if (p.is_primary) primaryPhoneNumberIds.add(p.phone_number_id)
+      }
+    }
+
+    // One row per phone number — return the whole list for this account,
+    // most-recently-updated first (so the "default" is stable even before
+    // migration 053 adds is_primary).
     const { data: rows, error: listError } = await supabase
       .from('whatsapp_config')
-      .select(
-        'id, phone_number_id, waba_id, access_token, status, connection_status, is_primary, display_phone_number, business_name, registered_at, subscribed_apps_at, last_registration_error',
-      )
+      .select(CONFIG_BASE_COLS)
       .eq('account_id', accountId)
-      .order('is_primary', { ascending: false })
       .order('updated_at', { ascending: false })
 
     if (listError) {
@@ -375,7 +392,7 @@ export async function GET() {
           waba_id: row.waba_id,
           display_phone_number: row.display_phone_number,
           business_name: row.business_name,
-          is_primary: Boolean(row.is_primary),
+          is_primary: primaryPhoneNumberIds.has(row.phone_number_id),
           status: row.status,
           connection_status: 'error',
           connected: false,
@@ -409,7 +426,7 @@ export async function GET() {
         waba_id: row.waba_id,
         display_phone_number: row.display_phone_number,
         business_name: row.business_name,
-        is_primary: Boolean(row.is_primary),
+        is_primary: primaryPhoneNumberIds.has(row.phone_number_id),
         status: row.status,
         connection_status: connected ? 'connected' : 'error',
         connected,
@@ -420,8 +437,11 @@ export async function GET() {
       })
     }
 
+    // Primary = the flagged number when the column exists; otherwise the
+    // most-recently-updated number (rows are already sorted updated_at
+    // desc when is_primary is absent).
     const primary =
-      numbers.find((n: { is_primary: boolean }) => n.is_primary) ?? numbers[0] ?? null
+      numbers.find((n: { is_primary: boolean }) => !!n.is_primary) ?? numbers[0] ?? null
 
     return NextResponse.json({
       numbers,
@@ -457,6 +477,53 @@ async function persistConnectionStatus(
     console.warn('[whatsapp/config] connection_status write skipped:', err)
   }
 }
+
+/**
+ * Whether `whatsapp_config.is_primary` exists in the current schema.
+ *
+ * The `is_primary` column is introduced by migration 053 (drops
+ * UNIQUE(account_id) for multi-number support). Until that migration is
+ * applied in a given environment, the column does not exist and any
+ * SELECT/ORDER/upsert that references it fails with PostgreSQL 42703 —
+ * which is what surfaced as the GET /api/whatsapp/config 500 in
+ * production. This lets the route degrade gracefully: multi-number
+ * ordering falls back to most-recent when the column is absent, and the
+ * API keeps working before AND after the migration lands.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function supportsIsPrimary(supabase: any): Promise<boolean> {
+  try {
+    const probe = await supabase.from('whatsapp_config').select('id, is_primary').limit(1)
+    return !probe.error
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Read the is_primary flag for a single config row when the column exists
+ * (migration 053), otherwise null. Uses a fixed static SELECT (not an
+ * interpolated string) so the statically-typed Supabase client parses it.
+ */
+async function readPrimaryFlag(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  configId: string,
+  hasIsPrimary: boolean,
+): Promise<boolean | null> {
+  if (!hasIsPrimary) return null
+  const { data } = await supabase
+    .from('whatsapp_config')
+    .select('is_primary')
+    .eq('id', configId)
+    .limit(1)
+    .maybeSingle()
+  return data?.is_primary ?? null
+}
+
+// Columns that exist on every deployed schema (no is_primary dependency).
+const CONFIG_BASE_COLS =
+  'id, phone_number_id, waba_id, access_token, status, connection_status, display_phone_number, business_name, registered_at, subscribed_apps_at, last_registration_error'
 
 interface NumberPayload {
   phone_number_id?: unknown
@@ -529,6 +596,11 @@ export async function POST(request: Request) {
         { status: 400 },
       )
     }
+
+    // is_primary may not exist on this schema yet (migration 053) —
+    // detect once so every SELECT/update/upsert that references it stays
+    // conditional and never 500s with 42703 on an older deployment.
+    const hasIsPrimary = await supportsIsPrimary(supabase)
 
     const {
       phone_number_id,
@@ -640,12 +712,12 @@ export async function POST(request: Request) {
     // reuse the stored encrypted access token (a PIN-only re-register
     // sends no access_token).
     let existing:
-      | { id: string; is_primary: boolean | null; access_token: string | null; verify_token: string | null }
+      | { id: string; access_token: string | null; verify_token: string | null }
       | null = null
     try {
       const result = await supabase
         .from('whatsapp_config')
-        .select('id, is_primary, access_token, verify_token')
+        .select('id, access_token, verify_token')
         .eq('account_id', accountId)
         .eq('phone_number_id', trimmedNumber)
         .limit(1)
@@ -769,7 +841,6 @@ export async function POST(request: Request) {
     }
 
     // Count the account's configs to decide first-number / primary logic.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let accountConfigCount = 0
     try {
       const { count, error: countError } = await supabase
@@ -859,18 +930,21 @@ export async function POST(request: Request) {
     }
 
     // Persist: upsert on phone_number_id so create + update are atomic
-    // and keyed by the number, not by account.
+    // and keyed by the number, not by account. is_primary is only written
+    // when the column exists (migration 053).
     const persistenceBody: Record<string, unknown> = {
       account_id: accountId,
       user_id: user.id,
       ...baseRow,
-      is_primary: becomesPrimary,
+    }
+    if (hasIsPrimary) {
+      persistenceBody.is_primary = becomesPrimary
     }
 
     const { data: saved, error: saveError } = await supabase
       .from('whatsapp_config')
       .upsert(persistenceBody, { onConflict: 'phone_number_id' })
-      .select('id, phone_number_id, is_primary, status, connection_status, registered_at, subscribed_apps_at, last_registration_error')
+      .select('id, phone_number_id, status, connection_status, registered_at, subscribed_apps_at, last_registration_error')
       .single()
 
     if (saveError) {
@@ -902,7 +976,7 @@ export async function POST(request: Request) {
 
     // If this save promoted a NEW primary, demote any other primary rows
     // for the account (partial unique index allows only one is_primary).
-    if (becomesPrimary && saved && saved.id) {
+    if (hasIsPrimary && becomesPrimary && saved && saved.id) {
       const { error: demoteError } = await supabase
         .from('whatsapp_config')
         .update({ is_primary: false })
@@ -919,6 +993,9 @@ export async function POST(request: Request) {
       }
     }
 
+    const savedIsPrimary =
+      saved && saved.id ? await readPrimaryFlag(supabase, saved.id, hasIsPrimary) : null
+
     return NextResponse.json({
       success: true,
       saved: true,
@@ -928,7 +1005,7 @@ export async function POST(request: Request) {
       config: {
         id: saved?.id,
         phone_number_id: saved?.phone_number_id ?? trimmedNumber,
-        is_primary: Boolean(saved?.is_primary ?? becomesPrimary),
+        is_primary: Boolean(savedIsPrimary ?? becomesPrimary),
         status: saved?.status,
         connection_status: saved?.connection_status,
         registered_at: saved?.registered_at,
@@ -993,12 +1070,14 @@ export async function DELETE(request: Request) {
       )
     }
 
+    const hasIsPrimary = await supportsIsPrimary(supabase)
+
     // Resolve which row we're deleting and whether it was primary.
-    let target: { id: string; is_primary: boolean | null } | null = null
+    let target: { id: string; is_primary?: boolean | null } | null = null
     try {
       const query = supabase
         .from('whatsapp_config')
-        .select('id, is_primary')
+        .select('id')
         .eq('account_id', accountId)
       if (configId) {
         query.eq('id', configId)
@@ -1016,6 +1095,9 @@ export async function DELETE(request: Request) {
         return NextResponse.json({ error: 'Failed to delete configuration. Please try again.' }, { status: 500 })
       }
       target = Array.isArray(data) && data.length > 0 ? data[0] : null
+      if (target) {
+        target.is_primary = await readPrimaryFlag(supabase, target.id, hasIsPrimary)
+      }
     } catch (err) {
       logError('DELETE /api/whatsapp/config', 'fetch target', {
         userId,
@@ -1046,8 +1128,9 @@ export async function DELETE(request: Request) {
     }
 
     // If we removed the account's primary, promote the next available
-    // number (if any) so outbound sends keep working.
-    if (target.is_primary) {
+    // number (if any) so outbound sends keep working. Only meaningful
+    // when the is_primary column exists (migration 053).
+    if (hasIsPrimary && target.is_primary) {
       const { data, error: promoteError } = await supabase
         .from('whatsapp_config')
         .select('id')
