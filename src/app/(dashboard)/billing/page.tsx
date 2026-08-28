@@ -68,7 +68,10 @@ export default function BillingPage() {
 
       if (plansError) throw plansError;
 
-      // Fetch current subscription
+      // Fetch current subscription. Zero rows (no active/trialing/past_due
+      // subscription) is a valid "workspace without a plan" state — never a
+      // 406 — so use maybeSingle() and let the UI render the free/no-plan
+      // view instead of treating a missing subscription as an error.
       const { data: subData } = await supabase
         .from("business_subscriptions")
         .select("*, subscription_plans(*)")
@@ -76,7 +79,7 @@ export default function BillingPage() {
         .in("status", ["active", "trialing", "past_due"])
         .order("created_at", { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       // Fetch usage — the current month drives the live meters below,
       // and we also keep up to 6 past months for the history table

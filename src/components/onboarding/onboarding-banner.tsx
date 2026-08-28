@@ -55,7 +55,7 @@ export function OnboardingBanner() {
         .eq("account_id", accountId)
         .in("status", ["active", "trialing"])
         .limit(1)
-        .single();
+        .maybeSingle();
 
       const { data: whatsapp } = await supabase
         .from("whatsapp_config")

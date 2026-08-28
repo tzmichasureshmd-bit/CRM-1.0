@@ -78,17 +78,42 @@ export function WhatsAppConfig() {
   const isRegistered = Boolean(config?.registered_at);
   const lastRegistrationError = config?.last_registration_error ?? null;
 
-  const [verifyingRegistration, setVerifyingRegistration] = useState(false);
-  type RegistrationProbe = {
-    live: boolean;
-    checks: Record<string, boolean | null>;
-    errors?: string[];
-    last_registration_error?: string | null;
-    registered_at?: string | null;
-    subscribed_apps_at?: string | null;
+  // Connection diagnostics surfaced from the whatsapp_config row.
+  const lastWebhookAt = config?.last_webhook_at ?? null;
+  const lastInboundAt = config?.last_inbound_at ?? null;
+  const webhookVerifiedAt = config?.webhook_verified_at ?? null;
+  const lastApiError = config?.last_api_error ?? null;
+  const lastApiErrorAt = config?.last_api_error_at ?? null;
+
+  // Structured result from /api/whatsapp/verify ("Verified with Meta").
+  type VerifyCheck = {
+    key: string;
+    label: string;
+    status: 'ok' | 'fail' | 'warning' | 'skipped';
+    detail: string | null;
+    error?: {
+      status?: number;
+      code?: string;
+      type?: string;
+      message?: string;
+      operation?: string;
+    } | null;
   };
-  const [registrationProbe, setRegistrationProbe] =
-    useState<RegistrationProbe | null>(null);
+  type VerifyResult = {
+    ready: boolean;
+    partial: boolean;
+    registeredAt?: string | null;
+    registered_at?: string | null;
+    requiresRegistration: boolean;
+    last_registration_error?: string | null;
+    checks: VerifyCheck[];
+  };
+  const [verifyResult, setVerifyResult] = useState<VerifyResult | null>(null);
+  const [verifyLoading, setVerifyLoading] = useState(false);
+
+  // Track a pending PIN the admin is about to submit for registration.
+  const [registrationPin, setRegistrationPin] = useState('');
+  const [sendingPin, setSendingPin] = useState(false);
 
   const webhookUrl =
     typeof window !== 'undefined'
@@ -132,7 +157,7 @@ export function WhatsAppConfig() {
         setTokenEdited(false);
       }
       // Clear any stale probe result when reloading the row.
-      setRegistrationProbe(null);
+      setVerifyResult(null);
 
       // Then verify health via the API (decrypts token + pings Meta)
       if (data) {
@@ -250,22 +275,39 @@ export function WhatsAppConfig() {
       }
 
       // Save succeeded (the database operation completed) — only now do
-      // we show success feedback.
-      if (data.registered === false && data.registration_error) {
-        const message = `Saved, but Meta couldn't register the number: ${data.registration_error}`;
-        toast.error(message, { duration: 12000 });
-        setSaveError(message);
-      } else if (data.registration_skipped) {
-        toast.success(
-          'Credentials saved and verified. Inbound registration was skipped (no PIN) — see Registration status below.',
-          { duration: 10000 },
+      // we show success feedback. Credentials being valid is NOT the same
+      // as the number being registered for inbound — never claim success
+      // when registration is still pending.
+      const credentialsOk = Boolean(data.phone_info || data.config?.connection_status === 'connected');
+      if (data.requires_registration) {
+        const pending =
+          (data.registration_error && typeof data.registration_error === 'string' &&
+            data.registration_error.startsWith('Registration pending'))
+            ? 'Inbound is NOT active yet.'
+            : 'Registration is not complete — Meta could not register the number.';
+        // Keep the misleading "skipped" phrasing out: this is an explicit,
+        // actionable state the admin must resolve (enter the PIN).
+        const action =
+          data.registration_error && typeof data.registration_error === 'string' &&
+            data.registration_error.startsWith('Registration pending')
+            ? 'Enter the two-step verification PIN below to finish registering the number for inbound messages.'
+            : `Meta couldn't register the number: ${data.registration_error ?? 'unknown error'}`;
+        toast.warning(
+          `${credentialsOk ? 'Credentials connected. ' : ''}${pending} ${action}`,
+          { duration: 14000 },
         );
+        setSaveError(null);
         setPin('');
-      } else {
+      } else if (data.registered) {
         toast.success(
           data.phone_info?.verified_name
             ? `Live — ${data.phone_info.verified_name} can now receive events.`
             : 'WhatsApp connected. Events will start flowing within a minute.',
+        );
+        setPin('');
+      } else {
+        toast.success(
+          'Credentials connected and verified. Registration status below shows inbound readiness.',
         );
         setPin('');
       }
@@ -312,28 +354,73 @@ export function WhatsAppConfig() {
   }
 
   async function handleVerifyRegistration() {
-    setVerifyingRegistration(true);
-    setRegistrationProbe(null);
+    setVerifyLoading(true);
+    setVerifyResult(null);
     try {
-      const res = await fetch('/api/whatsapp/config/verify-registration', {
-        method: 'GET',
-      });
-      const data = (await res.json()) as RegistrationProbe;
-      setRegistrationProbe(data);
-      if (data.live) {
-        toast.success('Number is fully wired — Meta is delivering events.');
+      const res = await fetch('/api/whatsapp/verify', { method: 'GET' });
+      const data = (await res.json()) as VerifyResult;
+      setVerifyResult(data);
+      if (data.ready) {
+        toast.success('Verified with Meta — every check passed.');
       } else {
-        toast.error(
-          'Number is not fully registered. See the checks below for which step failed.',
-          { duration: 8000 },
+        const failed = (data.checks ?? []).filter(
+          (c) => c.status === 'fail' || c.status === 'warning',
         );
+        const labels = failed.map((c) => c.label).join(', ') || 'some checks';
+        toast.error(`Not fully ready. Failing: ${labels}`, { duration: 8000 });
       }
       if (accountId) await fetchConfig(accountId);
     } catch (err) {
-      console.error('verify-registration failed:', err);
+      console.error('verify failed:', err);
       toast.error('Could not reach the verification endpoint.');
     } finally {
-      setVerifyingRegistration(false);
+      setVerifyLoading(false);
+    }
+  }
+
+  // Submit the two-step verification PIN to finish registration on Meta.
+  // Re-POSTs the config with just the PIN (token is reused server-side)
+  // so /register actually runs now that a PIN is supplied.
+  async function handleSubmitPin() {
+    if (!registrationPin || registrationPin.length !== 6) {
+      toast.error('Enter the 6-digit two-step verification PIN.');
+      return;
+    }
+    setSendingPin(true);
+    try {
+      const payload: Record<string, unknown> = {
+        phone_number_id: phoneNumberId.trim(),
+        waba_id: wabaId.trim() || null,
+        pin: registrationPin.trim(),
+      };
+      const res = await fetch('/api/whatsapp/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = data.error || data.message || `Registration failed (HTTP ${res.status})`;
+        toast.error(msg, { duration: 12000 });
+        return;
+      }
+      if (data.registered) {
+        toast.success('Phone number registered — inbound messages will now reach the CRM inbox.');
+        setRegistrationPin('');
+        setPin('');
+      } else {
+        toast.error(
+          data.registration_error || 'Registration is still pending. Check that the PIN is correct and the number has two-step verification enabled.',
+          { duration: 12000 },
+        );
+      }
+      if (accountId) await fetchConfig(accountId);
+      await handleVerifyRegistration();
+    } catch (err) {
+      console.error('PIN submit failed:', err);
+      toast.error('Failed to complete registration. Please try again.');
+    } finally {
+      setSendingPin(false);
     }
   }
 
@@ -518,10 +605,10 @@ export function WhatsAppConfig() {
                 variant="outline"
                 size="sm"
                 onClick={handleVerifyRegistration}
-                disabled={verifyingRegistration}
+                disabled={verifyLoading}
                 className="border-border bg-transparent text-foreground hover:bg-muted h-7"
               >
-                {verifyingRegistration ? (
+                {verifyLoading ? (
                   <Loader2 className="size-3.5 animate-spin" />
                 ) : (
                   <Zap className="size-3.5" />
@@ -553,39 +640,100 @@ export function WhatsAppConfig() {
               )}
             </AlertDescription>
 
-            {registrationProbe && (
+            {verifyResult && (
               <div className="mt-3 rounded border border-border bg-card/60 px-3 py-2 space-y-1.5 text-[11px]">
                 <p className="font-medium text-foreground">
                   {t('diagnosticLastRun')}
-                  <span className={registrationProbe.live ? 'text-emerald-400' : 'text-amber-400'}>
-                    {registrationProbe.live ? t('live') : t('notLive')}
+                  <span
+                    className={
+                      verifyResult.ready
+                        ? 'text-emerald-400'
+                        : verifyResult.requiresRegistration
+                          ? 'text-amber-400'
+                          : 'text-red-400'
+                    }
+                  >
+                    {verifyResult.ready
+                      ? 'Ready'
+                      : verifyResult.requiresRegistration
+                        ? 'Registration required'
+                        : 'Not ready'}
                   </span>
                 </p>
                 <ul className="space-y-0.5 text-muted-foreground">
-                  {Object.entries(registrationProbe.checks).map(([k, v]) => (
-                    <li key={k} className="flex items-center gap-1.5">
-                      {v === true ? (
-                        <CheckCircle2 className="size-3 text-emerald-400 shrink-0" />
-                      ) : v === false ? (
-                        <XCircle className="size-3 text-red-400 shrink-0" />
-                      ) : (
-                        <span className="size-3 rounded-full border border-border shrink-0" />
-                      )}
-                      <code className="text-muted-foreground">{k}</code>
+                  {(verifyResult.checks ?? []).map((c) => (
+                    <li key={c.key} className="flex items-center justify-between gap-2">
+                      <span className="flex items-center gap-1.5">
+                        {c.status === 'ok' ? (
+                          <CheckCircle2 className="size-3 text-emerald-400 shrink-0" />
+                        ) : c.status === 'fail' ? (
+                          <XCircle className="size-3 text-red-400 shrink-0" />
+                        ) : c.status === 'warning' ? (
+                          <AlertTriangle className="size-3 text-amber-400 shrink-0" />
+                        ) : (
+                          <span className="size-3 rounded-full border border-border shrink-0" />
+                        )}
+                        <span className="font-medium text-foreground">{c.label}</span>
+                      </span>
+                      <span className="text-right text-muted-foreground truncate max-w-[55%]">
+                        {c.detail || c.error?.message || c.status}
+                      </span>
                     </li>
                   ))}
                 </ul>
-                {(registrationProbe.errors ?? []).length > 0 && (
-                  <ul className="pt-1 space-y-0.5 text-red-300">
-                    {registrationProbe.errors?.map((e, i) => (
-                      <li key={i}>• {e}</li>
-                    ))}
-                  </ul>
+                {verifyResult.requiresRegistration && (
+                  <div className="pt-2 border-t border-border space-y-2">
+                    <p className="text-muted-foreground">
+                      Inbound is not active yet. Enter the 6-digit two-step
+                      verification PIN to register the number and start
+                      receiving messages.
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="password"
+                        inputMode="numeric"
+                        maxLength={6}
+                        placeholder="6-digit PIN"
+                        value={registrationPin}
+                        onChange={(e) =>
+                          setRegistrationPin(e.target.value.replace(/\D/g, ''))
+                        }
+                        className="bg-muted border-border text-foreground placeholder:text-muted-foreground max-w-[180px]"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={sendingPin || registrationPin.length !== 6}
+                        onClick={handleSubmitPin}
+                      >
+                        {sendingPin ? <Loader2 className="size-3.5 animate-spin" /> : null}
+                        {sendingPin ? 'Registering…' : 'Register'}
+                      </Button>
+                    </div>
+                  </div>
                 )}
               </div>
             )}
           </Alert>
         )}
+
+        {/* Connection diagnostics */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-foreground">Connection diagnostics</CardTitle>
+            <CardDescription className="text-muted-foreground">
+              Live lifecycle timestamps recorded from the Meta webhook and API.
+              If inbound messages aren&apos;t showing up, these tell you the
+              last time anything actually reached this app.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-1.5 text-sm">
+            <DiagRow label="Webhooks received" value={lastWebhookAt} />
+            <DiagRow label="Inbound messages stored" value={lastInboundAt} />
+            <DiagRow label="Webhook challenge verified" value={webhookVerifiedAt} />
+            <DiagRow label="Last API error" value={lastApiErrorAt} suffix={lastApiError ?? undefined} isError={Boolean(lastApiError)} />
+          </CardContent>
+        </Card>
 
         {/* API Credentials */}
         <Card>
@@ -869,5 +1017,40 @@ export function WhatsAppConfig() {
       </div>
     </div>
     </section>
+  );
+}
+
+function fmtDiagTime(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleString();
+}
+
+function DiagRow({
+  label,
+  value,
+  suffix,
+  isError,
+}: {
+  label: string;
+  value: string | null | undefined;
+  suffix?: string;
+  isError?: boolean;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-2 border-b border-border/60 last:border-0 pb-1.5 last:pb-0">
+      <span className="text-muted-foreground shrink-0">{label}</span>
+      <span className="text-right">
+        <span className={isError ? 'text-red-300' : 'text-foreground'}>
+          {fmtDiagTime(value)}
+        </span>
+        {suffix ? (
+          <span className="block text-[11px] text-muted-foreground max-w-[260px] truncate" title={suffix}>
+            {suffix}
+          </span>
+        ) : null}
+      </span>
+    </div>
   );
 }

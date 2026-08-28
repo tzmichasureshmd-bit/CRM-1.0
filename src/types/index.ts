@@ -334,6 +334,16 @@ export interface WhatsAppConfig {
   subscribed_apps_at?: string;
   /** Last error from /register; cleared on success. */
   last_registration_error?: string;
+  /** Diagnostics — last time this number's webhook received any event. */
+  last_webhook_at?: string | null;
+  /** Diagnostics — last time an inbound customer message was stored. */
+  last_inbound_at?: string | null;
+  /** Diagnostics — last time the Meta webhook GET challenge succeeded. */
+  webhook_verified_at?: string | null;
+  /** Diagnostics — most recent safe Meta API error message. */
+  last_api_error?: string | null;
+  /** Diagnostics — when the most recent safe Meta API error occurred. */
+  last_api_error_at?: string | null;
 }
 
 // Raw Meta status enum. We persist this verbatim from Meta (sync + webhook)

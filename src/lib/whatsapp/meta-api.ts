@@ -24,18 +24,78 @@ export interface MetaPhoneInfo {
 }
 
 interface MetaErrorResponse {
-  error?: { message?: string; code?: number; type?: string }
+  error?: {
+    message?: string
+    code?: number
+    type?: string
+    error_subcode?: number
+    fbtrace_id?: string
+  }
 }
 
-async function throwMetaError(response: Response, fallback: string): Promise<never> {
-  let message = fallback
+/**
+ * Structured Meta Graph API error. Carries the HTTP status, Meta's error
+ * code / type / subcode / message, and the operation that failed — so callers
+ * (and the diagnostics UI) can show an actionable, safe diagnostic instead of
+ * a generic "unexpected response from server". Never holds credentials.
+ */
+export class MetaApiError extends Error {
+  readonly status: number
+  readonly code: number | null
+  readonly type: string | null
+  readonly subcode: number | null
+  readonly operation: string
+  readonly metasMessage: string | null
+
+  constructor(opts: {
+    status: number
+    code?: number | null
+    type?: string | null
+    subcode?: number | null
+    message?: string | null
+    operation: string
+  }) {
+    super(
+      opts.operation
+        ? `${opts.operation}: ${opts.message || `Meta API error (HTTP ${opts.status})`}`
+        : opts.message || `Meta API error (HTTP ${opts.status})`,
+    )
+    this.status = opts.status
+    this.code = opts.code ?? null
+    this.type = opts.type ?? null
+    this.subcode = opts.subcode ?? null
+    this.operation = opts.operation
+    this.metasMessage = opts.message ?? null
+    this.name = 'MetaApiError'
+  }
+}
+
+async function throwMetaError(
+  response: Response,
+  fallback: string,
+  operation: string,
+): Promise<never> {
+  let message: string | null = null
+  let code: number | null = null
+  let type: string | null = null
+  let subcode: number | null = null
   try {
     const data = (await response.json()) as MetaErrorResponse
     if (data.error?.message) message = data.error.message
+    if (typeof data.error?.code === 'number') code = data.error.code
+    if (typeof data.error?.type === 'string') type = data.error.type
+    if (typeof data.error?.error_subcode === 'number') subcode = data.error.error_subcode
   } catch {
     // response body wasn't JSON — keep the fallback
   }
-  throw new Error(message)
+  throw new MetaApiError({
+    status: response.status,
+    code,
+    type,
+    subcode,
+    message: message ?? fallback,
+    operation,
+  })
 }
 
 // ============================================================
@@ -60,9 +120,131 @@ export async function verifyPhoneNumber(
     headers: { Authorization: `Bearer ${accessToken}` },
   })
   if (!response.ok) {
-    await throwMetaError(response, `Meta API error: ${response.status}`)
+    await throwMetaError(response, `Meta API error: ${response.status}`, 'verify_phone_number')
   }
   return response.json()
+}
+
+// ============================================================
+// Token / WABA / registration verification (diagnostics)
+// ============================================================
+
+export interface TokenInfoArgs {
+  accessToken: string
+}
+
+export interface TokenInfo {
+  id: string
+  name?: string
+  /** Present on System User tokens. */
+  app_id?: string
+  /** Present on System User tokens. */
+  type?: string
+}
+
+/**
+ * Validate the access token by calling /me. A 200 confirms the token is
+ * live and scoped to a real Meta user / system user; one of the most
+ * common production failures is an expired or token-lost System User
+ * token that still passes a local check.
+ */
+export async function getTokenInfo(args: TokenInfoArgs): Promise<TokenInfo> {
+  const { accessToken } = args
+  const response = await fetch(`${META_API_BASE}/me?fields=id,name`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  if (!response.ok) {
+    await throwMetaError(response, `Token verification failed (HTTP ${response.status})`, 'verify_token')
+  }
+  return response.json()
+}
+
+export interface GetWabaArgs {
+  wabaId: string
+  accessToken: string
+}
+
+export interface WabaInfo {
+  id: string
+  name?: string
+  /** e.g. ACTIVE */
+  account_status?: string
+  /** e.g. VERIFIED (business verification state) */
+  business_verification_status?: string
+  currency?: string
+  timezone_id?: string
+  /** When true the WABA is subscribed to this app (from subscribed_apps). */
+  subscribed_to_app?: boolean
+}
+
+/**
+ * Fetch WhatsApp Business Account metadata for diagnostics.
+ */
+export async function getWaba(args: GetWabaArgs): Promise<WabaInfo> {
+  const { wabaId, accessToken } = args
+  const url = `${META_API_BASE}/${wabaId}?fields=id,name,account_status,business_verification_status,currency,timezone_id`
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  if (!response.ok) {
+    await throwMetaError(response, `WABA verification failed (HTTP ${response.status})`, 'verify_waba')
+  }
+  return response.json()
+}
+
+export interface GetPhoneNumberArgs {
+  phoneNumberId: string
+  accessToken: string
+}
+
+export interface PhoneNumberInfo extends MetaPhoneInfo {
+  /** TWO_STEP_VERIFICATION / UNVERIFIED / VERIFIED / DECLINED on the
+   *  on-premises API — on Cloud API this is typically absent, which is why
+   *  registration state is probed via /register with the 2FA PIN. */
+  code_verification_status?: string
+  /** 24-hour or 7-day messaging limit status. */
+  through?: { tier?: string }
+}
+
+/**
+ * Fetch a phone number's full health metadata for diagnostics.
+ */
+export async function getPhoneNumber(
+  args: GetPhoneNumberArgs
+): Promise<PhoneNumberInfo> {
+  const { phoneNumberId, accessToken } = args
+  const url = `${META_API_BASE}/${phoneNumberId}?fields=id,display_phone_number,verified_name,quality_rating,code_verification_status`
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  if (!response.ok) {
+    await throwMetaError(response, `Phone number verification failed (HTTP ${response.status})`, 'verify_phone_number')
+  }
+  return response.json()
+}
+
+export interface ProbeRegistrationArgs {
+  phoneNumberId: string
+  accessToken: string
+  /** 6-digit PIN from the WhatsApp account's two-step verification. */
+  pin: string
+}
+
+export interface ProbeRegistrationResult {
+  /** True when the number is registered to THIS app (fresh or already). */
+  registered: boolean
+  alreadyRegistered: boolean
+}
+
+/**
+ * Probe the phone number's registration state by attempting /register.
+ * Meta returns success (or "already registered to this app") when the
+ * number is wired for inbound webhooks on this app; when 2FA isn't on,
+ * or the PIN is wrong, Meta returns a code we surface as an error.
+ */
+export async function probeRegistration(args: ProbeRegistrationArgs): Promise<ProbeRegistrationResult> {
+  const result = await registerPhoneNumber(args)
+  return { registered: result.success, alreadyRegistered: result.alreadyRegistered }
 }
 
 // ============================================================
@@ -174,7 +356,7 @@ export async function subscribeWabaToApp(
     headers: { Authorization: `Bearer ${accessToken}` },
   })
   if (!response.ok) {
-    await throwMetaError(response, `Meta API error: ${response.status}`)
+    await throwMetaError(response, `Meta API error: ${response.status}`, 'subscribe_waba')
   }
 }
 
@@ -205,9 +387,45 @@ export async function getSubscribedApps(
     headers: { Authorization: `Bearer ${accessToken}` },
   })
   if (!response.ok) {
-    await throwMetaError(response, `Meta API error: ${response.status}`)
+    await throwMetaError(response, `Meta API error: ${response.status}`, 'get_subscribed_apps')
   }
   const data = (await response.json()) as { data?: SubscribedApp[] }
+  return data.data ?? []
+}
+
+export interface GetWebhookSubscriptionsArgs {
+  /** Meta App id (env META_APP_ID). */
+  appId: string
+  accessToken: string
+}
+
+export interface WebhookSubscription {
+  object: string
+  callback_url?: string
+  verify_token?: string
+  /** Subscribed fields, e.g. ["messages", "message_template_status_update"]. */
+  fields?: string[]
+  active?: boolean
+}
+
+/**
+ * Diagnostic — fetch the app's webhook subscriptions to confirm the
+ * `messages` field is subscribed and the callback URL / verify token
+ * are wired. Requires META_APP_ID; only used for the "Verified with
+ * Meta" / diagnostics result when the app id is configured.
+ */
+export async function getWebhookSubscriptions(
+  args: GetWebhookSubscriptionsArgs
+): Promise<WebhookSubscription[]> {
+  const { appId, accessToken } = args
+  const url = `${META_API_BASE}/${appId}/subscriptions`
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  if (!response.ok) {
+    await throwMetaError(response, `Webhook subscription check failed (HTTP ${response.status})`, 'get_webhook_subscriptions')
+  }
+  const data = (await response.json()) as { data?: WebhookSubscription[] }
   return data.data ?? []
 }
 
@@ -253,7 +471,7 @@ export async function sendTextMessage(
     body: JSON.stringify(body),
   })
   if (!response.ok) {
-    await throwMetaError(response, `Meta API error: ${response.status}`)
+    await throwMetaError(response, `Meta API error: ${response.status}`, 'send_text')
   }
   const data = await response.json()
   return { messageId: data.messages[0].id }
@@ -319,7 +537,7 @@ export async function sendMediaMessage(
     body: JSON.stringify(body),
   })
   if (!response.ok) {
-    await throwMetaError(response, `Meta API error: ${response.status}`)
+    await throwMetaError(response, `Meta API error: ${response.status}`, 'send_media')
   }
   const data = await response.json()
   return { messageId: data.messages[0].id }
@@ -437,7 +655,7 @@ export async function sendTemplateMessage(
     body: JSON.stringify(body),
   })
   if (!response.ok) {
-    await throwMetaError(response, `Meta API error: ${response.status}`)
+    await throwMetaError(response, `Meta API error: ${response.status}`, 'send_template')
   }
   const data = await response.json()
   return { messageId: data.messages[0].id }
@@ -491,7 +709,7 @@ export async function uploadResumableMedia(
     { method: 'POST' },
   )
   if (!startRes.ok) {
-    await throwMetaError(startRes, `Resumable upload start failed: ${startRes.status}`)
+    await throwMetaError(startRes, `Resumable upload start failed: ${startRes.status}`, 'resumable_upload_start')
   }
   const startData = (await startRes.json()) as { id?: string }
   if (!startData.id) {
@@ -511,7 +729,7 @@ export async function uploadResumableMedia(
     body: bytes as unknown as BodyInit,
   })
   if (!uploadRes.ok) {
-    await throwMetaError(uploadRes, `Resumable upload failed: ${uploadRes.status}`)
+    await throwMetaError(uploadRes, `Resumable upload failed: ${uploadRes.status}`, 'resumable_upload')
   }
   const uploadData = (await uploadRes.json()) as { h?: string }
   if (!uploadData.h) {
@@ -565,7 +783,7 @@ export async function submitMessageTemplate(
     body: JSON.stringify(payload),
   })
   if (!response.ok) {
-    await throwMetaError(response, `Meta API error: ${response.status}`)
+    await throwMetaError(response, `Meta API error: ${response.status}`, 'submit_template')
   }
   const data = await response.json()
   if (!data?.id) {
@@ -617,7 +835,7 @@ export async function editMessageTemplate(
     body: JSON.stringify(body),
   })
   if (!response.ok) {
-    await throwMetaError(response, `Meta API error: ${response.status}`)
+    await throwMetaError(response, `Meta API error: ${response.status}`, 'edit_template')
   }
   const data = await response.json().catch(() => ({}))
   return { success: data?.success !== false }
@@ -655,7 +873,7 @@ export async function deleteMessageTemplate(
   // side, and we still want the local row removed.
   if (response.status === 404) return
   if (!response.ok) {
-    await throwMetaError(response, `Meta API error: ${response.status}`)
+    await throwMetaError(response, `Meta API error: ${response.status}`, 'delete_template')
   }
 }
 
@@ -697,7 +915,7 @@ export async function sendReactionMessage(
     }),
   })
   if (!response.ok) {
-    await throwMetaError(response, `Meta API error: ${response.status}`)
+    await throwMetaError(response, `Meta API error: ${response.status}`, 'send_reaction')
   }
   const data = await response.json()
   return { messageId: data.messages[0].id }
@@ -827,7 +1045,7 @@ export async function sendInteractiveButtons(
     body: JSON.stringify(body),
   })
   if (!response.ok) {
-    await throwMetaError(response, `Meta API error: ${response.status}`)
+    await throwMetaError(response, `Meta API error: ${response.status}`, 'send_interactive_buttons')
   }
   const data = await response.json()
   return { messageId: data.messages[0].id }
@@ -959,7 +1177,7 @@ export async function sendInteractiveList(
     body: JSON.stringify(body),
   })
   if (!response.ok) {
-    await throwMetaError(response, `Meta API error: ${response.status}`)
+    await throwMetaError(response, `Meta API error: ${response.status}`, 'send_interactive_list')
   }
   const data = await response.json()
   return { messageId: data.messages[0].id }
@@ -1011,7 +1229,7 @@ export async function getMediaUrl(
     headers: { Authorization: `Bearer ${accessToken}` },
   })
   if (!response.ok) {
-    await throwMetaError(response, `Media fetch failed: ${response.status}`)
+    await throwMetaError(response, `Media fetch failed: ${response.status}`, 'get_media_url')
   }
   const data = await response.json()
   if (!data.url) throw new Error('Media URL not found in Meta response')

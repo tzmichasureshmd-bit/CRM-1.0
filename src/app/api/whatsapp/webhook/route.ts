@@ -148,6 +148,20 @@ export async function GET(request: Request) {
             }
           })
       }
+      // Record when the Meta webhook verification challenge last
+      // succeeded (diagnostics). Best-effort.
+      void supabaseAdmin()
+        .from('whatsapp_config')
+        .update({ webhook_verified_at: new Date().toISOString() })
+        .eq('id', matchedConfig.id)
+        .then(({ error }: { error: unknown }) => {
+          if (error) {
+            console.warn(
+              '[webhook] webhook_verified_at update skipped:',
+              (error as { message?: string })?.message ?? error,
+            )
+          }
+        })
       // Return challenge as plain text
       return new Response(challenge, {
         status: 200,
@@ -302,6 +316,19 @@ async function processWebhook(body: { entry?: WhatsAppWebhookEntry[] }) {
 
       const config = configRows[0]
 
+      // Record "last webhook received" on the matching config (diagnostics).
+      // Best-effort: this must never break the message flow.
+      const nowIso = new Date().toISOString()
+      void supabaseAdmin()
+        .from('whatsapp_config')
+        .update({ last_webhook_at: nowIso })
+        .eq('id', config.id)
+        .then(({ error }: { error: unknown }) => {
+          if (error) {
+            console.warn('[webhook] last_webhook_at update skipped:', (error as { message?: string })?.message ?? error)
+          }
+        })
+
       const decryptedAccessToken = decrypt(config.access_token)
 
       for (let i = 0; i < value.messages.length; i++) {
@@ -339,7 +366,8 @@ async function processWebhook(body: { entry?: WhatsAppWebhookEntry[] }) {
           // inserts that need it for NOT NULL FK compliance. Always
           // the admin who saved the WhatsApp config.
           config.user_id,
-          decryptedAccessToken
+          decryptedAccessToken,
+          config.id
         )
       }
     }
@@ -607,7 +635,10 @@ async function processMessage(
   // (contacts, conversations). Always the admin who saved the
   // WhatsApp config; the choice is arbitrary post-017 but stable.
   configOwnerUserId: string,
-  accessToken: string
+  accessToken: string,
+  // The whatsapp_config row that owns this number — used to record
+  // inbound diagnostics (last_inbound_at).
+  configId: string
 ) {
   const senderPhone = normalizePhone(message.from)
   const contactName = contact.profile.name
@@ -780,6 +811,24 @@ async function processMessage(
     'message_id:',
     message.id
   )
+
+  // Record "last inbound message" + clear any stale registration error on
+  // the owning config (diagnostics). The number demonstrably routes events
+  // to this app, so if it wasn't yet marked registered we now know inbound
+  // is live — record that so the diagnostics don't claim a false failure.
+  void supabaseAdmin()
+    .from('whatsapp_config')
+    .update({
+      last_inbound_at: new Date().toISOString(),
+      last_registration_error: null,
+      registered_at: new Date().toISOString(),
+    })
+    .eq('id', configId)
+    .then(({ error }: { error: unknown }) => {
+      if (error) {
+        console.warn('[webhook] whatsapp_config inbound diagnostics update skipped:', (error as { message?: string })?.message ?? error)
+      }
+    })
 
   // Update conversation
   const { error: convError } = await supabaseAdmin()
