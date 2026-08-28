@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import {
-  registerPhoneNumber,
+  probeRegistrationState,
   subscribeWabaToApp,
   verifyPhoneNumber,
 } from '@/lib/whatsapp/meta-api'
@@ -400,6 +400,7 @@ export async function GET() {
           registered_at: row.registered_at,
           subscribed_apps_at: row.subscribed_apps_at,
           last_registration_error: row.last_registration_error,
+          registration_state: row.registration_state ?? 'REGISTRATION_UNKNOWN',
         })
         continue
       }
@@ -434,6 +435,7 @@ export async function GET() {
         registered_at: row.registered_at,
         subscribed_apps_at: row.subscribed_apps_at,
         last_registration_error: row.last_registration_error,
+        registration_state: row.registration_state ?? 'REGISTRATION_UNKNOWN',
       })
     }
 
@@ -521,10 +523,10 @@ async function readPrimaryFlag(
   return data?.is_primary ?? null
 }
 
-// Columns that exist on every deployed schema after migration 054
+// Columns that exist on every deployed schema after migration 054/055
 // (no is_primary dependency; is_primary is added separately/defensively).
 const CONFIG_BASE_COLS =
-  'id, phone_number_id, waba_id, access_token, status, connection_status, display_phone_number, business_name, registered_at, subscribed_apps_at, last_registration_error, last_webhook_at, last_inbound_at, webhook_verified_at, last_api_error, last_api_error_at'
+  'id, phone_number_id, waba_id, access_token, status, connection_status, display_phone_number, business_name, registered_at, subscribed_apps_at, last_registration_error, last_webhook_at, last_inbound_at, webhook_verified_at, last_api_error, last_api_error_at, registration_state'
 
 interface NumberPayload {
   phone_number_id?: unknown
@@ -718,12 +720,13 @@ export async function POST(request: Request) {
           access_token: string | null
           verify_token: string | null
           registered_at: string | null
+          registration_state: string | null
         }
       | null = null
     try {
       const result = await supabase
         .from('whatsapp_config')
-        .select('id, access_token, verify_token, registered_at')
+        .select('id, access_token, verify_token, registered_at, registration_state')
         .eq('account_id', accountId)
         .eq('phone_number_id', trimmedNumber)
         .limit(1)
@@ -877,53 +880,52 @@ export async function POST(request: Request) {
     const becomesPrimary = requestPrimary || accountConfigCount === 0
     const now = new Date().toISOString()
 
-    // Register the number for inbound webhooks (needs the 2FA PIN).
+    // Determine the number's REAL registration state by live-probing Meta's
+    // /register endpoint (never guess). A correct PIN is used to complete
+    // registration; without one, Meta still reports "already registered to
+    // this app", "registered under another app", or "PIN required", so we
+    // learn the true state even when the admin hasn't entered a PIN.
     //
-    // IMPORTANT: `/register` is what tells Meta to route THIS number's
-    // inbound events to THIS app. Without it, Meta keeps sending events
-    // to whatever app last claimed the number (often the one that ran
-    // Embedded Signup), so messages are received by WhatsApp but never
-    // reach the CRM inbox. This is the most common cause of "works on
-    // Meta's side, nothing in the inbox".
-    //
-    // If the number was already registered on a prior save (registered_at
-    // set) we keep that state even when the user doesn't re-enter a PIN.
-    // If not, and no PIN is provided, we DO NOT silently skip — we record a
-    // clear "PIN required" state so the UI asks the admin for the PIN
-    // instead of claiming success.
+    // IMPORTANT: `/register` routes THIS number's inbound events to THIS
+    // app. Without it, Meta keeps sending events to whichever app last
+    // claimed the number (often the one that ran Embedded Signup) — so
+    // messages are received by WhatsApp but never reach the CRM inbox.
     let registeredAt: string | null = existing?.registered_at ?? null
     let registrationError: string | null = existing?.registered_at ? null : null
+    let registrationState: string =
+      existing?.registration_state ?? 'REGISTRATION_UNKNOWN'
     let registrationSkipped = false
     let alreadyRegistered = false
-    if (pin && typeof pin === 'string' && pin.length > 0) {
-      try {
-        const regResult = await registerPhoneNumber({
-          phoneNumberId: trimmedNumber,
-          accessToken: effectiveToken,
-          pin,
-        })
-        alreadyRegistered = regResult.alreadyRegistered
+    const providedPin = typeof pin === 'string' && pin.trim().length > 0 ? pin.trim() : null
+    try {
+      const regResult = await probeRegistrationState({
+        phoneNumberId: trimmedNumber,
+        accessToken: effectiveToken,
+        pin: providedPin,
+      })
+      registrationState = regResult.state
+      alreadyRegistered = regResult.state === 'REGISTERED' && !regResult.freshlyRegistered
+      if (regResult.state === 'REGISTERED') {
+        // Confirmed registered to THIS app (freshly, or already). Record it.
         registeredAt = now
         registrationError = null
         registrationSkipped = false
-      } catch (err) {
-        registrationError =
-          err instanceof Error ? err.message : 'Unknown Meta API error'
+      } else {
         registeredAt = existing?.registered_at ?? null
-        logError('POST /api/whatsapp/config', 'register number', {
-          userId,
-          accountId,
-          message: registrationError,
-        })
+        registrationError = regResult.message
+        registrationSkipped = false
       }
-    } else if (existing?.registered_at) {
-      // Already registered on this app — no PIN needed, nothing to skip.
+    } catch (err) {
+      registrationError =
+        err instanceof Error ? err.message : 'Unknown Meta API error'
+      registrationState = 'REGISTRATION_ERROR'
+      registeredAt = existing?.registered_at ?? null
       registrationSkipped = false
-    } else {
-      // Not registered and no PIN supplied — surface it clearly rather
-      // than quietly claiming success.
-      registrationSkipped = true
-      registrationError = 'Registration pending — the two-step verification PIN is required to complete it.'
+      logError('POST /api/whatsapp/config', 'probe registration', {
+        userId,
+        accountId,
+        message: registrationError,
+      })
     }
 
     // Subscribe the WABA to this app (idempotent, best effort).
@@ -963,6 +965,7 @@ export async function POST(request: Request) {
       registered_at: registeredAt,
       subscribed_apps_at: subscribedAppsAt ?? null,
       last_registration_error: registrationError,
+      registration_state: registrationState,
       updated_at: now,
     }
 
@@ -1039,7 +1042,8 @@ export async function POST(request: Request) {
       registered: registeredAt != null,
       registration_skipped: registrationSkipped,
       already_registered: alreadyRegistered,
-      requires_registration: registeredAt == null,
+      registration_state: registrationState,
+      requires_registration: registrationState !== 'REGISTERED',
       registration_error: registrationError,
       phone_info: phoneInfo,
       config: {

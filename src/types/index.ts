@@ -116,6 +116,16 @@ export interface Contact {
   company?: string;
   avatar_url?: string;
   lead_status?: LeadStatus;
+  /** First-class business/lead fields (migration 056). */
+  country?: string | null;
+  location?: string | null;
+  category?: string | null;
+  address?: string | null;
+  website?: string | null;
+  rating?: number | null;
+  review_count?: number | null;
+  /** Set when the contact was created via CSV/XLSX import (migration 056). */
+  imported_at?: string | null;
   created_at: string;
   updated_at: string;
   /** Hydrated by queries that embed `contact_tags(tags(*))` (e.g. the
@@ -330,6 +340,8 @@ export interface WhatsAppConfig {
    * webhooks on Meta's side — inbound events will be silently lost.
    */
   registered_at?: string;
+  /** Live-determined registration state from the /register probe. */
+  registration_state?: string;
   /** Set when POST /{waba_id}/subscribed_apps last succeeded. */
   subscribed_apps_at?: string;
   /** Last error from /register; cleared on success. */

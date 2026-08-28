@@ -75,7 +75,6 @@ export function WhatsAppConfig() {
   // in the row). When false, the saved config is metadata-only and
   // Meta will silently drop every inbound event — that's the
   // multi-number bug that prompted this work.
-  const isRegistered = Boolean(config?.registered_at);
   const lastRegistrationError = config?.last_registration_error ?? null;
 
   // Connection diagnostics surfaced from the whatsapp_config row.
@@ -107,9 +106,57 @@ export function WhatsAppConfig() {
     requiresRegistration: boolean;
     last_registration_error?: string | null;
     checks: VerifyCheck[];
+    registrationState?: string | null;
+    persisted_registration_state?: string | null;
+    last_inbound_at?: string | null;
+    last_webhook_at?: string | null;
+    webhook_verified_at?: string | null;
+    webhook_signature_configured?: boolean;
   };
   const [verifyResult, setVerifyResult] = useState<VerifyResult | null>(null);
   const [verifyLoading, setVerifyLoading] = useState(false);
+
+  // Real registration state — live-determined by the /register probe on
+  // save and by "Verify with Meta". Prefer the fresh probe from a verify
+  // when present, else the persisted column, else unknown.
+  const registrationState =
+    verifyResult?.registrationState ??
+    config?.registration_state ??
+    'REGISTRATION_UNKNOWN';
+  // If we have actually stored inbound messages, the number demonstrably
+  // delivers to this app — never ask for a PIN on a working number.
+  const inboundWorking = Boolean(config?.last_inbound_at || verifyResult?.last_inbound_at);
+  const webhookSignatureConfigured =
+    verifyResult?.webhook_signature_configured ?? true;
+
+  // Registration card derived styling.
+  const regOk = registrationState === 'REGISTERED' || inboundWorking;
+  const regNeedsPin =
+    registrationState === 'REGISTRATION_REQUIRED' ||
+    registrationState === 'REGISTERED_ELSEWHERE';
+  const regTitle = regOk
+    ? inboundWorking
+      ? 'Inbound Active — messages are being delivered'
+      : 'Registered — inbound ready'
+    : regNeedsPin
+      ? 'Registration Required'
+      : 'Registration Not Confirmed';
+  const regError = registrationState === 'REGISTRATION_ERROR';
+  const regCardStyle = regOk
+    ? 'bg-emerald-950/30 border-emerald-700/50'
+    : regError
+      ? 'bg-red-950/30 border-red-700/50'
+      : 'bg-amber-950/30 border-amber-700/50';
+  const regAccent = regOk
+    ? 'text-emerald-400'
+    : regError
+      ? 'text-red-400'
+      : 'text-amber-400';
+  const regTitleColor = regOk
+    ? 'text-emerald-200'
+    : regError
+      ? 'text-red-200'
+      : 'text-amber-200';
 
   // Track a pending PIN the admin is about to submit for registration.
   const [registrationPin, setRegistrationPin] = useState('');
@@ -277,38 +324,38 @@ export function WhatsAppConfig() {
       // Save succeeded (the database operation completed) — only now do
       // we show success feedback. Credentials being valid is NOT the same
       // as the number being registered for inbound — never claim success
-      // when registration is still pending.
+      // when registration is not confirmed. Use the REAL registration
+      // state determined by the live /register probe, never a guess.
       const credentialsOk = Boolean(data.phone_info || data.config?.connection_status === 'connected');
-      if (data.requires_registration) {
-        const pending =
-          (data.registration_error && typeof data.registration_error === 'string' &&
-            data.registration_error.startsWith('Registration pending'))
-            ? 'Inbound is NOT active yet.'
-            : 'Registration is not complete — Meta could not register the number.';
-        // Keep the misleading "skipped" phrasing out: this is an explicit,
-        // actionable state the admin must resolve (enter the PIN).
-        const action =
-          data.registration_error && typeof data.registration_error === 'string' &&
-            data.registration_error.startsWith('Registration pending')
-            ? 'Enter the two-step verification PIN below to finish registering the number for inbound messages.'
-            : `Meta couldn't register the number: ${data.registration_error ?? 'unknown error'}`;
+      const regState = data.registration_state ?? 'REGISTRATION_UNKNOWN';
+      if (regState === 'REGISTERED' || data.registered) {
+        toast.success(
+          data.phone_info?.verified_name
+            ? `WhatsApp Connected — Inbound Ready (${data.phone_info.verified_name}).`
+            : 'WhatsApp Connected — Inbound Ready.',
+        );
+        setPin('');
+      } else if (
+        regState === 'REGISTRATION_REQUIRED' ||
+        regState === 'REGISTERED_ELSEWHERE'
+      ) {
         toast.warning(
-          `${credentialsOk ? 'Credentials connected. ' : ''}${pending} ${action}`,
+          `${credentialsOk ? 'Credentials connected. ' : ''}Inbound is not active — this phone number requires registration. Enter the two-step verification PIN below.${
+            data.registration_error ? ` Meta: ${data.registration_error}` : ''
+          }`,
           { duration: 14000 },
         );
         setSaveError(null);
         setPin('');
-      } else if (data.registered) {
-        toast.success(
-          data.phone_info?.verified_name
-            ? `Live — ${data.phone_info.verified_name} can now receive events.`
-            : 'WhatsApp connected. Events will start flowing within a minute.',
-        );
-        setPin('');
       } else {
-        toast.success(
-          'Credentials connected and verified. Registration status below shows inbound readiness.',
+        // UNKNOWN / ERROR — do not hard-require a PIN.
+        toast.warning(
+          `${credentialsOk ? 'Credentials connected. ' : ''}Inbound registration is not confirmed yet. Click "Verify with Meta" to see the exact state.${
+            data.registration_error ? ` Meta: ${data.registration_error}` : ''
+          }`,
+          { duration: 14000 },
         );
+        setSaveError(null);
         setPin('');
       }
 
@@ -410,7 +457,9 @@ export function WhatsAppConfig() {
         setPin('');
       } else {
         toast.error(
-          data.registration_error || 'Registration is still pending. Check that the PIN is correct and the number has two-step verification enabled.',
+          data.registration_error
+            ? `Registration not completed: ${data.registration_error}`
+            : 'Registration not completed. If the number was set up through Meta Business Manager it may already be registered — the issue may instead be the webhook.',
           { duration: 12000 },
         );
       }
@@ -573,32 +622,20 @@ export function WhatsAppConfig() {
 
         {/* Registration Status — the "is it actually live?" check.
             Credentials being valid is necessary but not sufficient;
-            without a successful /register call the number won't
-            receive inbound events. Surface this dimension separately
-            so users don't trust a misleading green banner. */}
+            registration + webhook determine whether inbound actually
+            flows. Show the REAL registration state determined by the
+            live /register probe, never a guessed status. */}
         {config && (
-          <Alert
-            className={
-              isRegistered
-                ? 'bg-emerald-950/30 border-emerald-700/50'
-                : 'bg-amber-950/30 border-amber-700/50'
-            }
-          >
+          <Alert className={regCardStyle}>
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div className="flex items-center gap-2">
-                {isRegistered ? (
-                  <CheckCircle2 className="size-4 text-emerald-400" />
+                {regOk ? (
+                  <CheckCircle2 className={'size-4 ' + regAccent} />
                 ) : (
-                  <AlertTriangle className="size-4 text-amber-400" />
+                  <AlertTriangle className={'size-4 ' + regAccent} />
                 )}
-                <AlertTitle
-                  className={
-                    'mb-0 ' + (isRegistered ? 'text-emerald-200' : 'text-amber-200')
-                  }
-                >
-                  {isRegistered
-                    ? t('registered')
-                    : t('notRegistered')}
+                <AlertTitle className={'mb-0 ' + regTitleColor}>
+                  {regTitle}
                 </AlertTitle>
               </div>
               <Button
@@ -617,28 +654,55 @@ export function WhatsAppConfig() {
               </Button>
             </div>
             <AlertDescription className="text-muted-foreground mt-2 text-xs leading-relaxed">
-              {isRegistered ? (
-                <span
-                  dangerouslySetInnerHTML={{
-                    __html: t('subscribedSince', {
-                      date: config.registered_at
-                        ? new Date(config.registered_at).toLocaleString()
-                        : t('unknownDate'),
-                    }),
-                  }}
-                />
-              ) : lastRegistrationError ? (
-                <>
-                  {t('lastAttemptFailed')}
-                  <span className="text-red-300">
-                    &quot;{lastRegistrationError}&quot;
-                  </span>
-                  . {t('retryHint')}
-                </>
+              {registrationState === 'REGISTERED' || inboundWorking ? (
+                <span>
+                  Phone number is registered to this app
+                  {config.registered_at
+                    ? ` since ${new Date(config.registered_at).toLocaleString()}`
+                    : ''}
+                  . Inbound messages will reach the CRM inbox.
+                </span>
+              ) : registrationState === 'REGISTRATION_REQUIRED' ||
+                registrationState === 'REGISTERED_ELSEWHERE' ? (
+                <span>
+                  This phone number requires registration to receive inbound
+                  messages.
+                  {lastRegistrationError ? (
+                    <>
+                      {' '}
+                      Meta said:{' '}
+                      <span className="text-red-300">&quot;{lastRegistrationError}&quot;</span>
+                    </>
+                  ) : (
+                    ' Enter the two-step verification PIN below to complete it.'
+                  )}
+                </span>
               ) : (
-                <>{t('noRegistrationHint')}</>
+                <span>
+                  Registration is not confirmed for this number. If it was set
+                  up through Google/Facebook Business Manager or Embedded
+                  Signup it may already be registered — the issue may instead
+                  be the webhook. Use &quot;Verify with Meta&quot; to see the
+                  real state.
+                  {lastRegistrationError ? (
+                    <>
+                      {' '}
+                      Last attempt:{' '}
+                      <span className="text-red-300">&quot;{lastRegistrationError}&quot;</span>
+                    </>
+                  ) : null}
+                </span>
               )}
             </AlertDescription>
+
+            {!webhookSignatureConfigured && (
+              <div className="mt-2 rounded border border-red-700/50 bg-red-950/30 px-3 py-2 text-xs text-red-200">
+                The webhook &quot;META_APP_SECRET&quot; is not configured. The
+                inbound endpoint rejects every request (401), so no messages
+                will ever reach the CRM — even though Meta receives them. Set it
+                in your production environment variables.
+              </div>
+            )}
 
             {verifyResult && (
               <div className="mt-3 rounded border border-border bg-card/60 px-3 py-2 space-y-1.5 text-[11px]">
@@ -681,39 +745,46 @@ export function WhatsAppConfig() {
                     </li>
                   ))}
                 </ul>
-                {verifyResult.requiresRegistration && (
-                  <div className="pt-2 border-t border-border space-y-2">
-                    <p className="text-muted-foreground">
-                      Inbound is not active yet. Enter the 6-digit two-step
-                      verification PIN to register the number and start
-                      receiving messages.
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="password"
-                        inputMode="numeric"
-                        maxLength={6}
-                        placeholder="6-digit PIN"
-                        value={registrationPin}
-                        onChange={(e) =>
-                          setRegistrationPin(e.target.value.replace(/\D/g, ''))
-                        }
-                        className="bg-muted border-border text-foreground placeholder:text-muted-foreground max-w-[180px]"
-                      />
-                      <Button
-                        type="button"
-                        size="sm"
-                        disabled={sendingPin || registrationPin.length !== 6}
-                        onClick={handleSubmitPin}
-                      >
-                        {sendingPin ? <Loader2 className="size-3.5 animate-spin" /> : null}
-                        {sendingPin ? 'Registering…' : 'Register'}
-                      </Button>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
+
+            {/* PIN input — shown ONLY when inbound isn't already working and
+                registration isn't confirmed. For REQUIRED / ELSEWHERE states
+                it's a hard step; for UNKNOWN / ERROR it's an optional,
+                accurately-framed action. Never shown on a working number. */}
+            {!inboundWorking &&
+              registrationState !== 'REGISTERED' && (
+                <div className="mt-2 pt-2 border-t border-border space-y-2">
+                  <p className="text-muted-foreground">
+                    {registrationState === 'REGISTRATION_REQUIRED' ||
+                    registrationState === 'REGISTERED_ELSEWHERE'
+                      ? 'Enter the 6-digit two-step verification PIN to register the number and start receiving inbound messages.'
+                      : 'If registration is needed, enter the 6-digit two-step verification PIN (from Meta WhatsApp Manager → Two-step verification) to register the number.'}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="password"
+                      inputMode="numeric"
+                      maxLength={6}
+                      placeholder="6-digit PIN"
+                      value={registrationPin}
+                      onChange={(e) =>
+                        setRegistrationPin(e.target.value.replace(/\D/g, ''))
+                      }
+                      className="bg-muted border-border text-foreground placeholder:text-muted-foreground max-w-[180px]"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={sendingPin || registrationPin.length !== 6}
+                      onClick={handleSubmitPin}
+                    >
+                      {sendingPin ? <Loader2 className="size-3.5 animate-spin" /> : null}
+                      {sendingPin ? 'Registering…' : 'Register'}
+                    </Button>
+                  </div>
+                </div>
+              )}
           </Alert>
         )}
 
@@ -728,10 +799,34 @@ export function WhatsAppConfig() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-1.5 text-sm">
-            <DiagRow label="Webhooks received" value={lastWebhookAt} />
-            <DiagRow label="Inbound messages stored" value={lastInboundAt} />
-            <DiagRow label="Webhook challenge verified" value={webhookVerifiedAt} />
-            <DiagRow label="Last API error" value={lastApiErrorAt} suffix={lastApiError ?? undefined} isError={Boolean(lastApiError)} />
+            <DiagRow
+              label="Webhooks received"
+              value={verifyResult?.last_webhook_at ?? lastWebhookAt}
+            />
+            <DiagRow
+              label="Inbound messages stored"
+              value={verifyResult?.last_inbound_at ?? lastInboundAt}
+            />
+            <DiagRow
+              label="Webhook challenge verified"
+              value={verifyResult?.webhook_verified_at ?? webhookVerifiedAt}
+            />
+            <DiagRow
+              label="Last API error"
+              value={lastApiErrorAt}
+              suffix={lastApiError ?? undefined}
+              isError={Boolean(lastApiError)}
+            />
+            <DiagRow
+              label="Webhook signature (META_APP_SECRET)"
+              value={null}
+              suffix={
+                webhookSignatureConfigured
+                  ? 'Configured — inbound POSTs will verify'
+                  : 'NOT configured — inbound POSTs are rejected (401)'
+              }
+              isError={!webhookSignatureConfigured}
+            />
           </CardContent>
         </Card>
 

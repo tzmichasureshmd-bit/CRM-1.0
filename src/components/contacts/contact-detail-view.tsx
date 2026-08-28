@@ -77,6 +77,13 @@ export function ContactDetailView({
   const [editPhone, setEditPhone] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [editCompany, setEditCompany] = useState('');
+  const [editCountry, setEditCountry] = useState('');
+  const [editLocation, setEditLocation] = useState('');
+  const [editCategory, setEditCategory] = useState('');
+  const [editAddress, setEditAddress] = useState('');
+  const [editWebsite, setEditWebsite] = useState('');
+  const [editRating, setEditRating] = useState('');
+  const [editReviewCount, setEditReviewCount] = useState('');
   const [savingDetails, setSavingDetails] = useState(false);
 
   // Tags tab
@@ -135,6 +142,13 @@ export function ContactDetailView({
       setEditPhone(data.phone);
       setEditEmail(data.email ?? '');
       setEditCompany(data.company ?? '');
+      setEditCountry(data.country ?? '');
+      setEditLocation(data.location ?? '');
+      setEditCategory(data.category ?? '');
+      setEditAddress(data.address ?? '');
+      setEditWebsite(data.website ?? '');
+      setEditRating(data.rating != null ? String(data.rating) : '');
+      setEditReviewCount(data.review_count != null ? String(data.review_count) : '');
       if (data.lead_status) setLeadStatus(data.lead_status);
     }
     setLoading(false);
@@ -412,6 +426,13 @@ export function ContactDetailView({
         phone: editPhone.trim(),
         email: editEmail.trim() || null,
         company: editCompany.trim() || null,
+        country: editCountry.trim() || null,
+        location: editLocation.trim() || null,
+        category: editCategory.trim() || null,
+        address: editAddress.trim() || null,
+        website: editWebsite.trim() || null,
+        rating: editRating.trim() ? parseFloat(editRating) : null,
+        review_count: editReviewCount.trim() ? parseInt(editReviewCount, 10) : null,
         updated_at: new Date().toISOString(),
       })
       .eq('id', contactId);
@@ -740,6 +761,68 @@ export function ContactDetailView({
                     <Input
                       value={editCompany}
                       onChange={(e) => setEditCompany(e.target.value)}
+                      className="bg-muted border-border text-foreground h-8 text-sm"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1.5">
+                      <Label className="text-muted-foreground text-xs">Country</Label>
+                      <Input
+                        value={editCountry}
+                        onChange={(e) => setEditCountry(e.target.value)}
+                        className="bg-muted border-border text-foreground h-8 text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-muted-foreground text-xs">Location</Label>
+                      <Input
+                        value={editLocation}
+                        onChange={(e) => setEditLocation(e.target.value)}
+                        className="bg-muted border-border text-foreground h-8 text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-muted-foreground text-xs">Category</Label>
+                      <Input
+                        value={editCategory}
+                        onChange={(e) => setEditCategory(e.target.value)}
+                        className="bg-muted border-border text-foreground h-8 text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-muted-foreground text-xs">Website</Label>
+                      <Input
+                        value={editWebsite}
+                        onChange={(e) => setEditWebsite(e.target.value)}
+                        className="bg-muted border-border text-foreground h-8 text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-muted-foreground text-xs">Rating</Label>
+                      <Input
+                        inputMode="decimal"
+                        value={editRating}
+                        onChange={(e) => setEditRating(e.target.value)}
+                        className="bg-muted border-border text-foreground h-8 text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-muted-foreground text-xs">Reviews</Label>
+                      <Input
+                        inputMode="numeric"
+                        value={editReviewCount}
+                        onChange={(e) => setEditReviewCount(e.target.value)}
+                        className="bg-muted border-border text-foreground h-8 text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-muted-foreground text-xs">Address</Label>
+                    <Input
+                      value={editAddress}
+                      onChange={(e) => setEditAddress(e.target.value)}
                       className="bg-muted border-border text-foreground h-8 text-sm"
                     />
                   </div>

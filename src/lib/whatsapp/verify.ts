@@ -4,9 +4,10 @@ import {
   getWaba,
   getSubscribedApps,
   getWebhookSubscriptions,
-  registerPhoneNumber,
+  probeRegistrationState,
   MetaApiError,
 } from './meta-api'
+import type { RegistrationState } from './meta-api'
 
 /**
  * Shared WhatsApp Cloud API verification suite.
@@ -45,6 +46,8 @@ export interface VerificationResult {
   registeredAt: string | null
   /** True when inbound configuration (registration) is incomplete and needs a PIN/action. */
   requiresRegistration: boolean
+  /** Real registration state determined by live Meta probe. */
+  registrationState: RegistrationState | null
 }
 
 export interface VerifyInput {
@@ -112,7 +115,7 @@ export async function runVerification(input: VerifyInput): Promise<VerificationR
       ),
     )
     // If the token is invalid there's nothing else we can reliably check.
-    return { checks, ready: false, partial: false, registeredAt: input.registeredAt ?? null, requiresRegistration: true }
+    return { checks, ready: false, partial: false, registeredAt: input.registeredAt ?? null, requiresRegistration: true, registrationState: null }
   }
 
   // 2. WABA — GET /{waba_id}
@@ -178,36 +181,43 @@ export async function runVerification(input: VerifyInput): Promise<VerificationR
   }
 
   // 4. Registration — the make-or-break check for inbound routing.
-  //    Confirmed in two ways: a prior successful /register (registered_at),
-  //    or a live /register probe when a PIN is on hand.
-  let registered = Boolean(input.registeredAt)
-  if (!registered && input.pin) {
-    try {
-      const res = await registerPhoneNumber({
-        phoneNumberId: input.phoneNumberId,
-        accessToken: input.accessToken,
-        pin: input.pin,
-      })
-      registered = res.success
-    } catch (err) {
-      checks.push(
-        check(
-          'registration',
-          'Phone Registration',
-          'warning',
-          'Number is not yet confirmed registered to this app.',
-          redactError(err),
-        ),
-      )
-    }
-  }
-  if (registered) {
+  //    Live-probes Meta (/register) so we never guess. A provided PIN is
+  //    used to complete registration; without one, a placeholder elicits
+  //    Meta's real status ("already registered"/"PIN required").
+  const reg = await probeRegistrationState({
+    phoneNumberId: input.phoneNumberId,
+    accessToken: input.accessToken,
+    pin: input.pin ?? null,
+  })
+  if (reg.state === 'REGISTERED') {
     checks.push(
       check(
         'registration',
         'Phone Registration',
         'ok',
-        'Phone number is registered to this app.',
+        reg.freshlyRegistered
+          ? 'Phone number registered to this app.'
+          : 'Phone number is already registered to this app.',
+      ),
+    )
+  } else if (reg.state === 'REGISTRATION_REQUIRED') {
+    checks.push(
+      check(
+        'registration',
+        'Phone Registration',
+        'warning',
+        'Registration requires the two-step verification PIN.',
+        { message: reg.message ?? undefined },
+      ),
+    )
+  } else if (reg.state === 'REGISTERED_ELSEWHERE') {
+    checks.push(
+      check(
+        'registration',
+        'Phone Registration',
+        'fail',
+        'Phone number is registered under another WABA/app — it must be registered to THIS app to receive inbound here.',
+        { message: reg.message ?? undefined },
       ),
     )
   } else {
@@ -216,9 +226,8 @@ export async function runVerification(input: VerifyInput): Promise<VerificationR
         'registration',
         'Phone Registration',
         'warning',
-        input.pin
-          ? 'Registration could not be confirmed with the provided PIN.'
-          : 'Registration pending — enter the two-step verification PIN to complete it.',
+        'Registration state could not be confirmed.',
+        { message: reg.message ?? undefined },
       ),
     )
   }
@@ -334,6 +343,22 @@ export async function runVerification(input: VerifyInput): Promise<VerificationR
     ),
   )
 
+  // 7b. Webhook POST signature — the inbound endpoint FAILS CLOSED when
+  //     META_APP_SECRET is unset (rejects every POST), silently dropping
+  //     messages even though Meta "receives" them. Surface it as a hard
+  //     failure so operators can see why inbound is dead.
+  const metaAppSecretConfigured = Boolean(process.env.META_APP_SECRET)
+  checks.push(
+    check(
+      'webhook_signature',
+      'Webhook Signature',
+      metaAppSecretConfigured ? 'ok' : 'fail',
+      metaAppSecretConfigured
+        ? 'META_APP_SECRET is configured — inbound signatures will verify.'
+        : 'META_APP_SECRET is NOT set. The webhook rejects every inbound request (401), so messages will never appear.',
+    ),
+  )
+
   // 8. Inbound messaging readiness
   const inboundOk =
     checks.find((c) => c.key === 'registration')?.status === 'ok' &&
@@ -354,7 +379,7 @@ export async function runVerification(input: VerifyInput): Promise<VerificationR
   const requiredFails = checks.filter(
     (c) =>
       c.status === 'fail' &&
-      ['credentials', 'waba', 'phone_number', 'registration', 'waba_subscription'].includes(c.key),
+      ['credentials', 'waba', 'phone_number', 'registration', 'waba_subscription', 'webhook_signature'].includes(c.key),
   )
   const anyWarning = checks.some((c) => c.status === 'warning')
   const ready = requiredFails.length === 0 && !anyWarning
@@ -367,5 +392,6 @@ export async function runVerification(input: VerifyInput): Promise<VerificationR
     partial: requiredFails.length === 0 && anyWarning,
     registeredAt: input.registeredAt ?? null,
     requiresRegistration,
+    registrationState: reg.state,
   }
 }

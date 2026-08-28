@@ -18,8 +18,7 @@ import type { Deal, PipelineStage } from "@/types";
 import { DealCard } from "./deal-card";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
-import { useAuth } from "@/hooks/use-auth";
-import { formatCurrency } from "@/lib/currency";
+import { formatINR } from "@/lib/currency";
 import { useTranslations } from "next-intl";
 
 interface PipelineBoardProps {
@@ -37,7 +36,6 @@ export function PipelineBoard({
   onAddDeal,
   onEditDeal,
 }: PipelineBoardProps) {
-  const { defaultCurrency } = useAuth();
   const [activeDealId, setActiveDealId] = useState<string | null>(null);
 
   const sortedStages = useMemo(
@@ -116,7 +114,6 @@ export function PipelineBoard({
               stage={stage}
               deals={stageDeals}
               totalValue={totalValue}
-              currency={defaultCurrency}
               onAddDeal={onAddDeal}
               onEditDeal={onEditDeal}
             />
@@ -190,14 +187,12 @@ function StageColumn({
   stage,
   deals,
   totalValue,
-  currency,
   onAddDeal,
   onEditDeal,
 }: {
   stage: PipelineStage;
   deals: Deal[];
   totalValue: number;
-  currency: string;
   onAddDeal: (stageId: string) => void;
   onEditDeal: (deal: Deal) => void;
 }) {
@@ -226,7 +221,7 @@ function StageColumn({
         </span>
       </div>
       <p className="text-xs text-muted-foreground">
-        {formatCurrency(totalValue, currency)}
+        {formatINR(totalValue)}
       </p>
 
       <div

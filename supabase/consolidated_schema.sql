@@ -118,6 +118,14 @@ CREATE TABLE IF NOT EXISTS contacts (
   company          TEXT,
   avatar_url       TEXT,
   lead_status      TEXT DEFAULT 'new' CHECK (lead_status IN ('new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost')),
+  country          TEXT,
+  location         TEXT,
+  category         TEXT,
+  address          TEXT,
+  website          TEXT,
+  rating           NUMERIC,
+  review_count     INTEGER,
+  imported_at      TIMESTAMPTZ,
   created_at       TIMESTAMPTZ DEFAULT NOW(),
   updated_at       TIMESTAMPTZ DEFAULT NOW()
 );
@@ -126,6 +134,13 @@ CREATE INDEX IF NOT EXISTS idx_contacts_user_id ON contacts(user_id);
 CREATE INDEX IF NOT EXISTS idx_contacts_phone ON contacts(phone);
 CREATE INDEX IF NOT EXISTS idx_contacts_account ON contacts(account_id);
 CREATE INDEX IF NOT EXISTS idx_contacts_lead_status ON contacts(lead_status);
+CREATE INDEX IF NOT EXISTS idx_contacts_country ON contacts(country);
+CREATE INDEX IF NOT EXISTS idx_contacts_location ON contacts(location);
+CREATE INDEX IF NOT EXISTS idx_contacts_category ON contacts(category);
+CREATE INDEX IF NOT EXISTS idx_contacts_rating ON contacts(rating);
+CREATE INDEX IF NOT EXISTS idx_contacts_review_count ON contacts(review_count);
+CREATE INDEX IF NOT EXISTS idx_contacts_email ON contacts(email);
+CREATE INDEX IF NOT EXISTS idx_contacts_imported_at ON contacts(imported_at);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_contacts_account_phone_normalized
   ON contacts(account_id, phone_normalized)
   WHERE phone_normalized <> '';

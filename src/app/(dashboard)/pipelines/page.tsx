@@ -43,6 +43,7 @@ const SPEC_DEFAULT_STAGES = [
   { name: "Proposal Sent", color: "#f97316", position: 2 }, // orange
   { name: "Negotiation", color: "#8b5cf6", position: 3 }, // purple
   { name: "Won", color: "#22c55e", position: 4 }, // green
+  { name: "Lost", color: "#ef4444", position: 5 }, // red
 ];
 
 export default function PipelinesPage() {

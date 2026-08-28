@@ -24,8 +24,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { LEAD_STATUS_VALUES, SUGGESTED_CATEGORIES } from '@/lib/contacts/contact-fields';
 
 interface ContactFormProps {
   open: boolean;
@@ -57,6 +65,16 @@ export function ContactForm({
   const [company, setCompany] = useState('');
   const [saving, setSaving] = useState(false);
 
+  const [country, setCountry] = useState('');
+  const [location, setLocation] = useState('');
+  const [category, setCategory] = useState('');
+  const [address, setAddress] = useState('');
+  const [website, setWebsite] = useState('');
+  const [rating, setRating] = useState('');
+  const [reviewCount, setReviewCount] = useState('');
+  const [leadStatus, setLeadStatus] = useState('');
+  const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
+
   // Duplicate-phone detection for NEW contacts. `exact` (same digits)
   // hard-blocks the save; a fuzzy trunk-variant match only warns. The
   // DB unique index (migration 022) is the real backstop — this is the
@@ -76,6 +94,14 @@ export function ContactForm({
       setPhone(contact?.phone ?? '');
       setEmail(contact?.email ?? '');
       setCompany(contact?.company ?? '');
+      setCountry(contact?.country ?? '');
+      setLocation(contact?.location ?? '');
+      setCategory(contact?.category ?? '');
+      setAddress(contact?.address ?? '');
+      setWebsite(contact?.website ?? '');
+      setRating(contact?.rating != null ? String(contact.rating) : '');
+      setReviewCount(contact?.review_count != null ? String(contact.review_count) : '');
+      setLeadStatus(contact?.lead_status ?? '');
       setSelectedTagIds(contactTags.map((ct) => ct.tag_id));
       setDupMatch(null);
       fetchTags();
@@ -157,6 +183,14 @@ export function ContactForm({
             phone: phone.trim(),
             email: email.trim() || null,
             company: company.trim() || null,
+            country: country.trim() || null,
+            location: location.trim() || null,
+            category: category.trim() || null,
+            address: address.trim() || null,
+            website: website.trim() || null,
+            rating: rating.trim() ? parseFloat(rating) : null,
+            review_count: reviewCount.trim() ? parseInt(reviewCount, 10) : null,
+            lead_status: leadStatus || null,
             updated_at: new Date().toISOString(),
           })
           .eq('id', contactId);
@@ -171,6 +205,14 @@ export function ContactForm({
             phone: phone.trim(),
             email: email.trim() || null,
             company: company.trim() || null,
+            country: country.trim() || null,
+            location: location.trim() || null,
+            category: category.trim() || null,
+            address: address.trim() || null,
+            website: website.trim() || null,
+            rating: rating.trim() ? parseFloat(rating) : null,
+            review_count: reviewCount.trim() ? parseInt(reviewCount, 10) : null,
+            lead_status: leadStatus || null,
           })
           .select('id')
           .single();
@@ -321,6 +363,146 @@ export function ContactForm({
               placeholder={t('companyPlaceholder')}
               className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
             />
+          </div>
+
+          <div className="border-t border-border/70 pt-3">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Business / Lead Details
+            </p>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="cf-country" className="text-muted-foreground text-xs">
+                  Country
+                </Label>
+                <Input
+                  id="cf-country"
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  placeholder="e.g. India"
+                  className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="cf-location" className="text-muted-foreground text-xs">
+                  Location
+                </Label>
+                <Input
+                  id="cf-location"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  placeholder="e.g. Guntur"
+                  className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="cf-category" className="text-muted-foreground text-xs">
+                  Category
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="cf-category"
+                    value={category}
+                    onChange={(e) => {
+                      setCategory(e.target.value);
+                      setShowCategorySuggestions(true);
+                    }}
+                    onBlur={() => setTimeout(() => setShowCategorySuggestions(false), 150)}
+                    placeholder="e.g. School, Preschool…"
+                    className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
+                  />
+                  {showCategorySuggestions && category.length > 0 && (
+                    <div className="absolute z-10 mt-1 w-full rounded-lg border border-border bg-popover p-1 shadow-lg">
+                      {SUGGESTED_CATEGORIES.filter((c) =>
+                        c.toLowerCase().includes(category.toLowerCase())
+                      ).map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            setCategory(c);
+                            setShowCategorySuggestions(false);
+                          }}
+                          className="block w-full rounded-md px-2 py-1 text-left text-xs text-popover-foreground hover:bg-muted"
+                        >
+                          {c}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="cf-website" className="text-muted-foreground text-xs">
+                  Website
+                </Label>
+                <Input
+                  id="cf-website"
+                  value={website}
+                  onChange={(e) => setWebsite(e.target.value)}
+                  placeholder="https://…"
+                  className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="cf-rating" className="text-muted-foreground text-xs">
+                  Rating
+                </Label>
+                <Input
+                  id="cf-rating"
+                  inputMode="decimal"
+                  value={rating}
+                  onChange={(e) => setRating(e.target.value)}
+                  placeholder="0 - 5"
+                  className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="cf-reviews" className="text-muted-foreground text-xs">
+                  Reviews
+                </Label>
+                <Input
+                  id="cf-reviews"
+                  inputMode="numeric"
+                  value={reviewCount}
+                  onChange={(e) => setReviewCount(e.target.value)}
+                  placeholder="e.g. 120"
+                  className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
+                />
+              </div>
+            </div>
+
+            <div className="mt-3 space-y-1.5">
+              <Label htmlFor="cf-address" className="text-muted-foreground text-xs">
+                Address
+              </Label>
+              <Input
+                id="cf-address"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="Street, city, state…"
+                className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
+              />
+            </div>
+
+            <div className="mt-3 space-y-1.5">
+              <Label htmlFor="cf-lead-status" className="text-muted-foreground text-xs">
+                Lead Status
+              </Label>
+              <Select value={leadStatus} onValueChange={(v) => setLeadStatus(v ?? '')}>
+                <SelectTrigger id="cf-lead-status" className="bg-muted border-border text-foreground">
+                  <SelectValue placeholder="Select lead status…" />
+                </SelectTrigger>
+                <SelectContent className="bg-popover border-border">
+                  {LEAD_STATUS_VALUES.map((s) => (
+                    <SelectItem key={s} value={s} className="capitalize">
+                      {s}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="space-y-2">

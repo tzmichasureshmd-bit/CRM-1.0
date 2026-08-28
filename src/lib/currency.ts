@@ -81,6 +81,26 @@ export function formatCurrency(
 }
 
 /**
+ * Indian Rupee formatter with proper INR grouping (lakh/crore), e.g.
+ * ₹0, ₹1,000, ₹25,000, ₹1,00,000, ₹10,00,000.
+ *
+ * The Pipeline UI displays amounts in INR regardless of the account's
+ * default currency (spec: Pipeline page must show ₹). Uses the `en-IN`
+ * locale so `Intl.NumberFormat` renders the South-Asian digit grouping
+ * rather than the Western 1,000,000 style. Whole-number output, matching
+ * the rest of the deal-value formatting.
+ */
+export function formatINR(value: number): string {
+  const amount = Number(value) || 0;
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+/**
  * Compact currency for tight spaces (donut center, legend rows):
  * "$1.2M" / "€34.5k" / "₹900". Uses the currency's symbol from
  * CURRENCIES, falling back to the code when we don't carry a symbol.

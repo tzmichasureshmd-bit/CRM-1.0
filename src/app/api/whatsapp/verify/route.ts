@@ -117,5 +117,10 @@ export async function GET(request: Request) {
     ...result,
     registered_at: result.registeredAt,
     last_registration_error: config.last_registration_error ?? null,
+    persisted_registration_state: config.registration_state ?? null,
+    last_inbound_at: config.last_inbound_at ?? null,
+    last_webhook_at: config.last_webhook_at ?? null,
+    webhook_verified_at: config.webhook_verified_at ?? null,
+    webhook_signature_configured: Boolean(process.env.META_APP_SECRET),
   })
 }

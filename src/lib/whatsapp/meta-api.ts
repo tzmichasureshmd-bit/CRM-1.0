@@ -337,6 +337,105 @@ export async function registerPhoneNumber(
   throw new Error(message)
 }
 
+// ============================================================
+// Registration-state detection (no guessing)
+// ============================================================
+//
+// There is no direct "is this number registered to my app" read endpoint
+// on Cloud API. The only way to learn the truth is to call /register and
+// interpret Meta's response:
+//
+//   2xx                                        → newly registered (a valid
+//                                                PIN worked)
+//   400 "already registered to this app"        → already wired to THIS app
+//   400 "registered under another"              → owned by a different app
+//   400 "PIN required" / "two-step verification" → a PIN is genuinely needed
+//   400 "incorrect PIN"                          → a PIN is needed (ours was
+//                                                wrong)
+//
+// Crucially, /register reports "already registered to this app" and
+// PIN-required errors WITHOUT a correct PIN, so we can determine the real
+// state even when the admin hasn't given us a working PIN yet. When a real
+// PIN is provided we use it (so a valid PIN completes registration); when
+// not, we send a placeholder purely to elicit Meta's status — this never
+// registers anything by accident (any other outcome is an error with no
+// side effect).
+export type RegistrationState =
+  | 'REGISTERED' // confirmed registered to THIS app — inbound can flow
+  | 'REGISTRATION_REQUIRED' // /register + PIN genuinely needed to complete
+  | 'REGISTERED_ELSEWHERE' // registered under a different WABA/app
+  | 'REGISTRATION_ERROR' // other Meta error while probing
+  | 'REGISTRATION_UNKNOWN' // could not determine (e.g. 2FA off, ambiguous)
+
+export interface ProbeRegistrationStateArgs {
+  phoneNumberId: string
+  accessToken: string
+  /** Real PIN if the admin supplied one; otherwise probed with a placeholder. */
+  pin?: string | null
+}
+
+export interface ProbeRegistrationStateResult {
+  state: RegistrationState
+  /** Safe Meta message describing the outcome. */
+  message: string | null
+  /** True when the number is confirmed registered to THIS app. */
+  registered: boolean
+  /** When a PIN was present and registration completed, now > registered. */
+  freshlyRegistered: boolean
+}
+
+export async function probeRegistrationState(
+  args: ProbeRegistrationStateArgs
+): Promise<ProbeRegistrationStateResult> {
+  const { phoneNumberId, accessToken, pin } = args
+  const url = `${META_API_BASE}/${phoneNumberId}/register`
+  // Use a real PIN when supplied; otherwise a placeholder purely to elicit
+  // Meta's registration status. Meta rejects invalid PINs without side
+  // effects, and reports "already registered" regardless of the PIN.
+  const probePin = pin && pin.trim().length > 0 ? pin.trim() : '000000'
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ messaging_product: 'whatsapp', pin: probePin }),
+  })
+
+  if (response.ok) {
+    return {
+      state: 'REGISTERED',
+      message: null,
+      registered: true,
+      freshlyRegistered: Boolean(pin && pin.trim().length > 0),
+    }
+  }
+
+  let data: { error?: { message?: string; code?: number; error_subcode?: number; type?: string } } = {}
+  try {
+    data = await response.json()
+  } catch {
+    /* keep empty */
+  }
+  const message = data.error?.message ?? `Meta API error: ${response.status}`
+  const lower = message.toLowerCase()
+
+  if (/already.*registered/i.test(lower) && /this app/.test(lower)) {
+    return { state: 'REGISTERED', message, registered: true, freshlyRegistered: false }
+  }
+  if (/registered.*(another app|another waba|different app)/i.test(lower)) {
+    return { state: 'REGISTERED_ELSEWHERE', message, registered: false, freshlyRegistered: false }
+  }
+  if (/two.step verification pin required/i.test(lower) || /pin.*required/i.test(lower)) {
+    return { state: 'REGISTRATION_REQUIRED', message, registered: false, freshlyRegistered: false }
+  }
+  if (/incorrect pin|wrong pin|invalid pin/i.test(lower)) {
+    return { state: 'REGISTRATION_REQUIRED', message, registered: false, freshlyRegistered: false }
+  }
+
+  return { state: 'REGISTRATION_ERROR', message, registered: false, freshlyRegistered: false }
+}
+
 export interface SubscribeWabaToAppArgs {
   wabaId: string
   accessToken: string
