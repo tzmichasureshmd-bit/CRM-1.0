@@ -361,14 +361,23 @@ export async function GET() {
       }
     }
 
+    // Detect which optional columns (diagnostics 054, registration_state
+    // 055) exist in this environment. Only SELECT columns that actually
+    // exist — this prevents the 500 that occurs when migrations 054/055
+    // have not been applied to the production database.
+    const optionalCols = await detectOptionalColumns(supabase)
+    const extraCols = [...optionalCols].join(', ')
+    const selectCols = extraCols ? `${CONFIG_BASE_COLS}, ${extraCols}` : CONFIG_BASE_COLS
+
     // One row per phone number — return the whole list for this account,
     // most-recently-updated first (so the "default" is stable even before
     // migration 053 adds is_primary).
-    const { data: rows, error: listError } = await supabase
+    const { data: rawRows, error: listError } = await supabase
       .from('whatsapp_config')
-      .select(CONFIG_BASE_COLS)
+      .select(selectCols)
       .eq('account_id', accountId)
       .order('updated_at', { ascending: false })
+    const rows = (rawRows ?? []) as unknown as WhatsAppConfigRow[]
 
     if (listError) {
       logError('GET /api/whatsapp/config', 'fetch configs', {
@@ -425,6 +434,11 @@ export async function GET() {
           subscribed_apps_at: row.subscribed_apps_at,
           last_registration_error: row.last_registration_error,
           registration_state: row.registration_state ?? 'REGISTRATION_UNKNOWN',
+          last_webhook_at: row.last_webhook_at ?? null,
+          last_inbound_at: row.last_inbound_at ?? null,
+          webhook_verified_at: row.webhook_verified_at ?? null,
+          last_api_error: row.last_api_error ?? null,
+          last_api_error_at: row.last_api_error_at ?? null,
         })
         continue
       }
@@ -460,6 +474,11 @@ export async function GET() {
         subscribed_apps_at: row.subscribed_apps_at,
         last_registration_error: row.last_registration_error,
         registration_state: row.registration_state ?? 'REGISTRATION_UNKNOWN',
+        last_webhook_at: row.last_webhook_at ?? null,
+        last_inbound_at: row.last_inbound_at ?? null,
+        webhook_verified_at: row.webhook_verified_at ?? null,
+        last_api_error: row.last_api_error ?? null,
+        last_api_error_at: row.last_api_error_at ?? null,
       })
     }
 
@@ -533,6 +552,38 @@ async function supportsIsPrimary(supabase: any): Promise<boolean> {
 }
 
 /**
+ * Detect whether a specific column exists on `whatsapp_config` by
+ * probing with a lightweight SELECT. Returns true if the column exists,
+ * false otherwise. Never throws.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function supportsColumn(supabase: any, column: string): Promise<boolean> {
+  try {
+    const probe = await supabase.from('whatsapp_config').select(`id, ${column}`).limit(1)
+    return !probe.error
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Detect which optional columns exist on `whatsapp_config` in a single
+ * probe (one round-trip) by requesting all of them. Returns the set of
+ * column names that are present in the current schema.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function detectOptionalColumns(supabase: any): Promise<Set<string>> {
+  const allOptional = [...DIAGNOSTIC_COLS, HAS_REGISTRATION_STATE_COL]
+  const present = new Set<string>()
+  for (const col of allOptional) {
+    if (await supportsColumn(supabase, col)) {
+      present.add(col)
+    }
+  }
+  return present
+}
+
+/**
  * Read the is_primary flag for a single config row when the column exists
  * (migration 053), otherwise null. Uses a fixed static SELECT (not an
  * interpolated string) so the statically-typed Supabase client parses it.
@@ -553,10 +604,55 @@ async function readPrimaryFlag(
   return data?.is_primary ?? null
 }
 
-// Columns that exist on every deployed schema after migration 054/055
-// (no is_primary dependency; is_primary is added separately/defensively).
+// Columns that are GUARANTEED to exist on every deployed schema:
+//   initial (001): id, user_id, account_id, phone_number_id, waba_id,
+//                  access_token, verify_token, status, connected_at,
+//                  registered_at, subscribed_apps_at, last_registration_error,
+//                  created_at, updated_at
+//   052:          + display_phone_number, business_name, connection_status
+//
+// Columns that may NOT exist yet (and MUST NOT appear in SELECT or
+// INSERT/UPDATE until we probe for them):
+//   053: is_primary      (detected by supportsIsPrimary)
+//   054: last_webhook_at, last_inbound_at, webhook_verified_at,
+//        last_api_error, last_api_error_at
+//   055: registration_state
+//
+// The test endpoint already proves the 052 columns exist (it reads
+// business_name), so we can safely include those.
 const CONFIG_BASE_COLS =
-  'id, phone_number_id, waba_id, access_token, status, connection_status, display_phone_number, business_name, registered_at, subscribed_apps_at, last_registration_error, last_webhook_at, last_inbound_at, webhook_verified_at, last_api_error, last_api_error_at, registration_state'
+  'id, phone_number_id, waba_id, access_token, status, connection_status, display_phone_number, business_name, registered_at, subscribed_apps_at, last_registration_error, connected_at, updated_at'
+
+// Optional diagnostic columns added by migration 054.
+const DIAGNOSTIC_COLS = ['last_webhook_at', 'last_inbound_at', 'webhook_verified_at', 'last_api_error', 'last_api_error_at']
+
+// Optional registration_state column added by migration 055.
+const HAS_REGISTRATION_STATE_COL = 'registration_state'
+
+// Row shape for the dynamic SELECT query. The actual columns returned depend
+// on which optional migrations (054/055) have been applied, so every
+// potentially-missing column is optional here.
+interface WhatsAppConfigRow {
+  id: string
+  phone_number_id: string
+  waba_id: string | null
+  access_token: string
+  status: string | null
+  connection_status: string | null
+  display_phone_number: string | null
+  business_name: string | null
+  registered_at: string | null
+  subscribed_apps_at: string | null
+  last_registration_error: string | null
+  connected_at: string | null
+  updated_at: string | null
+  last_webhook_at?: string | null
+  last_inbound_at?: string | null
+  webhook_verified_at?: string | null
+  last_api_error?: string | null
+  last_api_error_at?: string | null
+  registration_state?: string | null
+}
 
 interface NumberPayload {
   phone_number_id?: unknown
@@ -634,6 +730,10 @@ export async function POST(request: Request) {
     // detect once so every SELECT/update/upsert that references it stays
     // conditional and never 500s with 42703 on an older deployment.
     const hasIsPrimary = await supportsIsPrimary(supabase)
+
+    // Detect optional columns (diagnostics 054, registration_state 055)
+    // so we never INSERT/UPDATE a column that doesn't exist.
+    const optionalCols = await detectOptionalColumns(supabase)
 
     const {
       phone_number_id,
@@ -744,19 +844,24 @@ export async function POST(request: Request) {
     // number (which is automatically made primary), and whether we can
     // reuse the stored encrypted access token (a PIN-only re-register
     // sends no access_token).
+    //
+    // IMPORTANT: Only select columns that are GUARANTEED to exist
+    // (initial schema + migration 052). Do NOT include registration_state
+    // (055) or diagnostics (054) — if those columns don't exist, the
+    // query would fail with 42703 and return "Failed to load your
+    // current configuration".
     let existing:
       | {
           id: string
           access_token: string | null
           verify_token: string | null
           registered_at: string | null
-          registration_state: string | null
         }
       | null = null
     try {
       const result = await supabase
         .from('whatsapp_config')
-        .select('id, access_token, verify_token, registered_at, registration_state')
+        .select('id, access_token, verify_token, registered_at')
         .eq('account_id', accountId)
         .eq('phone_number_id', trimmedNumber)
         .limit(1)
@@ -921,9 +1026,8 @@ export async function POST(request: Request) {
     // claimed the number (often the one that ran Embedded Signup) — so
     // messages are received by WhatsApp but never reach the CRM inbox.
     let registeredAt: string | null = existing?.registered_at ?? null
-    let registrationError: string | null = existing?.registered_at ? null : null
-    let registrationState: string =
-      existing?.registration_state ?? 'REGISTRATION_UNKNOWN'
+    let registrationError: string | null = null
+    let registrationState: string = 'REGISTRATION_UNKNOWN'
     let registrationSkipped = false
     let alreadyRegistered = false
     const providedPin = typeof pin === 'string' && pin.trim().length > 0 ? pin.trim() : null
@@ -995,7 +1099,6 @@ export async function POST(request: Request) {
       registered_at: registeredAt,
       subscribed_apps_at: subscribedAppsAt ?? null,
       last_registration_error: registrationError,
-      registration_state: registrationState,
       updated_at: now,
     }
 
@@ -1009,6 +1112,11 @@ export async function POST(request: Request) {
     }
     if (hasIsPrimary) {
       persistenceBody.is_primary = becomesPrimary
+    }
+    // Only include registration_state if the column exists (migration 055).
+    // Including a column that doesn't exist causes 42703 and a 500.
+    if (optionalCols.has(HAS_REGISTRATION_STATE_COL)) {
+      persistenceBody.registration_state = registrationState
     }
 
     const { data: saved, error: saveError } = await supabase
@@ -1068,6 +1176,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
+      configured: true,
+      message: 'WhatsApp configuration saved successfully.',
       saved: true,
       registered: registeredAt != null,
       registration_skipped: registrationSkipped,

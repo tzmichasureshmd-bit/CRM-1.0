@@ -70,6 +70,38 @@ async function resolveAccountId(
   return data?.account_id ?? null
 }
 
+/**
+ * Detect whether a column exists on `whatsapp_config`. Returns true if
+ * the column is present, false otherwise. Never throws.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function supportsColumn(supabase: any, column: string): Promise<boolean> {
+  try {
+    const probe = await supabase.from('whatsapp_config').select(`id, ${column}`).limit(1)
+    return !probe.error
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Build a safe update body for whatsapp_config that only includes
+ * columns that actually exist. The `registration_state` column was added
+ * by migration 055 and may not exist in all environments.
+ */
+async function buildSafeUpdate(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  fields: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const hasRegistrationState = await supportsColumn(supabase, 'registration_state')
+  const safe: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(fields)) {
+    if (key === 'registration_state' && !hasRegistrationState) continue
+    safe[key] = value
+  }
+  return safe
+}
+
 export async function POST(request: Request) {
   let userId: string | null = null
   let accountId: string | null = null
@@ -133,9 +165,12 @@ export async function POST(request: Request) {
 
     // Load the tenant's WhatsApp configuration (scoped to account_id so a
     // number from another tenant can never be touched).
+    // IMPORTANT: Only select columns GUARANTEED to exist (initial schema +
+    // migration 052). Do NOT include registration_state (migration 055)
+    // which may not exist in the production database.
     const { data: config, error: configError } = await supabase
       .from('whatsapp_config')
-      .select('id, phone_number_id, waba_id, access_token, registered_at, registration_state, last_registration_error')
+      .select('id, phone_number_id, waba_id, access_token, registered_at, last_registration_error')
       .eq('account_id', accountId)
       .order('updated_at', { ascending: false })
       .limit(1)
@@ -228,16 +263,17 @@ export async function POST(request: Request) {
 
       // Refresh local status: mark confirmed / connected and clear the last
       // registration error so the UI stops asking for a PIN on a working number.
+      const updateFields = await buildSafeUpdate(supabase, {
+        registration_state: state,
+        registered_at: now,
+        last_registration_error: null,
+        status: 'connected',
+        connection_status: 'connected',
+        updated_at: now,
+      })
       await supabase
         .from('whatsapp_config')
-        .update({
-          registration_state: state,
-          registered_at: now,
-          last_registration_error: null,
-          status: 'connected',
-          connection_status: 'connected',
-          updated_at: now,
-        })
+        .update(updateFields)
         .eq('id', config.id)
         .eq('account_id', accountId)
 
@@ -264,16 +300,17 @@ export async function POST(request: Request) {
       let safeMessage = 'Meta registration failed.'
       if (/already.*registered/i.test(message)) {
         safeMessage = 'The WhatsApp number is already registered with Meta.'
+        const regFields = await buildSafeUpdate(supabase, {
+          registration_state: 'REGISTERED',
+          registered_at: now,
+          last_registration_error: null,
+          status: 'connected',
+          connection_status: 'connected',
+          updated_at: now,
+        })
         await supabase
           .from('whatsapp_config')
-          .update({
-            registration_state: 'REGISTERED',
-            registered_at: now,
-            last_registration_error: null,
-            status: 'connected',
-            connection_status: 'connected',
-            updated_at: now,
-          })
+          .update(regFields)
           .eq('id', config.id)
           .eq('account_id', accountId)
         return NextResponse.json({
@@ -297,13 +334,14 @@ export async function POST(request: Request) {
         safeMessage = 'The phone number ID does not belong to this WhatsApp Business Account.'
       }
 
+      const errorFields = await buildSafeUpdate(supabase, {
+        registration_state: 'REGISTRATION_ERROR',
+        last_registration_error: safeMessage,
+        updated_at: now,
+      })
       await supabase
         .from('whatsapp_config')
-        .update({
-          registration_state: 'REGISTRATION_ERROR',
-          last_registration_error: safeMessage,
-          updated_at: now,
-        })
+        .update(errorFields)
         .eq('id', config.id)
         .eq('account_id', accountId)
 

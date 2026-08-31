@@ -225,7 +225,11 @@ export function WhatsAppConfig() {
             setConnectionStatus('disconnected');
             setResetReason(null);
             setStatusMessage(payload.error);
-            console.error('Health check returned an error:', payload.error);
+            console.error('Health check returned an error:', {
+              status: res.status,
+              code: payload.code || null,
+              message: payload.error,
+            });
           } else if (payload.connected) {
             setConnectionStatus('connected');
             setResetReason(null);
@@ -329,7 +333,12 @@ export function WhatsAppConfig() {
         // Surface the real server error (400/401/403/409/500) instead of
         // swallowing it — never claim success on a failed save.
         const message = data.error || data.message || `Failed to save configuration (HTTP ${res.status})`;
-        console.error('WhatsApp config save failed:', { status: res.status, data });
+        console.error('WhatsApp config save failed:', {
+          status: res.status,
+          code: data.code || null,
+          message: message,
+          detail: data.meta_error || data.details || null,
+        });
         toast.error(message, { duration: 12000 });
         setSaveError(message);
         setSaving(false);
