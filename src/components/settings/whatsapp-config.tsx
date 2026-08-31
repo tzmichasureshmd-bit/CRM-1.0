@@ -173,13 +173,19 @@ export function WhatsAppConfig() {
       // Load form values from Supabase (shows what's in DB).
       // Switched from `user_id` (which would only match the row's
       // original author) to `account_id` so every member of the
-      // account sees the same saved configuration. UNIQUE(account_id)
-      // on the table guarantees the .maybeSingle() return type
-      // remains accurate.
+      // account sees the same saved configuration. The table supports
+      // one row per phone_number_id (migration 053 dropped the
+      // UNIQUE(account_id) constraint), so we load the most-recently
+      // updated row deterministically instead of `.maybeSingle()` —
+      // `.maybeSingle()` would return PGRST116 for an account with
+      // more than one number, which previously surfaced as the
+      // "Failed to load your current configuration" error.
       const { data, error } = await supabase
         .from('whatsapp_config')
         .select('*')
         .eq('account_id', acctId)
+        .order('updated_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (error) {
@@ -210,9 +216,17 @@ export function WhatsAppConfig() {
       if (data) {
         try {
           const res = await fetch('/api/whatsapp/config', { method: 'GET' });
-          const payload = await res.json();
+          const payload = await res.json().catch(() => ({}));
 
-          if (payload.connected) {
+          // A real API error should be surfaced, not silently shown as
+          // "Not Connected" — otherwise a transient backend failure looks
+          // like the credentials are wrong.
+          if (!res.ok && payload.error) {
+            setConnectionStatus('disconnected');
+            setResetReason(null);
+            setStatusMessage(payload.error);
+            console.error('Health check returned an error:', payload.error);
+          } else if (payload.connected) {
             setConnectionStatus('connected');
             setResetReason(null);
             setStatusMessage('');
@@ -224,6 +238,7 @@ export function WhatsAppConfig() {
         } catch (err) {
           console.error('Health check failed:', err);
           setConnectionStatus('disconnected');
+          setStatusMessage('Unable to verify connection with Meta.');
         }
       } else {
         setConnectionStatus('disconnected');
@@ -232,7 +247,7 @@ export function WhatsAppConfig() {
       }
     } catch (err) {
       console.error('fetchConfig error:', err);
-      toast.error('Failed to load WhatsApp configuration');
+      toast.error('Unable to load WhatsApp configuration. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -373,23 +388,36 @@ export function WhatsAppConfig() {
   async function handleTestConnection() {
     try {
       setTesting(true);
-      const res = await fetch('/api/whatsapp/config', { method: 'GET' });
-      const payload = await res.json();
+      // Real Meta Cloud API test: the backend loads the tenant's stored
+      // (encrypted) credentials and calls Meta with them. The browser only
+      // ever sees the safe result — never the token.
+      const res = await fetch('/api/whatsapp/test', { method: 'POST' });
+      const payload = await res.json().catch(() => ({}));
 
       if (payload.connected) {
         setConnectionStatus('connected');
         setResetReason(null);
         setStatusMessage('');
         toast.success(
-          payload.phone_info?.verified_name
-            ? `Connected to ${payload.phone_info.verified_name}`
-            : 'API connection successful'
+          payload.phone?.verified_name
+            ? `Meta API connection successful (${payload.phone.verified_name}).`
+            : 'Meta API connection successful.'
         );
       } else {
+        // Distinguish a corrupted stored token (needs re-entry) from a
+        // plain Meta rejection so the reset path is offered correctly.
+        const resetReason =
+          payload.reason === 'token_corrupted'
+            ? 'token_corrupted'
+            : payload.reason === 'missing_access_token'
+              ? 'token_corrupted'
+              : null;
         setConnectionStatus('disconnected');
-        setResetReason(payload.needs_reset ? 'token_corrupted' : payload.reason === 'meta_api_error' ? 'meta_api_error' : null);
-        setStatusMessage(payload.message || '');
-        toast.error(payload.message || 'API connection failed');
+        setResetReason(resetReason);
+        setStatusMessage(payload.reason || payload.message || 'WhatsApp API connection failed.');
+        toast.error(payload.reason || payload.message || 'WhatsApp API connection failed.', {
+          duration: 12000,
+        });
       }
     } catch (err) {
       console.error('Test connection error:', err);
@@ -426,42 +454,42 @@ export function WhatsAppConfig() {
   }
 
   // Submit the two-step verification PIN to finish registration on Meta.
-  // Re-POSTs the config with just the PIN (token is reused server-side)
-  // so /register actually runs now that a PIN is supplied.
+  // Sends ONLY the PIN to our dedicated backend /api/whatsapp/register —
+  // the access token is resolved and used server-side, never sent to the
+  // browser. The user's entered fields are preserved on any failure.
   async function handleSubmitPin() {
-    if (!registrationPin || registrationPin.length !== 6) {
-      toast.error('Enter the 6-digit two-step verification PIN.');
+    if (!registrationPin || !/^\d{6}$/.test(registrationPin)) {
+      toast.error('Enter the 6-digit WhatsApp two-step verification PIN.');
       return;
     }
     setSendingPin(true);
     try {
-      const payload: Record<string, unknown> = {
-        phone_number_id: phoneNumberId.trim(),
-        waba_id: wabaId.trim() || null,
-        pin: registrationPin.trim(),
-      };
-      const res = await fetch('/api/whatsapp/config', {
+      const res = await fetch('/api/whatsapp/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ pin: registrationPin }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const msg = data.error || data.message || `Registration failed (HTTP ${res.status})`;
+        // Preserve the user's PIN + other fields; never blame them for a
+        // server/meta error with a generic message.
+        const msg =
+          data.message || data.details || data.error || `Registration failed (HTTP ${res.status})`;
         toast.error(msg, { duration: 12000 });
         return;
       }
       if (data.registered) {
-        toast.success('Phone number registered — inbound messages will now reach the CRM inbox.');
+        if (data.already_registered) {
+          toast.success(
+            'The WhatsApp number is already registered with Meta. Connection refreshed.',
+          );
+        } else {
+          toast.success(
+            'Phone number registered — inbound messages will now reach the CRM inbox.',
+          );
+        }
         setRegistrationPin('');
         setPin('');
-      } else {
-        toast.error(
-          data.registration_error
-            ? `Registration not completed: ${data.registration_error}`
-            : 'Registration not completed. If the number was set up through Meta Business Manager it may already be registered — the issue may instead be the webhook.',
-          { duration: 12000 },
-        );
       }
       if (accountId) await fetchConfig(accountId);
       await handleVerifyRegistration();
@@ -758,8 +786,8 @@ export function WhatsAppConfig() {
                   <p className="text-muted-foreground">
                     {registrationState === 'REGISTRATION_REQUIRED' ||
                     registrationState === 'REGISTERED_ELSEWHERE'
-                      ? 'Enter the 6-digit two-step verification PIN to register the number and start receiving inbound messages.'
-                      : 'If registration is needed, enter the 6-digit two-step verification PIN (from Meta WhatsApp Manager → Two-step verification) to register the number.'}
+                      ? 'Enter the 6-digit WhatsApp two-step verification PIN to register the number and start receiving inbound messages.'
+                      : 'Enter the 6-digit WhatsApp two-step verification PIN (from Meta WhatsApp Manager → Two-step verification) to register the number.'}
                   </p>
                   <div className="flex items-center gap-2">
                     <Input
@@ -767,16 +795,17 @@ export function WhatsAppConfig() {
                       inputMode="numeric"
                       maxLength={6}
                       placeholder="6-digit PIN"
+                      autoComplete="off"
                       value={registrationPin}
                       onChange={(e) =>
-                        setRegistrationPin(e.target.value.replace(/\D/g, ''))
+                        setRegistrationPin(e.target.value.replace(/\D/g, '').slice(0, 6))
                       }
-                      className="bg-muted border-border text-foreground placeholder:text-muted-foreground max-w-[180px]"
+                      className="bg-muted border-border text-foreground placeholder:text-muted-foreground max-w-[180px] tracking-widest"
                     />
                     <Button
                       type="button"
                       size="sm"
-                      disabled={sendingPin || registrationPin.length !== 6}
+                      disabled={sendingPin || !/^\d{6}$/.test(registrationPin)}
                       onClick={handleSubmitPin}
                     >
                       {sendingPin ? <Loader2 className="size-3.5 animate-spin" /> : null}

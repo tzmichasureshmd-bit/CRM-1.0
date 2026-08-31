@@ -331,7 +331,14 @@ export async function GET() {
 
     if (!accountId) {
       return NextResponse.json(
-        { numbers: [], connected: false, reason: 'no_account' },
+        {
+          configured: false,
+          connected: false,
+          registrationStatus: 'not_configured',
+          numbers: [],
+          primary_phone_number_id: null,
+          reason: 'no_account',
+        },
         { status: 200 },
       )
     }
@@ -371,6 +378,23 @@ export async function GET() {
         code: listError.code,
         details: listError.details,
       })
+      // A missing table (42P01), missing column (42703), or ambiguous
+      // column (42702) means the deployed schema is out of step with the
+      // code (a migration like 054/055 not applied). That is NOT a reason
+      // to 500 — degrade to the safe "not configured" response so the
+      // Settings page loads and the operator can see the real state
+      // instead of a bare 500. Genuine unexpected errors still 500.
+      const schemaLikeCode = ['42P01', '42703', '42702', '42804'].includes(listError.code ?? '')
+      if (schemaLikeCode) {
+        return NextResponse.json({
+          configured: false,
+          connected: false,
+          registrationStatus: 'not_configured',
+          numbers: [],
+          primary_phone_number_id: null,
+          reason: 'schema_missing_columns',
+        })
+      }
       return NextResponse.json(
         { error: 'Unable to read your WhatsApp configuration. Please try again.' },
         { status: 500 },
@@ -446,8 +470,14 @@ export async function GET() {
       numbers.find((n: { is_primary: boolean }) => !!n.is_primary) ?? numbers[0] ?? null
 
     return NextResponse.json({
+      configured: numbers.length > 0,
+      // `connected` is true ONLY when at least one number was actually
+      // verified against Meta with its stored token — never merely because
+      // config rows exist (that would be fake success). Each `number` entry
+      // carries its own accurate `connected` flag.
+      connected: numbers.some((n: { connected: boolean }) => !!n.connected),
+      registrationStatus: numbers.length > 0 ? 'configured' : 'not_configured',
       numbers,
-      connected: numbers.length > 0,
       primary_phone_number_id: primary?.phone_number_id ?? null,
     })
   } catch (error) {

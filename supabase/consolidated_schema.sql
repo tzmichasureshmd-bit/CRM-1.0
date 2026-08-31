@@ -345,15 +345,31 @@ CREATE TABLE IF NOT EXISTS whatsapp_config (
   webhook_verified_at    TIMESTAMPTZ,
   last_api_error         TEXT,
   last_api_error_at      TIMESTAMPTZ,
+  -- 046 / 052: per-number health + display metadata.
+  connection_status      TEXT DEFAULT 'disconnected'
+                         CHECK (connection_status IN ('connected', 'disconnected', 'pending', 'error')),
+  display_phone_number   TEXT,
+  business_name          TEXT,
+  -- 053: multiple numbers per account + primary (default outbound) marker.
+  is_primary             BOOLEAN NOT NULL DEFAULT false,
+  -- 055: machine-readable registration state.
+  registration_state     TEXT,
   created_at             TIMESTAMPTZ DEFAULT NOW(),
   updated_at             TIMESTAMPTZ DEFAULT NOW(),
-  CONSTRAINT whatsapp_config_account_id_key UNIQUE (account_id),
+  -- One WhatsApp phone number per instance (prevents two accounts
+  -- binding the same number and silently dropping webhook events).
   CONSTRAINT whatsapp_config_phone_number_id_key UNIQUE (phone_number_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_whatsapp_config_account ON whatsapp_config(account_id);
 CREATE INDEX IF NOT EXISTS idx_whatsapp_config_registered_at ON whatsapp_config(registered_at)
   WHERE registered_at IS NULL;
+
+-- At most one primary (default outbound) number per account (053).
+DROP INDEX IF EXISTS whatsapp_config_one_primary_idx;
+CREATE UNIQUE INDEX whatsapp_config_one_primary_idx
+  ON whatsapp_config (account_id)
+  WHERE is_primary;
 
 ALTER TABLE whatsapp_config ENABLE ROW LEVEL SECURITY;
 
