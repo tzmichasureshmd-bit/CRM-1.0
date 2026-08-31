@@ -79,12 +79,14 @@ interface BuiltRow {
 }
 
 interface ImportResult {
+  total: number;
   imported: number;
   updated: number;
   skipped: number;
   failed: number;
   tagsAssigned: number;
   customAssigned: number;
+  needsReview: { rowIndex: number; phone: string; name: string; reason: string }[];
 }
 
 interface ImportModalProps {
@@ -526,7 +528,23 @@ export function ImportModal({ open, onOpenChange, onImported }: ImportModalProps
         /* custom fields optional */
       }
 
-      setResult({ imported, updated, skipped, failed, tagsAssigned, customAssigned });
+      setResult({
+        total: builtRows.length,
+        imported,
+        updated,
+        skipped,
+        failed,
+        tagsAssigned,
+        customAssigned,
+        needsReview: builtRows
+          .filter((r) => !r.contact.phone || r.errors.length > 0)
+          .map((r) => ({
+            rowIndex: r.rowIndex,
+            phone: r.contact.phone,
+            name: r.contact.name ?? '',
+            reason: r.errors.join('; ') || 'Invalid row',
+          })),
+      });
       setStep('results');
       if (imported + updated > 0) onImported();
       if (imported > 0) toast.success(t('toastImported', { count: imported }));
@@ -1037,7 +1055,29 @@ export function ImportModal({ open, onOpenChange, onImported }: ImportModalProps
           {/* RESULTS */}
           {step === 'results' && result && (
             <div className="space-y-3">
-              <p className="text-sm font-semibold text-popover-foreground">Import Complete</p>
+              <p className="text-sm font-semibold text-popover-foreground">Import completed</p>
+              <div className="rounded-lg border border-border/70 bg-background/40 px-3 py-2 text-sm">
+                <p className="text-muted-foreground">
+                  Total rows:{' '}
+                  <span className="font-semibold text-foreground">
+                    {result.total.toLocaleString()}
+                  </span>
+                </p>
+                <p className="text-emerald-400">
+                  Imported: <span className="font-semibold">{result.imported.toLocaleString()}</span>
+                  {result.updated > 0 && (
+                    <span className="text-cyan-300"> (+{result.updated.toLocaleString()} updated)</span>
+                  )}
+                </p>
+                {(result.skipped > 0 || result.failed > 0) && (
+                  <p className="text-amber-300">
+                    Needs review:{' '}
+                    <span className="font-semibold">
+                      {(result.skipped + result.failed).toLocaleString()}
+                    </span>
+                  </p>
+                )}
+              </div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 <SummaryChip label="Imported" value={result.imported} tone="green" />
                 <SummaryChip label="Updated" value={result.updated} tone="cyan" />
@@ -1046,6 +1086,30 @@ export function ImportModal({ open, onOpenChange, onImported }: ImportModalProps
                 <SummaryChip label="Tags assigned" value={result.tagsAssigned} />
                 <SummaryChip label="Custom fields set" value={result.customAssigned} />
               </div>
+
+              {/* Rows that need review — shown so no invalid row silently
+                  disappears. Lists each problematic row with its reason. */}
+              {result.needsReview.length > 0 && (
+                <div className="rounded-lg border border-red-700/40 bg-red-950/20 text-xs text-red-200">
+                  <p className="px-3 py-2 font-semibold border-b border-red-700/30">
+                    {result.needsReview.length} row(s) need review and were not imported
+                  </p>
+                  <div className="max-h-48 overflow-y-auto divide-y divide-red-700/20">
+                    {result.needsReview.map((r) => (
+                      <div key={r.rowIndex} className="flex items-start gap-2 px-3 py-1.5">
+                        <span className="shrink-0 font-mono text-red-300">#{r.rowIndex + 2}</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-popover-foreground">
+                            {r.phone || r.name || '(no name)'}
+                          </p>
+                          <p className="text-red-300/80">{r.reason}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center gap-3">
                 {result.imported > 0 && (
                   <span className="flex items-center gap-1.5 text-sm text-emerald-400">

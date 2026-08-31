@@ -102,6 +102,20 @@ export async function POST(request: Request) {
       ? body.ids.filter((t): t is string => typeof t === 'string').slice(0, 100_000)
       : [];
 
+    // Bulk export guard (security). The `all` flag and the unbounded
+    // `ids` path are used for exporting large contact sets. These must be
+    // limited to platform super-admins; any other authenticated user gets a
+    // 403 so customer data cannot be bulk-extracted. The normal paginated
+    // table query (page/pageSize, bounded to 100 rows server-side) remains
+    // available to any viewer.
+    const isBulkExport = all === true || selectIds.length > 0;
+    if (isBulkExport && ctx.platformRole !== 'super_admin') {
+      return NextResponse.json(
+        { error: 'Export is not permitted for your role' },
+        { status: 403 },
+      );
+    }
+
     // Explicit-id path (export selected): fetch directly, scoped by RLS.
     if (selectIds.length > 0) {
       const { data: byIdRows } = await ctx.supabase

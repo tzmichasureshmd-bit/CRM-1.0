@@ -113,16 +113,41 @@ export default function ReportsPage() {
   const exportExcel = async () => {
     if (rows.length === 0) return;
     const XLSX = await import("xlsx");
-    const ws = XLSX.utils.json_to_sheet(rows);
+    const ws = XLSX.utils.json_to_sheet(sanitizeReportRows());
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Report");
     XLSX.writeFile(wb, `report-${reportType}-${Date.now()}.xlsx`);
   };
 
+  // Build report rows with phone numbers removed, so exported data never
+  // exposes customer mobile numbers. The button stays; the sensitive
+  // column is stripped. Heuristically drops columns whose header contains
+  // "phone"/"mobile", and masks a bare phone used as a fallback contact
+  // name in the "Contact" column.
+  const sanitizeReportRows = () => {
+    const PII_HEADER = /phone|mobile/i;
+    const PHONE_RE = /\b(\+?\d[\d\s.\-()]{6,})\b/g;
+    return rows.map((row) => {
+      const out: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(row)) {
+        if (PII_HEADER.test(key)) continue;
+        if (typeof value === "string" && /phone|mobile|contact/i.test(key)) {
+          // For "Contact", a bare phone (fallback when name unknown)
+          // should not leak — mask it.
+          out[key] = value.replace(PHONE_RE, "[hidden]");
+        } else {
+          out[key] = value;
+        }
+      }
+      return out;
+    });
+  };
+
   const exportPDF = () => {
     if (rows.length === 0) return;
+    const safe = sanitizeReportRows();
     const doc = new jsPDF();
-    const headers = rows[0] ? Object.keys(rows[0]) : [];
+    const headers = safe[0] ? Object.keys(safe[0]) : [];
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 10;
     const colWidth = (pageWidth - margin * 2) / headers.length;
@@ -140,7 +165,7 @@ export default function ReportsPage() {
     });
     y += 5;
 
-    rows.forEach((row) => {
+    safe.forEach((row) => {
       if (y > 280) {
         doc.addPage();
         y = 20;

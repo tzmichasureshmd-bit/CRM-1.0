@@ -218,13 +218,22 @@ export function validateMappedRow(
 
   const phone = get('phone');
   const digits = normalizePhone(phone);
-  if (requiredPhone && !digits) {
+  if (requiredPhone && !phone) {
     problems.push('Phone is required');
-  } else if (digits) {
-    if (digits.length < 7 || digits.length > 15) {
+  } else if (phone) {
+    // Accept phone numbers in many legitimate formats: with a leading
+    // trunk `0` (e.g. `09876543210`), a country code (`+91 ...`,
+    // `+1 ...`), spaces, hyphens, dots, brackets. We require a plausible
+    // minimum digit count but never reject a number purely for using a
+    // leading zero (a valid national trunk prefix) or for non-digit
+    // separators. Numbers that can't be confidently normalized keep
+    // their original value instead of being dropped (see buildContactRow).
+    if (!digits) {
+      problems.push('Phone looks invalid (no digits)');
+    } else if (digits.length < 7) {
+      problems.push(`Phone looks invalid (only ${digits.length} digits)`);
+    } else if (digits.length > 15) {
       problems.push(`Phone looks invalid (${digits.length} digits)`);
-    } else if (!/^[1-9]/.test(digits)) {
-      problems.push('Phone must not start with 0');
     }
   }
 

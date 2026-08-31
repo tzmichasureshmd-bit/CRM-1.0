@@ -80,7 +80,9 @@ import { ContactForm } from '@/components/contacts/contact-form';
 import { ContactDetailView } from '@/components/contacts/contact-detail-view';
 import { ImportModal } from '@/components/contacts/import-modal';
 import { CustomFieldsManager } from '@/components/contacts/custom-fields-manager';
+import { ConfidentialWatermark } from '@/components/shared/confidential-watermark';
 import { useCan } from '@/hooks/use-can';
+import { useAuth } from '@/hooks/use-auth';
 import { GatedButton } from '@/components/ui/gated-button';
 import { useTranslations } from 'next-intl';
 import { createClient } from '@/lib/supabase/client';
@@ -265,6 +267,7 @@ function ContactsPageInner() {
   const searchParams = useSearchParams();
   const canEdit = useCan('send-messages');
   const canEditSettings = useCan('edit-settings');
+  const { isSuperAdmin, profile, account } = useAuth();
 
   const [contacts, setContacts] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
@@ -669,7 +672,10 @@ function ContactsPageInner() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="crm-protected space-y-6">
+      <ConfidentialWatermark
+        identifier={profile?.full_name || account?.name || undefined}
+      />
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -690,8 +696,10 @@ function ContactsPageInner() {
             </Button>
           )}
 
-          {/* Export */}
-          <DropdownMenu>
+          {/* Export — visible only to platform super-admins. The server
+              enforces the same gate (403) on the bulk-export API path. */}
+          {isSuperAdmin && (
+            <DropdownMenu>
             <DropdownMenuTrigger
               render={<Button variant="outline" className="border-border text-muted-foreground hover:bg-muted" />}
             >
@@ -717,7 +725,8 @@ function ContactsPageInner() {
                 Export Selected ({selected.size})
               </DropdownMenuItem>
             </DropdownMenuContent>
-          </DropdownMenu>
+            </DropdownMenu>
+          )}
 
           <GatedButton
             variant="outline"
