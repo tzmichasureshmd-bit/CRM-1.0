@@ -531,7 +531,7 @@ export function SendMessageModal({
                 {urlButtonSlots.map((slot) => (
                   <div key={slot.index} className="space-y-1">
                     <Label className="text-xs text-popover-foreground">
-                      URL button "{slot.text}" — value for {'{{1}}'}
+                      {'URL button &quot;' + slot.text + '&quot;'} — value for {'{{1}}'}
                     </Label>
                     <Input
                       value={urlButtonVals[slot.index] ?? ''}
@@ -558,7 +558,7 @@ export function SendMessageModal({
 
           {sentOk && (
             <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-400">
-              Message sent. It will appear in the Inbox and this contact's activity.
+              Message sent. It will appear in the Inbox and this contact&apos;s activity.
             </div>
           )}
 
