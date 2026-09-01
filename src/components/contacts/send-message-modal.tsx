@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { Contact, MessageTemplate } from '@/types';
 import {
@@ -25,7 +25,6 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import {
-  LayoutTemplate,
   Loader2,
   MessageSquare,
   Phone,
@@ -33,7 +32,6 @@ import {
   Building2,
   MapPin,
   ShieldAlert,
-  ArrowLeft,
   Send,
 } from 'lucide-react';
 import { useCan } from '@/hooks/use-can';
@@ -75,15 +73,6 @@ interface SendMessageModalProps {
 
 function formatTemplateName(t: MessageTemplate): string {
   return t.name;
-}
-
-/** Reuse the same body-preview substitution as the inbox picker. */
-function renderBodyPreview(body: string, resolved: (string | undefined)[]): string {
-  return body.replace(/\{\{(\d+)\}\}/g, (_, raw) => {
-    const idx = Number(raw) - 1;
-    const value = resolved[idx];
-    return value && value.trim().length > 0 ? value : `{{${raw}}}`;
-  });
 }
 
 export function SendMessageModal({
@@ -236,11 +225,13 @@ export function SendMessageModal({
     (headerVarCount === 0 || headerText.trim().length > 0) &&
     urlButtonSlots.every((s) => (urlButtonVals[s.index] ?? '').trim().length > 0);
 
-  function updateVar(i: number, source: VariableSource, value: string) {
+  function updateVar(i: number, source: VariableSource, value: string | null) {
     setVars((prev) => {
+      // base-ui Select reports null when cleared; keep the prior value then.
+      const next = (value ?? prev[i]?.value ?? '').trim();
       const resolved =
-        source === 'contact' ? resolveContactField(value) : value;
-      return { ...prev, [i]: { source, value, resolved } };
+        source === 'contact' ? resolveContactField(next) : next;
+      return { ...prev, [i]: { source, value: next, resolved } };
     });
   }
 
@@ -393,7 +384,7 @@ export function SendMessageModal({
             <Label className="text-xs text-popover-foreground">Message Type</Label>
             <Select
               value={templateId}
-              onValueChange={setTemplateId}
+              onValueChange={(v) => setTemplateId(v ?? '')}
               disabled={!canSend || contact?.messaging_opt_out}
             >
               <SelectTrigger className="h-9 w-full border-border bg-muted text-foreground">

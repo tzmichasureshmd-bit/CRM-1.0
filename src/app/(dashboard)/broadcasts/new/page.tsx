@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import { toast } from 'sonner';
@@ -23,6 +23,7 @@ const steps = [
 
 export default function NewBroadcastPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const t = useTranslations('Broadcasts.new');
   const { accountId } = useAuth();
   const { createAndSendBroadcast, isProcessing, progress } = useBroadcastSending();
@@ -30,8 +31,9 @@ export default function NewBroadcastPage() {
   const [currentStep, setCurrentStep] = useState(0);
   const [template, setTemplate] = useState<MessageTemplate | null>(null);
   const [audience, setAudience] = useState<{
-    type: 'all' | 'tags' | 'custom_field' | 'csv';
+    type: 'all' | 'tags' | 'custom_field' | 'csv' | 'contacts';
     tagIds?: string[];
+    contactIds?: string[];
     customField?: {
       fieldId: string;
       operator: 'is' | 'is_not' | 'contains';
@@ -39,7 +41,21 @@ export default function NewBroadcastPage() {
     };
     csvContacts?: { phone: string; name?: string }[];
     excludeTagIds?: string[];
-  }>({ type: 'all' });
+  }>(() => {
+    // Seed the audience from /broadcasts/new?contacts=<id1>,<id2> so the
+    // "Create WhatsApp Broadcast" action in the Contacts page can hand off
+    // its selection.
+    const raw = searchParams.get('contacts');
+    const contactIds = raw
+      ? raw
+          .split(',')
+          .map((id) => id.trim())
+          .filter(Boolean)
+      : [];
+    return contactIds.length > 0
+      ? { type: 'contacts', contactIds }
+      : { type: 'all' };
+  });
   const [variables, setVariables] = useState<
     Record<string, { type: 'static' | 'field' | 'custom_field'; value: string }>
   >({});
@@ -59,6 +75,7 @@ export default function NewBroadcastPage() {
           customField: audience.customField,
           csvContacts: audience.csvContacts,
           excludeTagIds: audience.excludeTagIds,
+          contactIds: audience.contactIds,
         },
         variables,
         headerMediaUrl,
