@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
-type AudienceType = 'all' | 'tags' | 'custom_field' | 'csv';
+type AudienceType = 'all' | 'tags' | 'custom_field' | 'csv' | 'contacts';
 type CustomFieldOperator = 'is' | 'is_not' | 'contains';
 
 interface CustomFieldFilter {
@@ -31,6 +31,7 @@ interface AudienceConfig {
   customField?: CustomFieldFilter;
   csvContacts?: { phone: string; name?: string }[];
   excludeTagIds?: string[];
+  contactIds?: string[];
 }
 
 interface Step2Props {
@@ -64,6 +65,12 @@ export function Step2SelectAudience({
       type: 'all',
       label: t('selectAudience.method.all'),
       description: t('selectAudience.allDescLoading'),
+      icon: Users,
+    },
+    {
+      type: 'contacts',
+      label: t('selectAudience.method.contacts'),
+      description: t('selectAudience.contactsDesc'),
       icon: Users,
     },
     {
@@ -137,6 +144,12 @@ export function Step2SelectAudience({
 
       if (audience.type === 'all') {
         // Handled below — full-table count adjusted by excludes.
+      } else if (
+        audience.type === 'contacts' &&
+        audience.contactIds &&
+        audience.contactIds.length > 0
+      ) {
+        baseIds = new Set(audience.contactIds);
       } else if (
         audience.type === 'tags' &&
         audience.tagIds &&

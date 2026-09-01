@@ -14,10 +14,12 @@ export interface CustomFieldFilter {
 }
 
 export interface AudienceConfig {
-  type: 'all' | 'tags' | 'custom_field' | 'csv';
+  type: 'all' | 'tags' | 'custom_field' | 'csv' | 'contacts';
   tagIds?: string[];
   customField?: CustomFieldFilter;
   csvContacts?: { phone: string; name?: string }[];
+  /** Explicitly selected contact IDs (from the Contacts page selection). */
+  contactIds?: string[];
   /** Contacts carrying any of these tags are subtracted from the result. */
   excludeTagIds?: string[];
 }
@@ -147,6 +149,15 @@ async function fetchCustomValueIndex(
   return index;
 }
 
+/** Substitute {{N}} placeholders in a template body with resolved values. */
+function renderBody(body: string, params: string[]): string {
+  return body.replace(/\{\{(\d+)\}\}/g, (_, raw) => {
+    const idx = Number(raw) - 1;
+    const value = params[idx];
+    return value && value.trim().length > 0 ? value : `{{${raw}}}`;
+  });
+}
+
 export function useBroadcastSending(): UseBroadcastSendingReturn {
   const { accountId } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -189,6 +200,13 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
       contacts = await resolveCustomFieldAudience(supabase, audience.customField);
     } else if (audience.type === 'csv' && audience.csvContacts) {
       contacts = await upsertCsvContacts(supabase, audience.csvContacts);
+    } else if (audience.type === 'contacts' && audience.contactIds) {
+      const { data, error } = await supabase
+        .from('contacts')
+        .select('*')
+        .in('id', audience.contactIds);
+      if (error) throw new Error(`Failed to fetch contacts: ${error.message}`);
+      contacts = data ?? [];
     }
 
     // Apply exclude tags (works across all contact-derived audience
@@ -201,6 +219,11 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
       const excludedIds = new Set((excludeRows ?? []).map((r) => r.contact_id));
       contacts = contacts.filter((c) => !excludedIds.has(c.id));
     }
+
+    // Respect opt-outs: contacts who opted out of WhatsApp messaging are
+    // never included in a broadcast, regardless of how the audience was
+    // built. This is a hard safety rule, not a preference.
+    contacts = contacts.filter((c) => !c.messaging_opt_out);
 
     return contacts;
   }
@@ -318,6 +341,77 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
       .in('id', contactIds);
     if (error) throw new Error(`Failed to fetch contacts: ${error.message}`);
     return data ?? [];
+  }
+
+  /**
+   * Broadcast sends must be traceable to the contact (Part 11): persist
+   * an outbound message row into the contact's conversation so it shows
+   * up in the Inbox and the contact's activity timeline, and bump
+   * `last_contacted_at`. Finds-or-creates the conversation (one per
+   * account+contact, matching the inbox/webhook convention).
+   */
+  async function persistBroadcastMessage(
+    supabase: ReturnType<typeof createClient>,
+    contactId: string,
+    templateName: string,
+    bodyText: string,
+    params: string[],
+    whatsappMessageId: string,
+  ) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const user = session?.user;
+    if (!user || !accountId) return;
+
+    // Find-or-create the conversation.
+    let conversationId: string | null = null;
+    const { data: existing } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('account_id', accountId)
+      .eq('contact_id', contactId)
+      .maybeSingle();
+    conversationId = existing?.id ?? null;
+    if (!conversationId) {
+      const { data: created, error: createErr } = await supabase
+        .from('conversations')
+        .insert({
+          account_id: accountId,
+          user_id: user.id,
+          contact_id: contactId,
+        })
+        .select('id')
+        .single();
+      if (createErr || !created) return;
+      conversationId = created.id;
+    }
+
+    const rendered = renderBody(bodyText, params);
+
+    await supabase.from('messages').insert({
+      conversation_id: conversationId,
+      sender_type: 'agent',
+      sender_id: user.id,
+      content_type: 'template',
+      content_text: rendered,
+      template_name: templateName,
+      message_id: whatsappMessageId,
+      status: 'sent',
+    });
+
+    await supabase
+      .from('conversations')
+      .update({
+        last_message_text: rendered,
+        last_message_at: new Date().toISOString(),
+      })
+      .eq('id', conversationId);
+
+    await supabase
+      .from('contacts')
+      .update({ last_contacted_at: new Date().toISOString() })
+      .eq('id', contactId);
   }
 
   async function createAndSendBroadcast(payload: BroadcastPayload): Promise<string> {
@@ -521,6 +615,31 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
                   error_message: null,
                 })
                 .eq('id', recipient.id);
+
+              // Make the broadcast message traceable to the contact: persist
+              // an outbound message in their conversation (Part 11) so it
+              // appears in the Inbox and activity timeline, and record that
+              // they were contacted.
+              const contactById = recipients.find(
+                (r) => r.id === recipient.id,
+              )?.contact;
+              if (contactById?.id && result.whatsapp_message_id) {
+                const resolvedParams = contactById
+                  ? resolveVariables(
+                      payload.variables,
+                      contactById,
+                      customValueIndex.get(contactById.id),
+                    )
+                  : [];
+                void persistBroadcastMessage(
+                  supabase,
+                  contactById.id,
+                  payload.template.name,
+                  payload.template.body_text,
+                  resolvedParams,
+                  result.whatsapp_message_id,
+                );
+              }
             } else {
               failedCount++;
               await supabase

@@ -75,11 +75,13 @@ import {
   Phone as PhoneIcon,
   MapPin,
   Landmark,
+  MessageSquare,
 } from 'lucide-react';
 import { ContactForm } from '@/components/contacts/contact-form';
 import { ContactDetailView } from '@/components/contacts/contact-detail-view';
 import { ImportModal } from '@/components/contacts/import-modal';
 import { CustomFieldsManager } from '@/components/contacts/custom-fields-manager';
+import { SendMessageModal } from '@/components/contacts/send-message-modal';
 import { ConfidentialWatermark } from '@/components/shared/confidential-watermark';
 import { useCan } from '@/hooks/use-can';
 import { useAuth } from '@/hooks/use-auth';
@@ -300,6 +302,8 @@ function ContactsPageInner() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Contact | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [sendOpen, setSendOpen] = useState(false);
+  const [sendTarget, setSendTarget] = useState<Contact | null>(null);
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
@@ -428,6 +432,11 @@ function ContactsPageInner() {
     }
   }
 
+  function openSend(contact: Contact) {
+    setSendTarget(contact);
+    setSendOpen(true);
+  }
+
   function confirmDelete(contact: Contact) {
     setDeleteTarget(contact);
     setDeleteConfirmOpen(true);
@@ -498,6 +507,51 @@ function ContactsPageInner() {
     selectedTagIds.length > 0 ||
     filters.length > 0 ||
     activeTab !== 'all';
+
+  // Select every contact that matches the current search/filter across
+  // all pages (not just the visible page). Pages through the existing
+  // query API (which caps pageSize at 100) to accumulate IDs safely.
+  const [selectingAll, setSelectingAll] = useState(false);
+  async function selectAllFiltered() {
+    setSelectingAll(true);
+    try {
+      const groups = buildGroups();
+      const limit = 100;
+      const pageSize = limit;
+      let page = 0;
+      let total = Infinity;
+      const ids = new Set<string>();
+      while (page * pageSize < total) {
+        const res = await fetch('/api/contacts/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            search: search.trim() || null,
+            groups,
+            tagIds: selectedTagIds,
+            page,
+            pageSize,
+            order: sort,
+            ascending: sortAsc,
+            importedOnly: activeTab === 'imported',
+          }),
+        });
+        if (!res.ok) throw new Error('query failed');
+        const data = await res.json();
+        const rows: Row[] = data.contacts ?? [];
+        total = data.totalCount ?? 0;
+        rows.forEach((c) => ids.add(c.id));
+        page += 1;
+        if (rows.length < pageSize) break;
+      }
+      setSelected(ids);
+      toast.success(`${ids.size.toLocaleString()} contacts selected`);
+    } catch {
+      toast.error('Could not select all filtered contacts.');
+    } finally {
+      setSelectingAll(false);
+    }
+  }
 
   function toggleTagFilter(tagId: string) {
     setSelectedTagIds((prev) =>
@@ -1111,18 +1165,38 @@ function ContactsPageInner() {
             <button onClick={clearAll} className="text-xs text-muted-foreground hover:text-foreground px-1">
               Clear All
             </button>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={selectingAll}
+              onClick={() => void selectAllFiltered()}
+              className="ml-2 text-primary hover:bg-primary/10"
+            >
+              {selectingAll && <Loader2 className="size-3 animate-spin" />}
+              {t('selectAllFiltered')}
+            </Button>
           </div>
         )}
       </div>
 
       {/* Bulk action bar */}
       {selected.size > 0 && (
-        <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-muted/40 px-4 py-2">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 px-4 py-2">
           <p className="text-sm text-foreground">{t('selectedCount', { count: selected.size })}</p>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())} className="text-muted-foreground hover:text-foreground">
               {t('clearSelection')}
             </Button>
+            <GatedButton
+              variant="outline"
+              size="sm"
+              canAct={canEdit}
+              gateReason="send WhatsApp messages"
+              onClick={() => router.push(`/broadcasts/new?contacts=${[...selected].join(',')}`)}
+              className="border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+            >
+              <MessageSquare className="size-4" /> Create WhatsApp Broadcast
+            </GatedButton>
             <GatedButton
               variant="destructive"
               size="sm"
@@ -1203,7 +1277,16 @@ function ContactsPageInner() {
                     </TableCell>
                   ))}
                   <TableCell>
-                    <DropdownMenu>
+                    <div className="flex items-center justify-end gap-1">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); openSend(contact); }}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] font-medium text-emerald-400 transition-colors hover:bg-emerald-500/20"
+                        title="Send WhatsApp Message"
+                      >
+                        <MessageSquare className="size-3" />
+                        Send Message
+                      </button>
+                      <DropdownMenu>
                       <DropdownMenuTrigger
                         render={
                           <Button variant="ghost" size="icon-sm" className="text-muted-foreground hover:text-foreground" onClick={(e) => e.stopPropagation()} />
@@ -1223,7 +1306,8 @@ function ContactsPageInner() {
                           <Trash2 className="size-4" /> {t('deleteAction')}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
-                    </DropdownMenu>
+                      </DropdownMenu>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -1289,9 +1373,17 @@ function ContactsPageInner() {
               )}
               <div className="mt-2 flex items-center justify-between">
                 <span className="text-[10px] text-muted-foreground">{formatCreated(contact.created_at)}</span>
-                <button onClick={(e) => { e.stopPropagation(); openEditForm(contact); }} className="text-xs text-primary hover:underline">
-                  View Details
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); openSend(contact); }}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] font-medium text-emerald-400 transition-colors hover:bg-emerald-500/20"
+                  >
+                    <MessageSquare className="size-3" /> Send Message
+                  </button>
+                  <button onClick={(e) => { e.stopPropagation(); openDetail(contact.id); }} className="text-xs text-primary hover:underline">
+                    View Details
+                  </button>
+                </div>
               </div>
             </div>
           ))
@@ -1319,6 +1411,13 @@ function ContactsPageInner() {
       <ContactForm open={formOpen} onOpenChange={setFormOpen} contact={editContact} contactTags={editContactTags} onSaved={() => { fetchContacts(); fetchTags(); }} onViewExisting={(id) => { setFormOpen(false); openDetail(id); }} />
 
       <ContactDetailView open={detailOpen} onOpenChange={setDetailOpen} contactId={detailContactId} onUpdated={fetchContacts} />
+
+      <SendMessageModal
+        open={sendOpen}
+        onOpenChange={setSendOpen}
+        contact={sendTarget}
+        onSent={fetchContacts}
+      />
 
       <ImportModal open={importOpen} onOpenChange={setImportOpen} onImported={fetchContacts} />
 

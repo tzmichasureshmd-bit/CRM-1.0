@@ -126,6 +126,15 @@ export interface Contact {
   review_count?: number | null;
   /** Set when the contact was created via CSV/XLSX import (migration 056). */
   imported_at?: string | null;
+  /** WhatsApp messaging preference (migration 059). When true the contact
+    *  has opted out of WhatsApp business messaging and must be excluded
+    *  from broadcasts (and surfaced with a clear reason when messaged). */
+  messaging_opt_out?: boolean;
+  opted_out_reason?: string | null;
+  opted_out_at?: string | null;
+  /** When this contact was last messaged (individual or broadcast).
+    *  Maintained by the send paths; enables "already contacted" filtering. */
+  last_contacted_at?: string | null;
   created_at: string;
   updated_at: string;
   /** Hydrated by queries that embed `contact_tags(tags(*))` (e.g. the
