@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { Contact, MessageTemplate } from '@/types';
 import {
@@ -25,6 +26,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import {
+  Inbox,
   Loader2,
   MessageSquare,
   Phone,
@@ -35,6 +37,7 @@ import {
   Send,
 } from 'lucide-react';
 import { useCan } from '@/hooks/use-can';
+import { useAuth } from '@/hooks/use-auth';
 import { extractVariableIndices } from '@/lib/whatsapp/template-validators';
 
 /**
@@ -82,6 +85,8 @@ export function SendMessageModal({
   onSent,
 }: SendMessageModalProps) {
   const canSend = useCan('send-messages');
+  const router = useRouter();
+  const { accountId, user } = useAuth();
 
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
@@ -95,6 +100,7 @@ export function SendMessageModal({
 
   const [sending, setSending] = useState(false);
   const [sentOk, setSentOk] = useState(false);
+  const [openingInbox, setOpeningInbox] = useState(false);
   // opt-out editing
   const [optOut, setOptOut] = useState(false);
   const [optOutReason, setOptOutReason] = useState('');
@@ -302,6 +308,57 @@ export function SendMessageModal({
     }
     toast.success(next ? 'Opted out of WhatsApp messaging' : 'Messaging re-enabled');
     onSent?.();
+  }
+
+  /**
+   * Open this contact's conversation in the CRM Inbox, where a normal
+   * free-text WhatsApp message can be typed and sent (inside the 24h
+   * customer-service window). Reuses a conversation if one already
+   * exists; otherwise creates it (account-scoped, mirroring the
+   * send route's find-or-create) — never duplicates a thread.
+   */
+  async function openInbox() {
+    if (!contact || openingInbox) return;
+    if (!accountId || !user?.id) {
+      toast.error('Your session is still loading. Please try again.');
+      return;
+    }
+    setOpeningInbox(true);
+    try {
+      const supabase = createClient();
+      let conversationId: string | null = null;
+
+      const { data: existing } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('contact_id', contact.id)
+        .maybeSingle();
+      conversationId = existing?.id ?? null;
+
+      if (!conversationId) {
+        const { data: created, error } = await supabase
+          .from('conversations')
+          .insert({
+            account_id: accountId,
+            user_id: user?.id,
+            contact_id: contact.id,
+          })
+          .select('id')
+          .single();
+        if (error || !created) {
+          toast.error('Could not open a conversation for this contact.');
+          return;
+        }
+        conversationId = created.id;
+      }
+
+      onOpenChange(false);
+      router.push(`/inbox?c=${conversationId}`);
+    } catch {
+      toast.error('Could not open the conversation.');
+    } finally {
+      setOpeningInbox(false);
+    }
   }
 
   return (
@@ -597,6 +654,24 @@ export function SendMessageModal({
         </div>
 
         <DialogFooter className="gap-2">
+          <Button
+            variant="outline"
+            onClick={openInbox}
+            disabled={openingInbox || !contact}
+            title={
+              contact?.messaging_opt_out
+                ? 'This contact has opted out; free-text is blocked, use a template.'
+                : undefined
+            }
+            className="border-border text-popover-foreground hover:bg-muted disabled:opacity-50"
+          >
+            {openingInbox ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Inbox className="size-4" />
+            )}
+            Open in Inbox
+          </Button>
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
