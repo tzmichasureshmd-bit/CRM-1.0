@@ -365,6 +365,35 @@ export interface WhatsAppConfig {
   last_api_error?: string | null;
   /** Diagnostics — when the most recent safe Meta API error occurred. */
   last_api_error_at?: string | null;
+  /**
+   * How this number was connected: 'manual' (typed-in Cloud API system-user
+   * token) or 'embedded_signup' (Meta Embedded Signup popup / WhatsApp
+   * Business App). Migration 060. Additive — never used to replace an
+   * existing manual connection.
+   */
+  connection_method?: 'manual' | 'embedded_signup' | null;
+  /** 'cloud_api' (default) or 'whatsapp_business_app' (coexistence). */
+  onboarding_source?: string | null;
+  /** Embedded Signup state: 'connected' | 'coexistence_active' | other. */
+  embedded_signup_status?: string | null;
+  /**
+   * Meta-confirmed coexistence state: 'active' when Meta reports
+   * is_on_biz_app=true AND platform_type=CLOUD_API for this number.
+   * Never inferred — only set when Meta confirms.
+   */
+  coexistence_status?: 'active' | 'not_confirmed' | null;
+  /** Business Manager / business id from the Embedded Signup session. */
+  meta_business_id?: string | null;
+  /** When the 60-day Embedded Signup token expires. */
+  access_token_expires_at?: string | null;
+  /** 'system_user' (manual) or 'embedded_signup_long_lived'. */
+  token_type?: string | null;
+  /** Meta-reported is_on_biz_app flag (true for Business App numbers). */
+  is_on_biz_app?: boolean | null;
+  /** Meta-reported platform_type (CLOUD_API | ON_PREMISES | …). */
+  platform_type?: string | null;
+  /** When Meta first confirmed coexistence for this number. */
+  coexistence_confirmed_at?: string | null;
 }
 
 // Raw Meta status enum. We persist this verbatim from Meta (sync + webhook)

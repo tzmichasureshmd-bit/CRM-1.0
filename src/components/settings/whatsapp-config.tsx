@@ -23,6 +23,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { SettingsPanelHead } from './settings-panel-head';
+import { EmbeddedSignupConnectCard } from './embedded-signup-connect';
 import {
   Accordion,
   AccordionItem,
@@ -157,6 +158,15 @@ export function WhatsAppConfig() {
     : regError
       ? 'text-red-200'
       : 'text-amber-200';
+
+  // The "connection" card must never contradict "Inbound Active". It is
+  // connected when the credential ping succeeded OR the number demonstrably
+  // delivers inbound (registration confirmed / a message was actually
+  // received) — a live webhook with delivered messages is proof the
+  // connection is real even if the stored token can't be re-pinged right now.
+  const credsConnected = connectionStatus === 'connected';
+  const effectivelyConnected =
+    credsConnected || Boolean(config && (regOk || inboundWorking));
 
   // Track a pending PIN the admin is about to submit for registration.
   const [registrationPin, setRegistrationPin] = useState('');
@@ -629,31 +639,53 @@ export function WhatsAppConfig() {
         {/* Connection Status */}
         <Alert className="bg-card border-border">
           <div className="flex items-center gap-2">
-            {connectionStatus === 'connected' ? (
+            {effectivelyConnected ? (
               <CheckCircle2 className="size-4 text-primary" />
             ) : (
               <XCircle className="size-4 text-red-500" />
             )}
             <AlertTitle className="text-foreground mb-0">
-              {connectionStatus === 'connected' ? t('credentialsValid') : t('notConnected')}
+              {effectivelyConnected ? t('credentialsValid') : t('notConnected')}
             </AlertTitle>
           </div>
           <AlertDescription className="text-muted-foreground">
-            {connectionStatus === 'connected'
-              ? t('connectedDesc')
-              : statusMessage ||
-                t('notConnectedDesc')}
+            {effectivelyConnected ? (
+              <>
+                {t('connectedDesc')}
+                {!credsConnected && config && (regOk || inboundWorking) && (
+                  <span className="mt-1 block text-xs text-muted-foreground">
+                    Inbound messages are active for this number, so the
+                    connection is live. The stored credential could not be
+                    re-verified with Meta on this check — use “Verify with
+                    Meta” for the exact state.
+                  </span>
+                )}
+              </>
+            ) : (
+              statusMessage || t('notConnectedDesc')
+            )}
             {/* Identity reported by Meta on the last successful
                 verification — lets users confirm they wired the right
                 number/business without leaving the page. */}
             {(config?.business_name || config?.display_phone_number) &&
-             connectionStatus === 'connected' && (
+             effectivelyConnected && (
               <span className="mt-1 block text-xs">
                 {[config.business_name, config.display_phone_number]
                   .filter(Boolean)
                   .join(' · ')}
               </span>
             )}
+            {/* Connection method + coexistence — only rendered for an
+                Embedded-Signup-connected number, and only when Meta has
+                actually confirmed coexistence (never inferred). */}
+            {config?.connection_method === 'embedded_signup' &&
+              effectivelyConnected && (
+                <span className="mt-1.5 block rounded border border-emerald-800/40 bg-emerald-950/30 px-2 py-1 text-xs text-emerald-200">
+                  {config.coexistence_status === 'active'
+                    ? `Coexistence active — this number is live on both the WhatsApp Business App and the Cloud API (Meta-confirmed ${config.coexistence_confirmed_at ? new Date(config.coexistence_confirmed_at).toLocaleDateString() : ''}).`
+                    : 'Connected via WhatsApp Business App (Embedded Signup). Coexistence not yet confirmed by Meta.'}
+                </span>
+              )}
           </AlertDescription>
         </Alert>
 
@@ -825,6 +857,13 @@ export function WhatsAppConfig() {
               )}
           </Alert>
         )}
+
+        {/* Connect WhatsApp Business App — Meta Embedded Signup (v4)
+            coexistence onboarding. ADDITIVE: it connects an additional
+            phone number through Meta's Embedded Signup popup and stores a
+            NEW whatsapp_config row; it never modifies, resets, or deletes
+            the manual Cloud API connection above. */}
+        <EmbeddedSignupConnectCard />
 
         {/* Connection diagnostics */}
         <Card>

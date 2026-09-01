@@ -204,16 +204,33 @@ export interface PhoneNumberInfo extends MetaPhoneInfo {
   code_verification_status?: string
   /** 24-hour or 7-day messaging limit status. */
   through?: { tier?: string }
+  /** True when the number's WABA is a WhatsApp Business App managed
+   *  through Meta's business platform. Cloud API coexistence is active
+   *  when this is true AND platform_type === 'CLOUD_API'. */
+  is_on_biz_app?: boolean
+  /** e.g. CLOUD_API | ON_PREMISES — the messaging platform the number is
+   *  provisioned on. Coexistence is confirmed when this is CLOUD_API while
+   *  is_on_biz_app is true. */
+  platform_type?: string
+  /** The WABA id the number belongs to (present when is_on_biz_app). */
+  whatsapp_business_account_id?: string
 }
 
 /**
  * Fetch a phone number's full health metadata for diagnostics.
+ *
+ * The coexistence fields (is_on_biz_app / platform_type) are included so
+ * the UI can truthfully distinguish a plain Cloud API number from one that
+ * also lives on a WhatsApp Business App (coexistence confirmed by Meta).
  */
 export async function getPhoneNumber(
   args: GetPhoneNumberArgs
 ): Promise<PhoneNumberInfo> {
   const { phoneNumberId, accessToken } = args
-  const url = `${META_API_BASE}/${phoneNumberId}?fields=id,display_phone_number,verified_name,quality_rating,code_verification_status`
+  const url =
+    `${META_API_BASE}/${phoneNumberId}` +
+    `?fields=id,display_phone_number,verified_name,quality_rating,code_verification_status,` +
+    `is_on_biz_app,platform_type,whatsapp_business_account_id`
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
   })
@@ -221,6 +238,132 @@ export async function getPhoneNumber(
     await throwMetaError(response, `Phone number verification failed (HTTP ${response.status})`, 'verify_phone_number')
   }
   return response.json()
+}
+
+// ============================================================
+// Embedded Signup (WhatsApp Business App coexistence)
+// ============================================================
+
+/**
+ * Exchange an OAuth code from Meta WhatsApp Embedded Signup for a
+ * long-lived access token.
+ *
+ * This is a SERVER-ONLY operation: it POSTs the code to
+ * graph.facebook.com/oauth/access_token with the app secret. The app
+ * secret must never leave the server, so callers pass it via
+ * process.env.META_APP_SECRET. A 60-minute code is exchanged for a
+ * 60-day token (system-user-like, scoped to the Business Manager /
+ * WABAs the signup granted access to).
+ *
+ * Returns the (short-lived then long-lived) token data. Meta may also
+ * return `fbinfo` with `scopes` describing which parts the token can
+ * reach. Tokens issued this way can optionally be exchanged again for a
+ * Durable / non-expiring token via /oauth/access_token?grant_type
+ * (service-account token exchange, not implemented here — the 60-day
+ * token is stored and health-checked like any Cloud API token).
+ */
+export interface CodeExchangeArgs {
+  /** The one-time authorization `code` returned by the SDK popup. */
+  code: string
+  /** The OAuth `redirect_uri` that was used in the signup flow. The
+   *  Popup/JS SDK populates this automatically (current page URL). */
+  redirectUri: string
+  /** Meta App id (env META_APP_ID). */
+  appId: string
+  /** Meta App secret (env META_APP_SECRET). Never logged. */
+  appSecret: string
+}
+
+export interface CodeExchangeResult {
+  access_token: string
+  token_type: string
+  expires_in: number
+  expires_at?: string
+  /** OAuth user / system-user scopes Meta granted, when returned. */
+  data_access_expires_at?: string
+  error?: { message?: string; code?: number }
+}
+
+/**
+ * Exchange a signup `code` for a long-lived token, server-side.
+ *
+ * Endpoint: GET /oauth/access_token (Graph API). The app secret is sent
+ * as a require-secret parameter; Meta returns a bearer token usable as
+ * the Cloud API access token for the granted WABAs.
+ *
+ * NOTE: this does NOT render the token to the client — callers exchange
+ * the code on the server and persist the encrypted token themselves.
+ */
+export async function exchangeCodeForToken(
+  args: CodeExchangeArgs,
+): Promise<CodeExchangeResult> {
+  const { code, redirectUri, appId, appSecret } = args
+  const params = new URLSearchParams({
+    client_id: appId,
+    client_secret: appSecret,
+    code,
+    redirect_uri: redirectUri,
+  })
+  const response = await fetch(
+    `${META_API_BASE}/oauth/access_token?${params.toString()}`,
+  )
+  if (!response.ok) {
+    await throwMetaError(
+      response,
+      `Code exchange failed (HTTP ${response.status})`,
+      'embedded_signup_exchange',
+    )
+  }
+  const data = (await response.json()) as CodeExchangeResult
+  if (!data.access_token) {
+    throw new MetaApiError({
+      status: 400,
+      message: data.error?.message ?? 'Meta returned no access token for this code.',
+      code: data.error?.code ?? null,
+      operation: 'embedded_signup_exchange',
+    })
+  }
+  return data
+}
+
+/**
+ * Fetch a phone number's metadata, retrying a bounded number of times
+ * when Meta is still propagating a just-registered number. Embedded
+ * Signup writes (provisioning the number onto the WABA / Business App)
+ * are asynchronous on Meta's side — immediately after the popup closes,
+ * `is_on_biz_app` / `platform_type` may briefly read empty. Retrying
+ * lets the UI see the true coexistence state instead of a false negative.
+ */
+export interface GetPhoneNumberWithRetryArgs extends GetPhoneNumberArgs {
+  /** Max attempts. Default 5 (≈10s). */
+  attempts?: number
+  /** Delay between attempts, ms. Default 2000. */
+  delayMs?: number
+}
+
+export async function getPhoneNumberWithRetry(
+  args: GetPhoneNumberWithRetryArgs,
+): Promise<PhoneNumberInfo> {
+  const { attempts = 5, delayMs = 2000 } = args
+  let lastErr: unknown = null
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      const info = await getPhoneNumber(args)
+      // A successful fetch with is_on_biz_app present is authoritative;
+      // but even a fetch lacking it returns HTTP 200, so keep polling only
+      // while the coexistence fields are still absent AND we haven't given
+      // up. (A plain number genuinely has is_on_biz_app=false once live.)
+      if (info.is_on_biz_app !== undefined || info.platform_type !== undefined) {
+        return info
+      }
+      if (i === attempts) return info
+    } catch (err) {
+      lastErr = err
+      if (i === attempts) throw err
+    }
+    await new Promise((resolve) => setTimeout(resolve, delayMs))
+  }
+  return lastErr instanceof Error ? (() => { throw lastErr })() : {} as PhoneNumberInfo
 }
 
 export interface ProbeRegistrationArgs {

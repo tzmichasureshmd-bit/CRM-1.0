@@ -169,6 +169,20 @@ export async function GET(request: Request) {
       })
     }
 
+    // Optional instance-level fallback token (META_VERIFY_TOKEN). Accepting
+    // it lets Meta's dashboard verification succeed even before a config
+    // row exists. Purely additive — per-config verify tokens still win,
+    // and this is never logged or exposed.
+    if (
+      process.env.META_VERIFY_TOKEN &&
+      verifyToken === process.env.META_VERIFY_TOKEN
+    ) {
+      return new Response(challenge, {
+        status: 200,
+        headers: { 'Content-Type': 'text/plain' },
+      })
+    }
+
     return NextResponse.json(
       { error: 'Verification token mismatch' },
       { status: 403 }
