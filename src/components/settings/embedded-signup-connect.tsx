@@ -359,9 +359,20 @@ export function EmbeddedSignupConnectCard() {
                 </a>
                 .
               </span>
+              <span className="block mt-1 text-amber-200/90">
+                You can still click <b>Connect with Meta</b> below — the click
+                will surface the exact missing-variable error so the deployment
+                issue is visible.
+              </span>
             </AlertDescription>
           </Alert>
-        ) : (
+        ) : null}
+
+        {/* Always render the existing-number helper text + Connect with Meta
+            button, even when env is missing. The launch hook surfaces a
+            clear error in that case so deployment problems are visible
+            instead of silently hidden. */}
+        {!statusLoading && (
           <>
             <Alert className="bg-card border-border">
               <AlertDescription className="text-muted-foreground text-sm leading-relaxed space-y-2">
