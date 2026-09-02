@@ -1,0 +1,45 @@
+⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of C:\Users\HOME\Downloads\Tzmicha_CRM-main\package-lock.json as the root directory.
+ To silence this warning, set `turbopack.root` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack#root-directory for more information.
+ Detected additional lockfiles: 
+   * C:\Users\HOME\Downloads\Tzmicha_CRM-main\Tzmicha_CRM-main\package-lock.json
+
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] The method FB.getLoginStatus can no longer be called from http pages. https://developers.facebook.com/blog/post/2018/06/08/enforce-https-facebook-login/ 
+    at Object.s [as log] (https://connect.facebook.net/en_US/bundle/sdk.js/:77:299)
+    at u (https://connect.facebook.net/en_US/bundle/sdk.js/:175:234)
+    at Object.getLoginStatus (https://connect.facebook.net/en_US/bundle/sdk.js/:192:295)
+    at Object.<anonymous> (https://connect.facebook.net/en_US/bundle/sdk.js/:106:920)
+    at Object.getLoginStatus (https://connect.facebook.net/en_US/bundle/sdk.js/:96:259) (https://connect.facebook.net/en_US/bundle/sdk.js/:77:299)
+[browser] The method FB.login can no longer be called from http pages. https://developers.facebook.com/blog/post/2018/06/08/enforce-https-facebook-login/ 
+    at Object.s [as log] (https://connect.facebook.net/en_US/bundle/sdk.js/:77:299)
+    at u (https://connect.facebook.net/en_US/bundle/sdk.js/:175:234)
+    at Object.login (https://connect.facebook.net/en_US/bundle/sdk.js/:192:779)
+    at Object.<anonymous> (https://connect.facebook.net/en_US/bundle/sdk.js/:106:920)
+    at Object.login (https://connect.facebook.net/en_US/bundle/sdk.js/:96:259) (https://connect.facebook.net/en_US/bundle/sdk.js/:77:299)
+[browser] The method FB.getLoginStatus can no longer be called from http pages. https://developers.facebook.com/blog/post/2018/06/08/enforce-https-facebook-login/ 
+    at Object.s [as log] (https://connect.facebook.net/en_US/bundle/sdk.js/:77:299)
+    at u (https://connect.facebook.net/en_US/bundle/sdk.js/:175:234)
+    at Object.getLoginStatus (https://connect.facebook.net/en_US/bundle/sdk.js/:192:295)
+    at Object.<anonymous> (https://connect.facebook.net/en_US/bundle/sdk.js/:106:920)
+    at Object.getLoginStatus (https://connect.facebook.net/en_US/bundle/sdk.js/:96:259)
+    at <unknown> (https://connect.facebook.net/en_US/bundle/sdk.js/:151:6457)
+    at Object._xdRecv (https://connect.facebook.net/en_US/bundle/sdk.js/:190:15281)
+    at Object._triggerDefault (https://connect.facebook.net/en_US/bundle/sdk.js/:190:13194)
+    at e.<anonymous> (https://connect.facebook.net/en_US/bundle/sdk.js/:190:13968)
+    at o (https://connect.facebook.net/en_US/bundle/sdk.js/:129:447)
+    at e.inform (https://connect.facebook.net/en_US/bundle/sdk.js/:129:528)
+    at Object.b [as inform] (https://connect.facebook.net/en_US/bundle/sdk.js/:130:1243)
+    at d (https://connect.facebook.net/en_US/bundle/sdk.js/:146:4858)
+    at p (https://connect.facebook.net/en_US/bundle/sdk.js/:146:5091)
+    at u (https://connect.facebook.net/en_US/bundle/sdk.js/:146:1136)
+    at Object.m [as getLoginStatus] (https://connect.facebook.net/en_US/bundle/sdk.js/:146:4958)
+    at t (https://connect.facebook.net/en_US/bundle/sdk.js/:190:13496)
+    at _popupMonitor (https://connect.facebook.net/en_US/bundle/sdk.js/:190:14067) (https://connect.facebook.net/en_US/bundle/sdk.js/:77:299)

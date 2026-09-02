@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import {
   Eye,
@@ -33,6 +33,14 @@ import {
 import type { WhatsAppConfig as WhatsAppConfigType } from '@/types';
 
 const MASKED_TOKEN = '••••••••••••••••';
+
+// next-intl rich-text tags used by the WhatsApp setup steps (step3_*/step4_*).
+// Messages carry tag-only <strong>…</strong>; t.rich renders them with the
+// foreground color instead of t() + dangerouslySetInnerHTML (which throws
+// INVALID_MESSAGE: INVALID_TAG on tagged messages).
+const richStrong = {
+  strong: (chunks: ReactNode) => <strong className="text-foreground">{chunks}</strong>,
+};
 
 type ConnectionStatus = 'connected' | 'disconnected' | 'unknown';
 type ResetReason = 'token_corrupted' | 'meta_api_error' | null;
@@ -1147,9 +1155,9 @@ export function WhatsAppConfig() {
                 <AccordionContent className="text-muted-foreground">
                   <ol className="list-decimal list-inside space-y-1 text-sm">
                     <li>{t('step3_1')}</li>
-                    <li dangerouslySetInnerHTML={{ __html: t('step3_2') }} />
-                    <li dangerouslySetInnerHTML={{ __html: t('step3_3') }} />
-                    <li dangerouslySetInnerHTML={{ __html: t('step3_4') }} />
+                    <li>{t.rich('step3_2', richStrong)}</li>
+                    <li>{t.rich('step3_3', richStrong)}</li>
+                    <li>{t.rich('step3_4', richStrong)}</li>
                   </ol>
                 </AccordionContent>
               </AccordionItem>
@@ -1165,8 +1173,8 @@ export function WhatsAppConfig() {
                   <ol className="list-decimal list-inside space-y-1 text-sm">
                     <li>{t('step4_1')}</li>
                     <li>{t('step4_2')}</li>
-                    <li dangerouslySetInnerHTML={{ __html: t('step4_3') }} />
-                    <li dangerouslySetInnerHTML={{ __html: t('step4_4') }} />
+                    <li>{t.rich('step4_3', richStrong)}</li>
+                    <li>{t.rich('step4_4', richStrong)}</li>
                     <li>{t('step4_5')}</li>
                   </ol>
                 </AccordionContent>

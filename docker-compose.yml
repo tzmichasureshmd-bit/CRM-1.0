@@ -8,6 +8,12 @@ services:
       args:
         NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        # Public (baked into the client bundle at build time). Set these on
+        # the host too so the running container is consistent with the build.
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-}
+        NEXT_PUBLIC_META_APP_ID: ${META_APP_ID:-}
+        NEXT_PUBLIC_META_EMBEDDED_SIGNUP_CONFIG_ID: ${META_EMBEDDED_SIGNUP_CONFIG_ID:-}
+        NEXT_PUBLIC_META_EMBEDDED_SIGNUP_REDIRECT_URI: ${NEXT_PUBLIC_META_EMBEDDED_SIGNUP_REDIRECT_URI:-}
     container_name: tzmicha-crm
     restart: unless-stopped
     ports:
@@ -17,11 +23,31 @@ services:
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      # ---- Meta / WhatsApp (REQUIRED for Settings → WhatsApp →
+      # Connect to Meta / Embedded Signup + inbound webhook) ----
+      # META_APP_ID + META_EMBEDDED_SIGNUP_CONFIG_ID gate whether the
+      # Embedded Signup flow is usable. Without them, /api/whatsapp/
+      # embedded/status reports "not configured" and the UI hides the
+      # connection. Webhook inbound needs META_APP_SECRET (HMAC) +
+      # META_VERIFY_TOKEN (challenge verification).
+      - META_APP_ID=${META_APP_ID}
+      - META_EMBEDDED_SIGNUP_CONFIG_ID=${META_EMBEDDED_SIGNUP_CONFIG_ID}
       - META_APP_SECRET=${META_APP_SECRET}
+      - META_VERIFY_TOKEN=${META_VERIFY_TOKEN:-}
+      - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL:-}
+      # Optional public override for the exact OAuth redirect URI the
+      # Embedded Signup popup uses (must be registered verbatim in Meta).
+      - NEXT_PUBLIC_META_EMBEDDED_SIGNUP_REDIRECT_URI=${NEXT_PUBLIC_META_EMBEDDED_SIGNUP_REDIRECT_URI:-}
       - AI_PROVIDER=${AI_PROVIDER:-}
       - AI_MODEL=${AI_MODEL:-}
       - AI_API_KEY=${AI_API_KEY:-}
       - AUTOMATION_CRON_SECRET=${AUTOMATION_CRON_SECRET:-}
+      # Admin / super-admin access + locale. NEXT_PUBLIC_APP_LOCALE defaults
+      # to 'en' in code; SUPER_ADMIN_EMAILS gates /admin login.
+      - SUPER_ADMIN_EMAILS=${SUPER_ADMIN_EMAILS:-}
+      - NEXT_PUBLIC_APP_LOCALE=${NEXT_PUBLIC_APP_LOCALE:-en}
+      # Defense-in-depth hostname allow-list for invite links (optional).
+      - ALLOWED_INVITE_HOSTS=${ALLOWED_INVITE_HOSTS:-}
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.tzmicha-crm.rule=Host(`crm.tzmicha.com`)"

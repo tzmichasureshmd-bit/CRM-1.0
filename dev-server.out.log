@@ -1,0 +1,12 @@
+▲ Next.js 16.2.6 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://10.219.136.182:3000
+- Environments: .env.local
+✓ Ready in 2.3s
+
+ GET /settings?tab=whatsapp 200 in 7.1s (next.js: 1442ms, proxy.ts: 1212ms, application-code: 4.5s)
+ GET /login 200 in 1070ms (next.js: 328ms, proxy.ts: 41ms, application-code: 701ms)
+ GET /icon 200 in 1721ms (proxy.ts: 569ms)
+ GET /api/whatsapp/config 200 in 6.1s (next.js: 295ms, proxy.ts: 213ms, application-code: 5.6s)
+ GET /api/whatsapp/embedded/status 200 in 1129ms (next.js: 101ms, proxy.ts: 249ms, application-code: 778ms)
+ GET /api/whatsapp/embedded/status 200 in 1319ms (next.js: 17ms, proxy.ts: 543ms, application-code: 760ms)
