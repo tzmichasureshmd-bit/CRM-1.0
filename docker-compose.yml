@@ -14,6 +14,8 @@ services:
         NEXT_PUBLIC_META_APP_ID: ${META_APP_ID:-}
         NEXT_PUBLIC_META_EMBEDDED_SIGNUP_CONFIG_ID: ${META_EMBEDDED_SIGNUP_CONFIG_ID:-}
         NEXT_PUBLIC_META_EMBEDDED_SIGNUP_REDIRECT_URI: ${NEXT_PUBLIC_META_EMBEDDED_SIGNUP_REDIRECT_URI:-}
+        NEXT_PUBLIC_GIT_COMMIT: ${NEXT_PUBLIC_GIT_COMMIT:-unknown}
+        NEXT_PUBLIC_APP_VERSION: ${NEXT_PUBLIC_APP_VERSION:-dev}
     container_name: tzmicha-crm
     restart: unless-stopped
     ports:
@@ -38,6 +40,10 @@ services:
       # Optional public override for the exact OAuth redirect URI the
       # Embedded Signup popup uses (must be registered verbatim in Meta).
       - NEXT_PUBLIC_META_EMBEDDED_SIGNUP_REDIRECT_URI=${NEXT_PUBLIC_META_EMBEDDED_SIGNUP_REDIRECT_URI:-}
+      # Public non-secret build tag so /api/health reports which git commit
+      # is running in production (set automatically by the CI deploy step).
+      - NEXT_PUBLIC_GIT_COMMIT=${NEXT_PUBLIC_GIT_COMMIT:-unknown}
+      - NEXT_PUBLIC_APP_VERSION=${NEXT_PUBLIC_APP_VERSION:-dev}
       - AI_PROVIDER=${AI_PROVIDER:-}
       - AI_MODEL=${AI_MODEL:-}
       - AI_API_KEY=${AI_API_KEY:-}
