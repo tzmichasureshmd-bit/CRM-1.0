@@ -227,10 +227,16 @@ export async function getPhoneNumber(
   args: GetPhoneNumberArgs
 ): Promise<PhoneNumberInfo> {
   const { phoneNumberId, accessToken } = args
+  // NOTE: `whatsapp_business_account_id` is intentionally NOT requested.
+  // Meta's Graph API rejects it on the phone-number node with
+  // "(#100) Tried accessing nonexisting field" — including it makes the
+  // ENTIRE request 400, which broke Embedded Signup / coexistence connect
+  // (getPhoneNumberWithRetry always threw). The WABA id is resolved via
+  // `getWaba` / the signup session instead (see embedded-signup.ts).
   const url =
     `${META_API_BASE}/${phoneNumberId}` +
     `?fields=id,display_phone_number,verified_name,quality_rating,code_verification_status,` +
-    `is_on_biz_app,platform_type,whatsapp_business_account_id`
+    `is_on_biz_app,platform_type`
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
   })
