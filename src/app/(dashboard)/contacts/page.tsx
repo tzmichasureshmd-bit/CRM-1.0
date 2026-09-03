@@ -135,6 +135,22 @@ function RatingStars({ value }: { value?: number | null }) {
   );
 }
 
+function SourceBadge({ platform }: { platform?: string | null }) {
+  if (!platform) return null;
+  const isFb = platform === 'facebook';
+  return (
+    <span
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${
+        isFb
+          ? 'bg-blue-950/40 text-blue-300 border-blue-700/50'
+          : 'bg-pink-950/40 text-pink-300 border-pink-700/50'
+      }`}
+    >
+      {isFb ? 'Facebook' : 'Instagram'}
+    </span>
+  );
+}
+
 function LeadStatusBadge({ status }: { status?: string | null }) {
   if (!status) return <span className="text-muted-foreground">—</span>;
   const map: Record<string, string> = {
@@ -227,6 +243,32 @@ function FieldContent({
       );
     case 'lead_status':
       return <LeadStatusBadge status={row.lead_status} />;
+    case 'source':
+      return row.source ? (
+        <span className="text-muted-foreground">{row.source}</span>
+      ) : (
+        <span className="text-muted-foreground">—</span>
+      );
+    case 'source_platform':
+      return <SourceBadge platform={row.source_platform} />;
+    case 'source_page':
+      return row.source_page_name ? (
+        <span className="text-sm text-muted-foreground">{row.source_page_name}</span>
+      ) : row.source_instagram_username ? (
+        <span className="text-sm text-muted-foreground">@{row.source_instagram_username}</span>
+      ) : (
+        <span className="text-muted-foreground">—</span>
+      );
+    case 'source_instagram':
+      return row.source_instagram_username ? (
+        <span className="text-sm text-muted-foreground">@{row.source_instagram_username}</span>
+      ) : (
+        <span className="text-muted-foreground">—</span>
+      );
+    case 'campaign':
+      return row.campaign_name || <span className="text-muted-foreground">—</span>;
+    case 'form':
+      return row.form_name || <span className="text-muted-foreground">—</span>;
     case 'tags':
       return row.tags && row.tags.length > 0 ? (
         <div className="flex max-w-[12rem] flex-wrap gap-1">
@@ -263,6 +305,17 @@ export default function ContactsPage() {
   );
 }
 
+const TAB_WHITELIST = [
+  'all',
+  'high_rated',
+  'reviewed',
+  'new_leads',
+  'meta_leads',
+  'facebook_leads',
+  'instagram_leads',
+  'imported',
+] as const;
+
 function ContactsPageInner() {
   const t = useTranslations('Contacts.page');
   const router = useRouter();
@@ -281,6 +334,18 @@ function ContactsPageInner() {
   const [activeTab, setActiveTab] = useState('all');
   const [sort, setSort] = useState<OrderKey>('created_at');
   const [sortAsc, setSortAsc] = useState(false);
+
+  // Lead-count statistics (server-side RPC — never loads all contacts).
+  const [stats, setStats] = useState<{
+    total_contacts: number;
+    total_leads: number;
+    new_leads: number;
+    facebook_leads: number;
+    instagram_leads: number;
+    today_leads: number;
+    week_leads: number;
+    month_leads: number;
+  } | null>(null);
 
   // Column management (persisted to localStorage).
   const [columns, setColumns] = useState<ContactColumnKey[]>(() => {
@@ -321,6 +386,23 @@ function ContactsPageInner() {
     }
   }
 
+  // Deep-link support: /contacts?tab=<tab>[&created=today|this_month] sets
+  // the initial quick tab (used by the Dashboard + Social Media lead boxes).
+  const tabParam = searchParams.get('tab');
+  const createdParam = searchParams.get('created');
+  const [deepCreated, setDeepCreated] = useState<string | null>(null);
+  useEffect(() => {
+    const validTab = TAB_WHITELIST.includes(
+      tabParam as (typeof TAB_WHITELIST)[number],
+    );
+    if (validTab && tabParam) setActiveTab(tabParam as typeof activeTab);
+    if (createdParam === 'today' || createdParam === 'this_month') {
+      setDeepCreated(createdParam);
+    } else {
+      setDeepCreated(null);
+    }
+  }, [tabParam, createdParam]);
+
   const persistColumns = (cols: ContactColumnKey[]) => {
     setColumns(cols);
     try {
@@ -346,14 +428,39 @@ function ContactsPageInner() {
   const resetColumns = () => persistColumns(DEFAULT_VISIBLE_COLUMNS);
 
   const buildGroups = useCallback(() => {
-    if (activeTab === 'all') return filtersToGroups(filters);
-    if (activeTab === 'high_rated') return filtersToGroups([{ id: 'hr', field: 'rating', operator: 'gte', value: '4' }]);
-    if (activeTab === 'reviewed')
-      return filtersToGroups([{ id: 'rv', field: 'reviews', operator: 'gt', value: '0' }]);
-    if (activeTab === 'new_leads')
-      return filtersToGroups([{ id: 'nl', field: 'lead_status', operator: 'is', value: 'new' }]);
-    return filtersToGroups(filters);
-  }, [filters, activeTab]);
+    let base: ReturnType<typeof filtersToGroups>;
+    if (activeTab === 'all') {
+      base = filtersToGroups(filters);
+    } else if (activeTab === 'high_rated') {
+      base = filtersToGroups([{ id: 'hr', field: 'rating', operator: 'gte', value: '4' }]);
+    } else if (activeTab === 'reviewed') {
+      base = filtersToGroups([{ id: 'rv', field: 'reviews', operator: 'gt', value: '0' }]);
+    } else if (activeTab === 'new_leads') {
+      base = filtersToGroups([{ id: 'nl', field: 'lead_status', operator: 'is', value: 'new' }]);
+    } else if (activeTab === 'meta_leads') {
+      base = filtersToGroups([
+        { id: 'mlf', field: 'source_platform', operator: 'is', value: 'facebook' },
+        { id: 'mli', field: 'source_platform', operator: 'is', value: 'instagram' },
+      ]);
+    } else if (activeTab === 'facebook_leads') {
+      base = filtersToGroups([{ id: 'fbl', field: 'source_platform', operator: 'is', value: 'facebook' }]);
+    } else if (activeTab === 'instagram_leads') {
+      base = filtersToGroups([{ id: 'igl', field: 'source_platform', operator: 'is', value: 'instagram' }]);
+    } else {
+      base = filtersToGroups(filters);
+    }
+    if (!deepCreated) return base;
+    // Deep-link date scope (Today / This Month) — always conjunction.
+    const createdGroup = filtersToGroups([
+      {
+        id: 'dt',
+        field: 'created_at',
+        operator: deepCreated === 'today' ? 'today' : 'this_month',
+        value: '',
+      },
+    ]);
+    return [...base, ...createdGroup];
+  }, [deepCreated, filters, activeTab]);
 
   const fetchContacts = useCallback(async () => {
     const seq = ++fetchSeq.current;
@@ -407,6 +514,21 @@ function ContactsPageInner() {
   useEffect(() => {
     void fetchContacts();
   }, [fetchContacts]);
+
+  // Load lead-count statistics.
+  const fetchStats = useCallback(async () => {
+    try {
+      const res = await fetch('/api/contacts/stats', { cache: 'no-store' });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.stats) setStats(data.stats);
+    } catch {
+      /* stats are best-effort */
+    }
+  }, []);
+  useEffect(() => {
+    void fetchStats();
+  }, [fetchStats, fetchContacts]);
 
   function openAddForm() {
     setEditContact(null);
@@ -804,6 +926,20 @@ function ContactsPageInner() {
         </div>
       </div>
 
+      {/* Lead statistics (server-computed, never mock numbers) */}
+      {stats && (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
+          <StatCard label="Total Contacts" value={stats.total_contacts} />
+          <StatCard label="Total Leads" value={stats.total_leads} highlight />
+          <StatCard label="New Leads" value={stats.new_leads} />
+          <StatCard label="Facebook" value={stats.facebook_leads} />
+          <StatCard label="Instagram" value={stats.instagram_leads} />
+          <StatCard label="Today" value={stats.today_leads} />
+          <StatCard label="This Week" value={stats.week_leads} />
+          <StatCard label="This Month" value={stats.month_leads} />
+        </div>
+      )}
+
       {/* Quick tabs */}
       <div className="flex flex-wrap gap-1.5">
         {(
@@ -812,6 +948,9 @@ function ContactsPageInner() {
             ['high_rated', 'High Rated'],
             ['reviewed', 'Reviewed'],
             ['new_leads', 'New Leads'],
+            ['meta_leads', 'Meta Leads'],
+            ['facebook_leads', 'Facebook'],
+            ['instagram_leads', 'Instagram'],
             ['imported', 'Imported'],
           ] as const
         ).map(([key, label]) => (
@@ -1462,5 +1601,30 @@ function ActiveChip({ label, onRemove }: { label: string; onRemove: () => void }
         <X className="size-3" />
       </button>
     </span>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  highlight,
+}: {
+  label: string;
+  value: number;
+  highlight?: boolean;
+}) {
+  return (
+    <div
+      className={`flex flex-col justify-center rounded-lg border px-3 py-2 ${
+        highlight ? 'border-primary/40 bg-primary/10' : 'border-border bg-card'
+      }`}
+    >
+      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </span>
+      <span className={`text-xl font-bold tabular-nums ${highlight ? 'text-primary' : 'text-foreground'}`}>
+        {value.toLocaleString()}
+      </span>
+    </div>
   );
 }

@@ -827,6 +827,48 @@ export function ContactDetailView({
                     />
                   </div>
 
+                  {/* Lead Ads source attribution (migration 061) */}
+                  {contact.source_platform && (
+                    <div className="rounded-lg border border-border bg-muted/40 p-3 space-y-1.5">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Lead Source
+                      </p>
+                      {contact.source_platform && (
+                        <SourceDetail
+                          label="Platform"
+                          value={contact.source_platform === 'instagram' ? 'Instagram' : 'Facebook'}
+                        />
+                      )}
+                      {contact.source_page_name && (
+                        <SourceDetail label="Page" value={contact.source_page_name} />
+                      )}
+                      {contact.source_instagram_username && (
+                        <SourceDetail label="Instagram" value={`@${contact.source_instagram_username}`} />
+                      )}
+                      {contact.campaign_name && (
+                        <SourceDetail label="Campaign" value={contact.campaign_name} />
+                      )}
+                      {contact.adset_name && (
+                        <SourceDetail label="Ad Set" value={contact.adset_name} />
+                      )}
+                      {contact.ad_name && (
+                        <SourceDetail label="Ad" value={contact.ad_name} />
+                      )}
+                      {contact.form_name && (
+                        <SourceDetail label="Form" value={contact.form_name} />
+                      )}
+                      {contact.meta_lead_id && (
+                        <SourceDetail label="Meta Lead ID" value={contact.meta_lead_id} mono />
+                      )}
+                      {contact.meta_created_time && (
+                        <SourceDetail
+                          label="Lead Created"
+                          value={new Date(contact.meta_created_time).toLocaleString()}
+                        />
+                      )}
+                    </div>
+                  )}
+
                   <div className="space-y-1.5">
                     <Label className="text-muted-foreground text-xs">{t('leadStatus', { fallback: 'Lead Status' })}</Label>
                     <Select value={leadStatus} onValueChange={(v) => setLeadStatus(v as LeadStatus)}>
@@ -1286,5 +1328,28 @@ export function ContactDetailView({
       onSelect={handleSendTemplate}
     />
     </>
+  );
+}
+
+function SourceDetail({
+  label,
+  value,
+  mono,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3 text-sm">
+      <span className="shrink-0 text-muted-foreground">{label}</span>
+      <span
+        className={`break-all text-right text-foreground ${
+          mono ? "font-mono text-xs" : "font-medium"
+        }`}
+      >
+        {value}
+      </span>
+    </div>
   );
 }

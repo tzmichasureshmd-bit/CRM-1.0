@@ -16,6 +16,7 @@ import { MembersTab } from '@/components/settings/members-tab';
 import { RolesSettings } from '@/components/settings/roles-settings';
 import { ActivityLog } from '@/components/settings/activity-log';
 import { WhatsAppConfig } from '@/components/settings/whatsapp-config';
+import { MetaLeadsConnect } from '@/components/settings/meta-leads-connect';
 import { EmailSettings } from '@/components/settings/email-settings';
 import { NotificationSettings } from '@/components/settings/notification-settings';
 import { TemplateManager } from '@/components/settings/template-manager';
@@ -84,6 +85,7 @@ function SettingsPageInner() {
     roles: <RolesSettings />,
     activity: <ActivityLog />,
     whatsapp: <WhatsAppConfig />,
+    'meta-leads': <MetaLeadsConnect />,
     email: <EmailSettings />,
     notifications: <NotificationSettings />,
     templates: <TemplateManager />,

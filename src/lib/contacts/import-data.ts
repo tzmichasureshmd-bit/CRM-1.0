@@ -43,6 +43,12 @@ export const AUTO_MAP_ALIASES: Record<ContactColumnKey, string[]> = {
   created_at: ['created', 'created date', 'date', 'added date'],
   updated_at: ['updated', 'updated date', 'last updated'],
   company: ['company', 'organization', 'organisation', 'business'],
+  source: [],
+  source_platform: [],
+  source_page: [],
+  source_instagram: [],
+  campaign: [],
+  form: [],
 };
 
 function buildAliasLookup(): Map<string, ContactColumnKey> {

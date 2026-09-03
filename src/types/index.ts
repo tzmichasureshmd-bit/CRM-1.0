@@ -126,6 +126,27 @@ export interface Contact {
   review_count?: number | null;
   /** Set when the contact was created via CSV/XLSX import (migration 056). */
   imported_at?: string | null;
+  /** Lead Ads source attribution (migration 061). `source` is set to
+    *  "Meta" (with `source_platform` facebook/instagram) when the contact
+    *  was imported from a Facebook/Instagram Lead Ad; `meta_lead_id` is
+    *  the idempotency key. */
+  source?: string | null;
+  source_platform?: string | null; // 'facebook' | 'instagram'
+  meta_lead_id?: string | null;
+  source_page_id?: string | null;
+  source_page_name?: string | null;
+  source_instagram_id?: string | null;
+  source_instagram_username?: string | null;
+  campaign_id?: string | null;
+  campaign_name?: string | null;
+  adset_id?: string | null;
+  adset_name?: string | null;
+  ad_id?: string | null;
+  ad_name?: string | null;
+  form_id?: string | null;
+  form_name?: string | null;
+  meta_created_time?: string | null;
+  source_json?: unknown | null;
   /** WhatsApp messaging preference (migration 059). When true the contact
     *  has opted out of WhatsApp business messaging and must be excluded
     *  from broadcasts (and surfaced with a clear reason when messaged). */
@@ -235,7 +256,8 @@ export type NotificationType =
   | 'new_message'
   | 'mention'
   | 'whatsapp_disconnected'
-  | 'whatsapp_error';
+  | 'whatsapp_error'
+  | 'new_lead';
 
 export interface Notification {
   id: string;

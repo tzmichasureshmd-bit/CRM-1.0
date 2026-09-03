@@ -23,7 +23,13 @@ export type ContactColumnKey =
   | 'tags'
   | 'created_at'
   | 'company'
-  | 'updated_at';
+  | 'updated_at'
+  | 'source'
+  | 'source_platform'
+  | 'source_page'
+  | 'source_instagram'
+  | 'campaign'
+  | 'form';
 
 export type ContactFieldType = 'text' | 'number' | 'date';
 
@@ -63,6 +69,12 @@ export const CONTACT_FIELDS: ContactFieldDef[] = [
   { key: 'created_at', label: 'Created Date', type: 'date', dbColumn: 'created_at', searchable: false, filterable: true, defaultVisible: true, requiredImport: true },
   { key: 'company', label: 'Company', type: 'text', dbColumn: 'company', searchable: true, filterable: true, defaultVisible: false },
   { key: 'updated_at', label: 'Updated Date', type: 'date', dbColumn: 'updated_at', searchable: false, filterable: true, defaultVisible: false },
+  { key: 'source', label: 'Source', type: 'text', dbColumn: 'source', searchable: true, filterable: true, defaultVisible: false },
+  { key: 'source_platform', label: 'Source Platform', type: 'text', dbColumn: 'source_platform', searchable: true, filterable: true, defaultVisible: false },
+  { key: 'source_page', label: 'Page/Account', type: 'text', dbColumn: 'source_page_name', searchable: true, filterable: true, defaultVisible: false },
+  { key: 'source_instagram', label: 'Instagram Account', type: 'text', dbColumn: 'source_instagram_username', searchable: true, filterable: true, defaultVisible: false },
+  { key: 'campaign', label: 'Campaign', type: 'text', dbColumn: 'campaign_name', searchable: true, filterable: true, defaultVisible: false },
+  { key: 'form', label: 'Form', type: 'text', dbColumn: 'form_name', searchable: true, filterable: true, defaultVisible: false },
 ];
 
 export const CONTACT_FIELDS_BY_KEY: Record<ContactColumnKey, ContactFieldDef> =
@@ -94,6 +106,7 @@ export const DEFAULT_VISIBLE_COLUMNS: ContactColumnKey[] = [
   'location',
   'phone',
   'lead_status',
+  'source_platform',
   'tags',
   'created_at',
 ];

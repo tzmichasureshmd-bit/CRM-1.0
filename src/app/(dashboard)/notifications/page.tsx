@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import type { Notification } from "@/types";
-import { Bell, CheckCheck, Loader2, UserPlus, MessageSquare, AtSign, WifiOff, AlertTriangle } from "lucide-react";
+import { Bell, CheckCheck, Loader2, UserPlus, MessageSquare, AtSign, WifiOff, AlertTriangle, UserRoundPlus } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -17,6 +17,7 @@ const TYPE_ICON: Record<Notification["type"], typeof Bell> = {
   mention: AtSign,
   whatsapp_disconnected: WifiOff,
   whatsapp_error: AlertTriangle,
+  new_lead: UserRoundPlus,
 };
 
 export default function NotificationsPage() {

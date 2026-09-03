@@ -42,6 +42,8 @@ import { PipelineDonut } from '@/components/dashboard/pipeline-donut'
 import { ResponseTimeChart } from '@/components/dashboard/response-time-chart'
 import { ActivityFeed } from '@/components/dashboard/activity-feed'
 import { RecentConversationsCard } from '@/components/dashboard/recent-conversations-card'
+import { LeadStatCards, type LeadStats } from '@/components/social-media/lead-stat-cards'
+import { RecentLeads, type RecentLead } from '@/components/social-media/recent-leads'
 
 import { useTranslations } from 'next-intl'
 
@@ -79,6 +81,25 @@ export default function DashboardPage() {
 
   const [recentConversations, setRecentConversations] = useState<RecentConversation[] | null>(null)
   const [recentLoading, setRecentLoading] = useState(true)
+
+  const [leadStats, setLeadStats] = useState<LeadStats | null>(null)
+  const [leadStatsLoading, setLeadStatsLoading] = useState(true)
+  const [recentLeads, setRecentLeads] = useState<RecentLead[]>([])
+  const [recentLeadsLoading, setRecentLeadsLoading] = useState(true)
+
+  const loadLeads = useCallback(() => {
+    fetch('/api/social-media/overview', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d) => {
+        setLeadStats(d.stats ?? null)
+        setRecentLeads(d.recentLeads ?? [])
+      })
+      .catch((err) => console.error('[dashboard] social overview failed:', err))
+      .finally(() => {
+        setLeadStatsLoading(false)
+        setRecentLeadsLoading(false)
+      })
+  }, [])
 
   const [whatsappConnected, setWhatsappConnected] = useState<boolean | null>(null)
 
@@ -173,6 +194,10 @@ export default function DashboardPage() {
   useEffect(() => {
     loadAll()
   }, [loadAll])
+
+  useEffect(() => {
+    loadLeads()
+  }, [loadLeads])
 
   useEffect(() => {
     const checkConnection = async () => {
@@ -333,6 +358,17 @@ export default function DashboardPage() {
 
       <QuickActions />
 
+      {/* Lead Overview — Meta Lead Ads stats (clickable → filtered Contacts) */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-foreground">Lead Overview</h2>
+          <Link href="/social-media" className="text-xs font-medium text-primary hover:underline">
+            Social Media
+          </Link>
+        </div>
+        <LeadStatCards stats={leadStats} loading={leadStatsLoading} />
+      </section>
+
       <div className="rounded-xl border border-border/60 bg-card p-5">
         <h2 className="mb-4 text-sm font-semibold text-foreground">{t('overview')}</h2>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -398,6 +434,16 @@ export default function DashboardPage() {
             </div>
           </div>
         </Link>
+      </div>
+
+      <div className="rounded-xl border border-border bg-card p-6">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-foreground">Recent Leads</h2>
+          <Link href="/contacts?tab=meta_leads" className="text-xs font-medium text-primary hover:underline">
+            View all
+          </Link>
+        </div>
+        <RecentLeads leads={recentLeads} loading={recentLeadsLoading} />
       </div>
 
       <div className="rounded-xl border border-border bg-card p-6">

@@ -39,6 +39,7 @@ import {
   Zap,
   Timer,
   BarChart3,
+  Share2,
 } from "lucide-react";
 import type { AccountRole } from "@/lib/auth/roles";
 import {
@@ -274,6 +275,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
           <ul className="flex flex-col gap-0.5">
             {[
               { href: "/dashboard", labelKey: "dashboard", icon: LayoutDashboard },
+              { href: "/social-media", labelKey: "socialMedia", icon: Share2 },
             ].map((item) => {
               const isActive = pathname === item.href;
               return (

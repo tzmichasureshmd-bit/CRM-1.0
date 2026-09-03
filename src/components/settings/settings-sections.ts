@@ -15,6 +15,7 @@ import {
   UserCog,
   Mail,
   Bell,
+  Megaphone,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -36,6 +37,7 @@ export const SETTINGS_SECTIONS = [
   'roles',
   'activity',
   'whatsapp',
+  'meta-leads',
   'email',
   'notifications',
   'templates',
@@ -67,6 +69,7 @@ export const SECTION_META: Record<SettingsSection, SectionMeta> = {
   roles: { id: 'roles', label: 'Roles & permissions', icon: UserCog, group: 'workspace' },
   activity: { id: 'activity', label: 'Activity log', icon: History, group: 'workspace' },
   whatsapp: { id: 'whatsapp', label: 'WhatsApp', icon: PlugZap, group: 'workspace' },
+  'meta-leads': { id: 'meta-leads', label: 'Meta Leads', icon: Megaphone, group: 'workspace' },
   email: { id: 'email', label: 'Email', icon: Mail, group: 'workspace' },
   notifications: { id: 'notifications', label: 'Notifications', icon: Bell, group: 'workspace' },
   templates: { id: 'templates', label: 'Templates', icon: FileText, group: 'workspace' },
