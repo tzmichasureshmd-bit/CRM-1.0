@@ -5,7 +5,11 @@ FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
+# postinstall (npm ci lifecycle) runs `node scripts/patch-whatsapp-embedded-signup.mjs`,
+# so scripts/ MUST exist before installing or the build fails and the deploy
+# silently reuses the previous image (production never updates).
 COPY package.json package-lock.json ./
+COPY scripts ./scripts
 RUN npm ci --legacy-peer-deps
 
 # Rebuild the source code only when needed
