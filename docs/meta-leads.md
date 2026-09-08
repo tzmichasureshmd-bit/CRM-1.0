@@ -40,10 +40,10 @@ Set these on the host (see `.env.local.example` and `docker-compose.yml`):
 
 | Variable | Purpose |
 |---|---|
-| `META_APP_ID` | App ID (App Settings → Basic) |
+| `META_APP_ID` | App ID (App Settings → Basic). Required — the OAuth endpoint refuses to start the flow without it. |
 | `META_APP_SECRET` | App Secret; also verifies webhook HMAC signatures |
 | `NEXT_PUBLIC_SITE_URL` | Canonical origin used to build OAuth + webhook URLs |
-| `META_VERIFY_TOKEN` | Instance-level fallback verify token (optional) |
+| `META_VERIFY_TOKEN` | Verify token for the leadgen webhook GET challenge. The codebase does not generate per-connection verify tokens, so this env value is the only thing Meta's dashboard verification will accept — set it and register the exact value in Meta. |
 
 ## Meta for Developers configuration
 

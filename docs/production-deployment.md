@@ -47,7 +47,7 @@ AUTOMATION_CRON_SECRET=
 | `META_APP_ID` | **yes** | `/api/whatsapp/embedded/status` returns `configured:false` and the UI hides the connection, or template submission with image headers fails |
 | `META_APP_SECRET` | **yes** | Webhook rejects every POST (401); signature verification fails |
 | `META_EMBEDDED_SIGNUP_CONFIG_ID` | **yes** | Embedded Signup popup can't launch |
-| `META_VERIFY_TOKEN` | recommended | Meta dashboard webhook verification may fail before a config row exists |
+| `META_VERIFY_TOKEN` | **yes (Meta lead webhook)** | Meta dashboard webhook verification for `/api/meta/leads/webhook` fails (403). No per-connection verify tokens are generated, so the env fallback is the only path. |
 | `NEXT_PUBLIC_SITE_URL` | recommended | Sitemap/robots + invite links wrong; set to the real production URL (never `localhost`) |
 | `NEXT_PUBLIC_META_EMBEDDED_SIGNUP_REDIRECT_URI` | recommended | Embedded Signup OAuth redirect defaults to current page origin (register it verbatim in Meta) |
 | `SUPER_ADMIN_EMAILS` | recommended | `/admin` login gating |

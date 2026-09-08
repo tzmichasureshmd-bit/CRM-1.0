@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import crypto from "node:crypto";
-import { requireRole, toErrorResponse } from "@/lib/auth/account";
+import { requireRole } from "@/lib/auth/account";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +12,22 @@ const PERMISSIONS = [
 ].join(",");
 
 /**
+ * Destinations the OAuth flow may send the user back to. Never trust
+ * an arbitrary `return_to` from the browser — the callback stores the
+ * value in the state cookie and re-normalizes it before redirecting.
+ */
+const SAFE_RETURN_TOS = new Set<string>(["/settings", "/social-media"]);
+
+/**
+ * Normalize a (possibly user-supplied) `return_to` to a known-safe path.
+ * Unknown or missing values fall back to /settings (the historical home
+ * of the Meta Leads settings panel).
+ */
+export function normalizeReturnTo(value: string | null | undefined): string {
+  return value && SAFE_RETURN_TOS.has(value) ? value : "/settings";
+}
+
+/**
  * Build the Meta OAuth authorization URL for server-side redirect.
  *
  * The `state` is a random value stored in a short-lived cookie; the
@@ -20,51 +36,69 @@ const PERMISSIONS = [
  * local dev and production with no hardcoded host.
  */
 export async function GET(request: Request) {
-  try {
-    const ctx = await requireRole("admin");
+  const url = new URL(request.url);
+  const returnTo = normalizeReturnTo(url.searchParams.get("return_to"));
 
-    const appId = process.env.META_APP_ID;
-    if (!appId) {
-      return NextResponse.json(
-        { error: "META_APP_ID is not configured" },
-        { status: 500 },
-      );
-    }
-
-    const redirectUri = buildRedirectUri(request) + "/api/meta/leads/connect/callback";
-
-    const state = crypto.randomBytes(24).toString("hex");
-
-    const params = new URLSearchParams({
-      client_id: appId,
-      redirect_uri: redirectUri,
-      response_type: "code",
-      scope: PERMISSIONS,
-      state,
-    });
-
-    const url = `https://www.facebook.com/v21.0/dialog/oauth?${params.toString()}`;
-
-    const response = NextResponse.redirect(url);
-    // Short-lived HttpOnly state cookie for CSRF protection on callback.
-    // Carries the trusted account + user ids captured from the
-    // authenticated session (the callback itself is an external redirect
-    // with no app session).
-    response.cookies.set(
-      "meta_oauth_state",
-      JSON.stringify({ state, accountId: ctx.accountId, userId: ctx.userId }),
-      {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: request.url.startsWith("https://"),
-        path: "/",
-        maxAge: 600,
-      },
+  // Config error: never leak `META_APP_ID is not configured` as raw JSON.
+  // Log the technical detail server-side and bounce the user back to the
+  // CRM with a flag the UI renders as a professional message.
+  const appId = process.env.META_APP_ID;
+  if (!appId) {
+    console.error(
+      "[meta/connect] Meta Lead Ads connect blocked: META_APP_ID is not " +
+        "set on this process. Set META_APP_ID (and META_APP_SECRET) in the " +
+        "server environment — see docs/meta-leads.md and .env.local.",
     );
-    return response;
-  } catch (err) {
-    return toErrorResponse(err);
+    return NextResponse.redirect(`${returnTo}?meta_leads=config_error`);
   }
+
+  let ctx;
+  try {
+    ctx = await requireRole("admin");
+  } catch (err) {
+    // Auth/role failures also get the friendly treatment; the technical
+    // reason is logged server-side only.
+    console.error("[meta/connect] connect blocked by auth check:", err);
+    return NextResponse.redirect(`${returnTo}?meta_leads=error`);
+  }
+
+  const redirectUri =
+    buildRedirectUri(request) + "/api/meta/leads/connect/callback";
+
+  const state = crypto.randomBytes(24).toString("hex");
+
+  const params = new URLSearchParams({
+    client_id: appId,
+    redirect_uri: redirectUri,
+    response_type: "code",
+    scope: PERMISSIONS,
+    state,
+  });
+
+  const facebookUrl = `https://www.facebook.com/v21.0/dialog/oauth?${params.toString()}`;
+
+  const response = NextResponse.redirect(facebookUrl);
+  // Short-lived HttpOnly state cookie for CSRF protection on callback.
+  // Carries the trusted account + user ids captured from the
+  // authenticated session (the callback itself is an external redirect
+  // with no app session), plus the whitelisted destination to return to.
+  response.cookies.set(
+    "meta_oauth_state",
+    JSON.stringify({
+      state,
+      accountId: ctx.accountId,
+      userId: ctx.userId,
+      returnTo,
+    }),
+    {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: request.url.startsWith("https://"),
+      path: "/",
+      maxAge: 600,
+    },
+  );
+  return response;
 }
 
 /**

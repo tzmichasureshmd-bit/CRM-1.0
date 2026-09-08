@@ -1,8 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Loader2, ThumbsUp, Camera, Link2, RefreshCw, AlertTriangle } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { toast } from "sonner";
+import {
+  CheckCircle2,
+  Loader2,
+  ThumbsUp,
+  Camera,
+  Link2,
+  RefreshCw,
+  AlertTriangle,
+  Settings2,
+  Unlink,
+} from "lucide-react";
 import { LeadStatCards, type LeadStats } from "@/components/social-media/lead-stat-cards";
 import { RecentLeads, type RecentLead } from "@/components/social-media/recent-leads";
 
@@ -15,6 +27,7 @@ interface OverviewPayload {
     byInstagramAccount: { label: string; count: number }[];
   };
   connections: {
+    id?: string;
     pageId: string;
     pageName: string | null;
     platform: string;
@@ -48,9 +61,25 @@ function StatusPill({ connected, error }: { connected: boolean; error?: boolean 
   );
 }
 
-const GET_CONNECT_URL = "/api/meta/leads/connect";
-
 export default function SocialMediaPage() {
+  return (
+    <Suspense fallback={null}>
+      <SocialMediaContent />
+    </Suspense>
+  );
+}
+
+/** Safe, user-presentable OAuth failure messages. See callback/route.ts. */
+const REASON_MESSAGES: Record<string, string> = {
+  exchange_code: "Meta connection failed. Please try again.",
+  discover_pages: "Meta connection failed. Please try again.",
+  subscribe_page:
+    "The Pages were connected, but one or more could not be subscribed to the lead webhook. You can retry from Settings.",
+  meta_error: "Meta connection failed. Please try again.",
+};
+
+function SocialMediaContent() {
+  const searchParams = useSearchParams();
   const [data, setData] = useState<OverviewPayload | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -89,6 +118,58 @@ export default function SocialMediaPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Surface the outcome of an OAuth redirect (single loopback from the
+  // Meta callback). Never echoes raw error strings — configuration issues
+  // become a professional banner; everything else a short toast.
+  useEffect(() => {
+    const status = searchParams.get("meta_leads");
+    if (!status) return;
+
+    if (status === "connected") {
+      toast.success("Meta connection successful");
+      void load();
+    } else if (status === "denied") {
+      toast.error("You declined the connection with Meta");
+    } else if (status === "connection_error" || status === "error") {
+      toast.error(
+        REASON_MESSAGES[searchParams.get("reason") ?? "meta_error"] ??
+          "Meta connection failed. Please try again.",
+      );
+    } else if (status === "no_pages" || status === "error_no_pages") {
+      toast.error(
+        "We could not find a Facebook Page on this account. You need to be an admin of at least one Facebook Page.",
+      );
+    } else if (status === "config_error") {
+      toast.error(
+        "Meta integration configuration is incomplete. Please contact your CRM administrator.",
+      );
+    }
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete("meta_leads");
+    url.searchParams.delete("reason");
+    url.searchParams.delete("pages");
+    window.history.replaceState({}, "", url.toString());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  const disconnect = useCallback(
+    async (platform: "facebook" | "instagram", pageId: string) => {
+      const res = await fetch("/api/meta/leads/config", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pageId, platform }),
+      });
+      if (res.ok) {
+        toast.success(`${platform === "facebook" ? "Facebook" : "Instagram"} connection removed`);
+        void load();
+      } else {
+        toast.error("Could not remove the connection. Please try again.");
+      }
+    },
+    [load],
+  );
 
   const facebookConnections = (data?.connections ?? []).filter((c) => c.platform === "facebook");
   const instagramConnections = (data?.connections ?? []).filter((c) => c.platform === "instagram");
@@ -137,24 +218,37 @@ export default function SocialMediaPage() {
                 <Loader2 className="size-4 animate-spin" /> Loading…
               </div>
             ) : facebookConnected ? (
-              <div>
-                <p className="text-sm font-medium text-foreground">
-                  {facebookConnections.length}{" "}
-                  {facebookConnections.length === 1 ? "Page" : "Pages"} Connected
+              <div className="space-y-2">
+                <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <CheckCircle2 className="size-4 text-emerald-500" />
+                  Facebook Connected
                 </p>
-                <ul className="mt-2 space-y-1">
+                <div className="rounded-lg bg-muted/40 px-3 py-2">
                   {facebookConnections.map((c) => (
-                    <li
-                      key={`${c.pageId}-${c.platform}`}
-                      className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-sm"
-                    >
-                      <span className="truncate text-foreground">{c.pageName ?? c.pageId}</span>
-                      <span className="shrink-0 text-xs text-muted-foreground">
+                    <p key={`${c.pageId}-${c.platform}`} className="text-sm text-foreground">
+                      <span className="text-xs text-muted-foreground">Page:</span>{" "}
+                      {c.pageName ?? c.pageId}
+                      <span className="ml-2 text-xs text-muted-foreground">
                         {c.webhookStatus === "active" ? "Webhook active" : "Webhook pending"}
                       </span>
-                    </li>
+                    </p>
                   ))}
-                </ul>
+                </div>
+                <div className="flex items-center gap-2 pt-1">
+                  <Link
+                    href="/settings?tab=meta-leads"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted"
+                  >
+                    <Settings2 className="size-3.5" /> Manage
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => disconnect("facebook", facebookConnections[0].pageId)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-red-400"
+                  >
+                    <Unlink className="size-3.5" /> Disconnect
+                  </button>
+                </div>
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">
@@ -165,7 +259,7 @@ export default function SocialMediaPage() {
 
           {!facebookConnected && (
             <Link
-              href={GET_CONNECT_URL}
+              href="/social-media/connect?platform=facebook"
               className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
             >
               <Link2 className="size-4" />
@@ -174,7 +268,7 @@ export default function SocialMediaPage() {
           )}
           {facebookConnected && (
             <Link
-              href={GET_CONNECT_URL}
+              href="/social-media/connect?platform=facebook"
               className="mt-4 inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted"
             >
               <RefreshCw className="size-4" />
@@ -204,9 +298,33 @@ export default function SocialMediaPage() {
                 <Loader2 className="size-4 animate-spin" /> Loading…
               </div>
             ) : instagramConnected && instagramAccount ? (
-              <p className="text-sm text-foreground">
-                <span className="font-medium">{instagramAccount}</span>
-              </p>
+              <div className="space-y-2">
+                <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <CheckCircle2 className="size-4 text-emerald-500" />
+                  Instagram Connected
+                </p>
+                <div className="rounded-lg bg-muted/40 px-3 py-2">
+                  <p className="text-sm text-foreground">
+                    <span className="text-xs text-muted-foreground">Account:</span>{" "}
+                    {instagramAccount}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 pt-1">
+                  <Link
+                    href="/settings?tab=meta-leads"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted"
+                  >
+                    <Settings2 className="size-3.5" /> Manage
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => disconnect("instagram", instagramConnections[0].pageId)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-red-400"
+                  >
+                    <Unlink className="size-3.5" /> Disconnect
+                  </button>
+                </div>
+              </div>
             ) : (
               <p className="text-sm text-muted-foreground">
                 Instagram lead ads are delivered through a Facebook Page. When the connected Page has a
@@ -222,7 +340,7 @@ export default function SocialMediaPage() {
             </div>
           ) : (
             <Link
-              href={GET_CONNECT_URL}
+              href="/social-media/connect?platform=instagram"
               className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted"
             >
               <Camera className="size-4" />

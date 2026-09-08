@@ -8,9 +8,50 @@ import {
   subscribePageToLeadgen,
   MetaLeadsApiError,
 } from "@/lib/meta/leads-api";
-import { buildRedirectUri } from "../../connect/route";
+import { buildRedirectUri, normalizeReturnTo } from "../../connect/route";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Operation names whose failures map onto a user-presentable message in the
+ * UI. Anything else collapses to the generic `meta_error` code.
+ */
+const SAFE_REASON_KEYS = new Set([
+  "no_pages",
+  "denied",
+  "exchange_code",
+  "discover_pages",
+  "subscribe_page",
+]);
+
+/**
+ * Map a technical error to a safe reason code the UI can translate into a
+ * friendly message. `metaMessage` / `code` are logged server-side and never
+ * shown to the user.
+ */
+function reasonForError(err: unknown): string {
+  if (!(err instanceof MetaLeadsApiError)) return "meta_error";
+  console.error(
+    `[meta/callback] ${err.operation} failed: code=${err.code ?? "n/a"} ` +
+      `type=${err.type ?? "n/a"} message=${err.metaMessage ?? err.message}`,
+  );
+  return err.operation && SAFE_REASON_KEYS.has(err.operation)
+    ? err.operation
+    : "meta_error";
+}
+
+function safeRedirect(
+  base: string,
+  returnTo: string,
+  status: "connected" | "denied" | "error" | "error_no_pages",
+  params: Record<string, string> = {},
+): NextResponse {
+  const query = new URLSearchParams({ meta_leads: status });
+  for (const [key, value] of Object.entries(params)) {
+    if (value) query.set(key, value);
+  }
+  return NextResponse.redirect(`${base}${returnTo}?${query.toString()}`);
+}
 
 /**
  * Facebook OAuth callback.
@@ -21,7 +62,7 @@ export const dynamic = "force-dynamic";
  * 3. Discovers the user's Pages and linked Instagram accounts.
  * 4. Subscribes each Page to the leadgen webhook.
  * 5. Persists connections (with encrypted page access tokens).
- * 6. Redirects back to Settings with a status flag.
+ * 6. Redirects back to the originating page with a status flag.
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -29,15 +70,15 @@ export async function GET(request: Request) {
   const stateParam = url.searchParams.get("state");
   const errorParam = url.searchParams.get("error");
 
+  const base = buildRedirectUri(request);
+
   if (errorParam) {
-    return NextResponse.redirect(
-      buildRedirectUri(request) + "/settings?meta_leads=denied",
-    );
+    // `access_denied` (or the user back-buttoning / the app not being in
+    // review) is the common case — treat any Meta `error` as "denied".
+    return safeRedirect(base, "/settings", "denied");
   }
   if (!code || !stateParam) {
-    return NextResponse.redirect(
-      buildRedirectUri(request) + "/settings?meta_leads=error",
-    );
+    return safeRedirect(base, "/settings", "error");
   }
 
   // CSRF: validate state against the cookie, and recover the trusted
@@ -54,6 +95,7 @@ export async function GET(request: Request) {
     state?: string;
     accountId?: string;
     userId?: string;
+    returnTo?: string;
   } | null;
   if (
     !session ||
@@ -62,14 +104,14 @@ export async function GET(request: Request) {
     !session.accountId ||
     !session.userId
   ) {
-    return NextResponse.redirect(
-      buildRedirectUri(request) + "/settings?meta_leads=error",
-    );
+    return safeRedirect(base, "/settings", "error");
   }
   const { accountId, userId } = session;
+  const returnTo = normalizeReturnTo(session.returnTo);
 
   try {
-    const redirectUri = buildRedirectUri(request) + "/api/meta/leads/connect/callback";
+    const redirectUri =
+      base + "/api/meta/leads/connect/callback";
 
     // 1. Code -> long-lived user token.
     const { accessToken } = await exchangeCodeForLongLivedToken(code, redirectUri);
@@ -77,10 +119,11 @@ export async function GET(request: Request) {
     // 2. Discover Pages (and their linked Instagram accounts).
     const pages = await discoverPages(accessToken);
     if (pages.length === 0) {
-      return NextResponse.redirect(
-        buildRedirectUri(request) +
-          "/settings?meta_leads=error&reason=no_pages",
+      console.warn(
+        `[meta/callback] account ${accountId}: OAuth succeeded but no Pages ` +
+          "were found (user may not be an admin of any Page).",
       );
+      return safeRedirect(base, returnTo, "error_no_pages");
     }
 
     const admin = supabaseAdmin();
@@ -145,17 +188,12 @@ export async function GET(request: Request) {
       }
     }
 
-    return NextResponse.redirect(
-      buildRedirectUri(request) +
-        `/settings?meta_leads=connected&pages=${records.length}`,
-    );
+    return safeRedirect(base, returnTo, "connected", {
+      pages: String(records.length),
+    });
   } catch (err) {
-    const reason =
-      err instanceof MetaLeadsApiError
-        ? encodeURIComponent(err.metaMessage ?? "meta_error")
-        : "unknown";
-    return NextResponse.redirect(
-      buildRedirectUri(request) + `/settings?meta_leads=error&reason=${reason}`,
-    );
+    return safeRedirect(base, returnTo, "error", {
+      reason: reasonForError(err),
+    });
   }
 }

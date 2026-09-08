@@ -19,6 +19,21 @@ interface PageConnection {
   connected_at: string | null;
 }
 
+/** Safe, user-presentable messages for the OAuth failure codes emitted by
+ * the callback. Technical details are logged server-side and never shown. */
+const REASON_MESSAGES: Record<string, string> = {
+  denied: "You declined the connection with Meta.",
+  no_pages:
+    "We could not find a Facebook Page on this account. You need to be an admin of at least one Facebook Page.",
+  zero_pages:
+    "We could not find a Facebook Page on this account. You need to be an admin of at least one Facebook Page.",
+  meta_error: "Meta connection failed. Please try again.",
+  exchange_code: "Meta connection failed. Please try again.",
+  discover_pages: "Meta connection failed. Please try again.",
+  subscribe_page:
+    "The Pages were connected, but one or more could not be subscribed to the lead webhook.",
+};
+
 export function MetaLeadsConnect() {
   const searchParams = useSearchParams();
   const [connections, setConnections] = useState<PageConnection[]>([]);
@@ -45,23 +60,29 @@ export function MetaLeadsConnect() {
   // Surface the result of the OAuth redirect (loopback).
   useEffect(() => {
     const status = searchParams.get("meta_leads");
+    const reason = searchParams.get("reason");
     if (!status) return;
     if (status === "connected") {
       toast.success("Facebook account connected");
       void fetchConnections();
     } else if (status === "denied") {
-      toast.error("You declined the connection");
-    } else if (status === "error") {
+      toast.error("You declined the connection with Meta");
+    } else if (status === "config_error") {
       toast.error(
-        searchParams.get("reason")
-          ? `Connection failed: ${searchParams.get("reason")}`
-          : "Meta connection failed",
+        "Meta integration configuration is incomplete. Please contact your CRM administrator.",
       );
+    } else if (status === "error_no_pages") {
+      toast.error(
+        "We could not find a Facebook Page on this account. You need to be an admin of at least one Facebook Page.",
+      );
+    } else if (status === "error") {
+      toast.error(REASON_MESSAGES[reason ?? "meta_error"] ?? "Meta connection failed. Please try again.");
     }
     // clean the query string
     const url = new URL(window.location.href);
     url.searchParams.delete("meta_leads");
     url.searchParams.delete("reason");
+    url.searchParams.delete("pages");
     window.history.replaceState({}, "", url.toString());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
