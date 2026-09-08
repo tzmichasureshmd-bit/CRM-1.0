@@ -28,6 +28,21 @@ export function normalizeReturnTo(value: string | null | undefined): string {
 }
 
 /**
+ * Build a redirect back into the CRM with a `meta_leads` status flag.
+ * Uses an ABSOLUTE URL: `NextResponse.redirect()` rejects relative
+ * locations (`URL is malformed ...`, see next/dist/server/web/utils.js
+ * validateURL), which previously turned this error path into a raw HTTP
+ * 500 in production instead of the intended return to the CRM.
+ */
+function redirectBack(
+  request: Request,
+  returnTo: string,
+  flag: string,
+): NextResponse {
+  return NextResponse.redirect(`${buildRedirectUri(request)}${returnTo}?meta_leads=${flag}`);
+}
+
+/**
  * Build the Meta OAuth authorization URL for server-side redirect.
  *
  * The `state` is a random value stored in a short-lived cookie; the
@@ -49,7 +64,7 @@ export async function GET(request: Request) {
         "set on this process. Set META_APP_ID (and META_APP_SECRET) in the " +
         "server environment — see docs/meta-leads.md and .env.local.",
     );
-    return NextResponse.redirect(`${returnTo}?meta_leads=config_error`);
+    return redirectBack(request, returnTo, "config_error");
   }
 
   let ctx;
@@ -59,7 +74,7 @@ export async function GET(request: Request) {
     // Auth/role failures also get the friendly treatment; the technical
     // reason is logged server-side only.
     console.error("[meta/connect] connect blocked by auth check:", err);
-    return NextResponse.redirect(`${returnTo}?meta_leads=error`);
+    return redirectBack(request, returnTo, "error");
   }
 
   const redirectUri =

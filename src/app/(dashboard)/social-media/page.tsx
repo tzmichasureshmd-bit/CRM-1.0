@@ -82,6 +82,9 @@ function SocialMediaContent() {
   const searchParams = useSearchParams();
   const [data, setData] = useState<OverviewPayload | null>(null);
   const [loading, setLoading] = useState(true);
+  // Default to true so a failed /failure of the config endpoint never shows
+  // a false alarm; it flips to false only on an explicit server response.
+  const [metaConfigured, setMetaConfigured] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -92,6 +95,7 @@ function SocialMediaContent() {
       ]);
       const overview = overviewRes.ok ? await overviewRes.json() : null;
       const config = configRes.ok ? await configRes.json() : null;
+      setMetaConfigured(config?.metaConfigured !== false);
       const connections = overview?.connections ?? config?.connections ?? [];
       setData({
         stats:
@@ -188,6 +192,23 @@ function SocialMediaContent() {
           your CRM.
         </p>
       </div>
+
+      {/* Meta config warning (server-side env state, no secrets exposed) */}
+      {!metaConfigured && (
+        <div
+          role="alert"
+          className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-300"
+        >
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+          <div>
+            <p className="font-semibold">Meta integration configuration is incomplete.</p>
+            <p className="text-amber-300/80">
+              Facebook/Instagram connection is not enabled on this deployment yet. Please contact your
+              CRM administrator.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Lead Overview */}
       <section className="space-y-3">

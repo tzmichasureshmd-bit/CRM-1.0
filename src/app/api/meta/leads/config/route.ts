@@ -27,7 +27,11 @@ export async function GET() {
       );
     }
 
-    return NextResponse.json({ connections: data ?? [] });
+    // True only when the server process actually has META_APP_ID available.
+    // Never expose the value itself — existence only.
+    const metaConfigured = Boolean(process.env.META_APP_ID);
+
+    return NextResponse.json({ connections: data ?? [], metaConfigured });
   } catch (err) {
     return toErrorResponse(err);
   }
