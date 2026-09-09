@@ -16,6 +16,7 @@ import {
   Mail,
   Bell,
   Megaphone,
+  FileSpreadsheet,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -38,6 +39,7 @@ export const SETTINGS_SECTIONS = [
   'activity',
   'whatsapp',
   'meta-leads',
+  'google-forms',
   'email',
   'notifications',
   'templates',
@@ -70,6 +72,7 @@ export const SECTION_META: Record<SettingsSection, SectionMeta> = {
   activity: { id: 'activity', label: 'Activity log', icon: History, group: 'workspace' },
   whatsapp: { id: 'whatsapp', label: 'WhatsApp', icon: PlugZap, group: 'workspace' },
   'meta-leads': { id: 'meta-leads', label: 'Meta Leads', icon: Megaphone, group: 'workspace' },
+  'google-forms': { id: 'google-forms', label: 'Google Forms', icon: FileSpreadsheet, group: 'workspace' },
   email: { id: 'email', label: 'Email', icon: Mail, group: 'workspace' },
   notifications: { id: 'notifications', label: 'Notifications', icon: Bell, group: 'workspace' },
   templates: { id: 'templates', label: 'Templates', icon: FileText, group: 'workspace' },

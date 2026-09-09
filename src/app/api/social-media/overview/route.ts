@@ -17,27 +17,35 @@ export async function GET() {
     const ctx = await requireRole("viewer");
     const accountId = ctx.accountId;
 
-    const [statsRes, breakdownRes, recentRes, connRes] = await Promise.all([
-      ctx.supabase.rpc("count_meta_leads", { p_account_id: accountId }),
-      ctx.supabase.rpc("get_social_media_overview", { p_account_id: accountId }),
-      ctx.supabase
-        .from("contacts")
-        .select(
-          "id, name, phone, source_platform, source_page_name, " +
-            "source_instagram_username, campaign_name, lead_status, created_at",
-        )
-        .eq("account_id", accountId)
-        .not("source_platform", "is", null)
-        .order("created_at", { ascending: false })
-        .limit(10),
-      ctx.supabase
-        .from("meta_page_connections")
-        .select(
-          "page_id, page_name, platform, status, webhook_status, " +
-            "instagram_account_id, instagram_username",
-        )
-        .eq("status", "active"),
-    ]);
+    const [statsRes, breakdownRes, recentRes, connRes, sourceRes] =
+      await Promise.all([
+        ctx.supabase.rpc("count_meta_leads", { p_account_id: accountId }),
+        ctx.supabase.rpc("get_social_media_overview", { p_account_id: accountId }),
+        ctx.supabase
+          .from("contacts")
+          .select(
+            "id, name, phone, source_platform, source_page_name, " +
+              "source_instagram_username, campaign_name, lead_status, created_at",
+          )
+          .eq("account_id", accountId)
+          .not("source_platform", "is", null)
+          .order("created_at", { ascending: false })
+          .limit(10),
+        ctx.supabase
+          .from("meta_page_connections")
+          .select(
+            "page_id, page_name, platform, status, webhook_status, " +
+              "instagram_account_id, instagram_username",
+          )
+          .eq("status", "active"),
+        // Per-source lead counts (WhatsApp/Website/Manual), grouped over the
+        // real `contacts.source` values so the Social Media source cards always
+        // reflect actual data and never hard-coded numbers. RLS scopes to tenant.
+        ctx.supabase
+          .from("contacts")
+          .select("source, source_platform")
+          .eq("account_id", accountId),
+      ]);
 
     if (statsRes.error) {
       return NextResponse.json(
@@ -109,6 +117,34 @@ export async function GET() {
       byInstagramAccount: instagramByAccount,
     };
 
+    // Normalize every contact row to a stable source key so the non-Meta
+    // source cards (WhatsApp/Website/Manual) reflect the actual data.
+    type SourceRow = { source: string | null; source_platform: string | null };
+    const sourceCounts: Record<string, number> = {};
+    for (const r of (sourceRes.data as SourceRow[] | null) ?? []) {
+      let key: string | null = null;
+      if (r.source_platform === "facebook") key = "facebook";
+      else if (r.source_platform === "instagram") key = "instagram";
+      else {
+        const s = (r.source || "").toLowerCase();
+        if (s.includes("google")) key = "google_form";
+        else if (s.includes("whatsapp")) key = "whatsapp";
+        else if (s.includes("instagram")) key = "instagram";
+        else if (s.includes("facebook")) key = "facebook";
+        else if (s.includes("website") || s.includes("web")) key = "website";
+        else if (s.includes("manual")) key = "manual";
+      }
+      if (key) sourceCounts[key] = (sourceCounts[key] ?? 0) + 1;
+    }
+    const sourceSummary = {
+      facebook: sourceCounts.facebook ?? 0,
+      instagram: sourceCounts.instagram ?? 0,
+      whatsapp: sourceCounts.whatsapp ?? 0,
+      google_form: sourceCounts.google_form ?? 0,
+      website: sourceCounts.website ?? 0,
+      manual: sourceCounts.manual ?? 0,
+    };
+
     const connections = (
       (connRes.data ?? []) as unknown as Array<{
         page_id: string;
@@ -156,6 +192,7 @@ export async function GET() {
     return NextResponse.json({
       stats,
       breakdown,
+      sourceSummary,
       connections,
       recentLeads,
     });

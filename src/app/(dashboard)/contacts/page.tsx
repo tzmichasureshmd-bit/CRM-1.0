@@ -135,18 +135,61 @@ function RatingStars({ value }: { value?: number | null }) {
   );
 }
 
-function SourceBadge({ platform }: { platform?: string | null }) {
-  if (!platform) return null;
-  const isFb = platform === 'facebook';
+const SOURCE_BADGE_STYLES: Record<string, string> = {
+  facebook: 'bg-blue-950/40 text-blue-300 border-blue-700/50',
+  instagram: 'bg-pink-950/40 text-pink-300 border-pink-700/50',
+  whatsapp: 'bg-emerald-950/40 text-emerald-300 border-emerald-700/50',
+  website: 'bg-violet-950/40 text-violet-300 border-violet-700/50',
+  manual: 'bg-slate-950/40 text-slate-300 border-slate-700/50',
+  google_form: 'bg-amber-950/40 text-amber-300 border-amber-700/50',
+  meta: 'bg-primary/10 text-primary border-primary/30',
+};
+
+function resolveSourceKey(
+  source?: string | null,
+  sourcePlatform?: string | null,
+): string | null {
+  if (sourcePlatform === 'facebook') return 'facebook';
+  if (sourcePlatform === 'instagram') return 'instagram';
+  const s = (source ?? '').toLowerCase();
+  if (s.includes('google')) return 'google_form';
+  if (s.includes('facebook')) return 'facebook';
+  if (s.includes('instagram')) return 'instagram';
+  if (s.includes('whatsapp')) return 'whatsapp';
+  if (s.includes('website') || s.includes('web')) return 'website';
+  if (s.includes('manual')) return 'manual';
+  if (s === 'meta' || s.includes('lead ads')) return 'meta';
+  return null;
+}
+
+function SourceBadge({
+  platform,
+  source,
+}: {
+  platform?: string | null;
+  source?: string | null;
+}) {
+  const key = resolveSourceKey(source, platform);
+  if (!key) return null;
+  const label =
+    key === 'facebook'
+      ? 'Facebook'
+      : key === 'instagram'
+        ? 'Instagram'
+        : key === 'whatsapp'
+          ? 'WhatsApp'
+          : key === 'google_form'
+            ? 'Google Form'
+            : key === 'website'
+              ? 'Website'
+              : key === 'manual'
+                ? 'Manual'
+                : 'Meta';
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${
-        isFb
-          ? 'bg-blue-950/40 text-blue-300 border-blue-700/50'
-          : 'bg-pink-950/40 text-pink-300 border-pink-700/50'
-      }`}
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium capitalize ${SOURCE_BADGE_STYLES[key] ?? SOURCE_BADGE_STYLES.meta}`}
     >
-      {isFb ? 'Facebook' : 'Instagram'}
+      {label}
     </span>
   );
 }
@@ -245,12 +288,16 @@ function FieldContent({
       return <LeadStatusBadge status={row.lead_status} />;
     case 'source':
       return row.source ? (
-        <span className="text-muted-foreground">{row.source}</span>
+        row.source_platform ? (
+          <SourceBadge platform={row.source_platform} source={row.source} />
+        ) : (
+          <SourceBadge source={row.source} />
+        )
       ) : (
         <span className="text-muted-foreground">—</span>
       );
     case 'source_platform':
-      return <SourceBadge platform={row.source_platform} />;
+      return <SourceBadge platform={row.source_platform} source={row.source} />;
     case 'source_page':
       return row.source_page_name ? (
         <span className="text-sm text-muted-foreground">{row.source_page_name}</span>
@@ -386,6 +433,25 @@ function ContactsPageInner() {
     }
   }
 
+  // Popup source/lead filters driven by URL query params. These are read
+  // once into state so the page reacts to Social Media deep-links such as
+  // /contacts?source=facebook&status=new&created=this_month. All filtering
+  // is applied server-side by the existing filter_contacts RPC — no frontend
+  // mock filtering.
+  const SOURCE_FILTER_VALUES = [
+    'meta',
+    'facebook',
+    'instagram',
+    'whatsapp',
+    'google_form',
+    'website',
+    'manual',
+  ] as const;
+  const sourceParam = searchParams.get('source');
+  const statusParam = searchParams.get('status');
+  const [deepSource, setDeepSource] = useState<string | null>(null);
+  const [deepStatus, setDeepStatus] = useState<string | null>(null);
+
   // Deep-link support: /contacts?tab=<tab>[&created=today|this_month] sets
   // the initial quick tab (used by the Dashboard + Social Media lead boxes).
   const tabParam = searchParams.get('tab');
@@ -401,7 +467,19 @@ function ContactsPageInner() {
     } else {
       setDeepCreated(null);
     }
-  }, [tabParam, createdParam]);
+    setDeepSource(
+      (SOURCE_FILTER_VALUES as readonly string[]).includes(sourceParam ?? '')
+        ? sourceParam
+        : null,
+    );
+    const validStatus =
+      typeof statusParam === 'string' &&
+      ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost'].includes(
+        statusParam,
+      );
+    setDeepStatus(validStatus ? statusParam : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabParam, createdParam, sourceParam, statusParam]);
 
   const persistColumns = (cols: ContactColumnKey[]) => {
     setColumns(cols);
@@ -449,6 +527,44 @@ function ContactsPageInner() {
     } else {
       base = filtersToGroups(filters);
     }
+
+    // Deep-link source scope — always a conjunction with any active filter.
+    if (deepSource) {
+      if (deepSource === 'meta') {
+        base = [
+          ...base,
+          ...filtersToGroups([
+            { id: 'dsf', field: 'source_platform', operator: 'is', value: 'facebook' },
+            { id: 'dsi', field: 'source_platform', operator: 'is', value: 'instagram', connector: 'or' },
+          ]),
+        ];
+      } else if (deepSource === 'facebook' || deepSource === 'instagram') {
+        base = [
+          ...base,
+          ...filtersToGroups([
+            { id: `dsrc-${deepSource}`, field: 'source_platform', operator: 'is', value: deepSource },
+          ]),
+        ];
+      } else {
+        base = [
+          ...base,
+          ...filtersToGroups([
+            { id: `dsrc-${deepSource}`, field: 'source', operator: 'is', value: deepSource },
+          ]),
+        ];
+      }
+    }
+
+    // Deep-link lead-status scope.
+    if (deepStatus) {
+      base = [
+        ...base,
+        ...filtersToGroups([
+          { id: `dst-${deepStatus}`, field: 'lead_status', operator: 'is', value: deepStatus },
+        ]),
+      ];
+    }
+
     if (!deepCreated) return base;
     // Deep-link date scope (Today / This Month) — always conjunction.
     const createdGroup = filtersToGroups([
@@ -460,7 +576,7 @@ function ContactsPageInner() {
       },
     ]);
     return [...base, ...createdGroup];
-  }, [deepCreated, filters, activeTab]);
+  }, [deepCreated, filters, activeTab, deepSource, deepStatus]);
 
   const fetchContacts = useCallback(async () => {
     const seq = ++fetchSeq.current;
@@ -628,7 +744,9 @@ function ContactsPageInner() {
     search.trim().length > 0 ||
     selectedTagIds.length > 0 ||
     filters.length > 0 ||
-    activeTab !== 'all';
+    activeTab !== 'all' ||
+    deepSource !== null ||
+    deepStatus !== null;
 
   // Select every contact that matches the current search/filter across
   // all pages (not just the visible page). Pages through the existing
@@ -691,7 +809,11 @@ function ContactsPageInner() {
     setFilters([]);
     setSelectedTagIds([]);
     setActiveTab('all');
+    setDeepSource(null);
+    setDeepStatus(null);
+    setDeepCreated(null);
     setPage(0);
+    router.replace('/contacts', { scroll: false });
   }
 
   // Filter editor helpers
@@ -969,6 +1091,48 @@ function ContactsPageInner() {
             {label}
           </button>
         ))}
+      </div>
+
+      {/* Source filter — dedicated lead-source quick filter (uses the real
+          filter_contacts RPC, same source of truth as Social Media). */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Source:
+        </span>
+        {(
+          [
+            [null, 'All'],
+            ['facebook', 'Facebook'],
+            ['instagram', 'Instagram'],
+            ['whatsapp', 'WhatsApp'],
+            ['google_form', 'Google Form'],
+            ['website', 'Website'],
+            ['manual', 'Manual'],
+          ] as const
+        ).map(([value, label]) => {
+          const active = deepSource === value;
+          return (
+            <button
+              key={label}
+              onClick={() => {
+                if (active) {
+                  setDeepSource(null);
+                } else {
+                  setDeepSource(value as string | null);
+                  setActiveTab('all');
+                }
+                setPage(0);
+              }}
+              className={`rounded-full px-3 py-1 text-xs font-medium capitalize transition-colors ${
+                active
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Search + filter + columns */}
@@ -1270,7 +1434,7 @@ function ContactsPageInner() {
         </div>
 
         {/* Active filter summary */}
-        {(filters.length > 0 || selectedTagIds.length > 0 || activeTab !== 'all' || search.trim()) && (
+        {(filters.length > 0 || selectedTagIds.length > 0 || activeTab !== 'all' || search.trim() || deepSource !== null || deepStatus !== null) && (
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-[11px] font-semibold uppercase text-muted-foreground">Active:</span>
             {search.trim() && (
@@ -1278,6 +1442,22 @@ function ContactsPageInner() {
             )}
             {activeTab !== 'all' && (
               <ActiveChip label={`Tab: ${activeTab.replace('_', ' ')}`} onRemove={() => setActiveTab('all')} />
+            )}
+            {deepSource && (
+              <ActiveChip
+                label={`Source: ${
+                  deepSource === 'google_form'
+                    ? 'Google Form'
+                    : deepSource.charAt(0).toUpperCase() + deepSource.slice(1)
+                }`}
+                onRemove={() => setDeepSource(null)}
+              />
+            )}
+            {deepStatus && (
+              <ActiveChip
+                label={`Status: ${deepStatus.charAt(0).toUpperCase() + deepStatus.slice(1)}`}
+                onRemove={() => setDeepStatus(null)}
+              />
             )}
             {filters.map((f) => {
               const fl = filterSummary.find((s) => s.id === f.id);

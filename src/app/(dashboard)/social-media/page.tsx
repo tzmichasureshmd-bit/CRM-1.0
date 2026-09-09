@@ -26,6 +26,14 @@ interface OverviewPayload {
     byFacebookPage: { label: string; count: number }[];
     byInstagramAccount: { label: string; count: number }[];
   };
+  sourceSummary: {
+    facebook: number;
+    instagram: number;
+    whatsapp: number;
+    google_form: number;
+    website: number;
+    manual: number;
+  };
   connections: {
     id?: string;
     pageId: string;
@@ -111,6 +119,9 @@ function SocialMediaContent() {
         breakdown:
           overview?.breakdown ??
           { facebookTotal: 0, instagramTotal: 0, byFacebookPage: [], byInstagramAccount: [] },
+        sourceSummary:
+          overview?.sourceSummary ??
+          { facebook: 0, instagram: 0, whatsapp: 0, google_form: 0, website: 0, manual: 0 },
         connections,
         recentLeads: overview?.recentLeads ?? [],
       });
@@ -373,7 +384,12 @@ function SocialMediaContent() {
 
       {/* Lead Sources */}
       <section className="rounded-xl border border-border bg-card p-5">
-        <h2 className="mb-4 text-sm font-semibold text-foreground">Lead Sources</h2>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-foreground">Lead Sources</h2>
+          <Link href="/contacts?source=meta" className="text-xs font-medium text-primary hover:underline">
+            View all contacts
+          </Link>
+        </div>
         {loading ? (
           <div className="flex justify-center py-6">
             <Loader2 className="size-5 animate-spin text-muted-foreground" />
@@ -383,14 +399,44 @@ function SocialMediaContent() {
             <SourceList
               title="Facebook"
               total={data?.breakdown.facebookTotal ?? 0}
+              href="/contacts?source=facebook"
               colorClass="text-blue-500"
               items={data?.breakdown.byFacebookPage ?? []}
             />
             <SourceList
               title="Instagram"
               total={data?.breakdown.instagramTotal ?? 0}
+              href="/contacts?source=instagram"
               colorClass="text-pink-500"
               items={data?.breakdown.byInstagramAccount ?? []}
+            />
+            <SourceList
+              title="WhatsApp"
+              total={data?.sourceSummary.whatsapp ?? 0}
+              href="/contacts?source=whatsapp"
+              colorClass="text-emerald-500"
+              items={[]}
+            />
+            <SourceList
+              title="Google Form"
+              total={data?.sourceSummary.google_form ?? 0}
+              href="/contacts?source=google_form"
+              colorClass="text-amber-500"
+              items={[]}
+            />
+            <SourceList
+              title="Website"
+              total={data?.sourceSummary.website ?? 0}
+              href="/contacts?source=website"
+              colorClass="text-violet-500"
+              items={[]}
+            />
+            <SourceList
+              title="Manual"
+              total={data?.sourceSummary.manual ?? 0}
+              href="/contacts?source=manual"
+              colorClass="text-slate-400"
+              items={[]}
             />
           </div>
         )}
@@ -413,11 +459,13 @@ function SocialMediaContent() {
 function SourceList({
   title,
   total,
+  href,
   colorClass,
   items,
 }: {
   title: string;
   total: number;
+  href: string;
   colorClass: string;
   items: { label: string; count: number }[];
 }) {
@@ -425,12 +473,14 @@ function SourceList({
     <div>
       <div className="mb-2 flex items-baseline justify-between">
         <p className="text-sm font-medium text-foreground">{title}</p>
-        <p className={`text-xl font-bold tabular-nums ${colorClass}`}>
+        <Link href={href} className={`text-xl font-bold tabular-nums transition-opacity hover:opacity-80 ${colorClass}`}>
           {total.toLocaleString()} <span className="text-xs font-medium text-muted-foreground">leads</span>
-        </p>
+        </Link>
       </div>
       {items.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No leads from this source yet.</p>
+        <p className="text-xs text-muted-foreground">
+          {total === 0 ? "No leads from this source yet." : "All leads from this source."}
+        </p>
       ) : (
         <ul className="space-y-1.5">
           {items.map((item) => (
