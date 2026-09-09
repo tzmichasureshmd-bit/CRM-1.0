@@ -242,6 +242,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
           "transition-transform duration-200 ease-out will-change-transform",
           open ? "translate-x-0" : "-translate-x-full",
           "lg:static lg:z-0 lg:w-60 lg:translate-x-0 lg:transition-none",
+          "lg:shadow-[1px_0_0_0_rgba(0,0,0,0.04)]",
         )}
         aria-label="Primary"
       >

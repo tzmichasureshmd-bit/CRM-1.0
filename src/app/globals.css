@@ -304,3 +304,195 @@ html[data-theme="rose"] {
   transform: rotate(-24deg);
   text-transform: uppercase;
 }
+
+/* ============================================================
+   PREMIUM LANDING PAGE — animations & utility classes
+   ============================================================ */
+
+/* ---- Marquee (infinite horizontal scroll) ---- */
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.landing-marquee {
+  animation: marquee 30s linear infinite;
+}
+.landing-marquee:hover {
+  animation-play-state: paused;
+}
+
+@keyframes marquee-reverse {
+  0% { transform: translateX(-50%); }
+  100% { transform: translateX(0); }
+}
+
+.landing-marquee-reverse {
+  animation: marquee-reverse 30s linear infinite;
+}
+.landing-marquee-reverse:hover {
+  animation-play-state: paused;
+}
+
+/* ---- Floating words animation ---- */
+@keyframes float-word {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+    opacity: 0.12;
+  }
+  50% {
+    transform: translateY(-12px) rotate(1deg);
+    opacity: 0.22;
+  }
+}
+
+.landing-float-word {
+  animation: float-word 6s ease-in-out infinite;
+}
+
+/* ---- Fade-up reveal (IntersectionObserver-driven) ---- */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.landing-reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+}
+.landing-reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ---- Subtle float for product screenshots ---- */
+@keyframes product-float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+.landing-product-float {
+  animation: product-float 5s ease-in-out infinite;
+}
+
+/* ---- Glow pulse behind product ---- */
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.05); }
+}
+
+.landing-glow {
+  animation: glow-pulse 4s ease-in-out infinite;
+}
+
+/* ---- Floating notification card animation ---- */
+@keyframes float-card {
+  0%, 100% { transform: translateY(0px) translateX(0px); }
+  25% { transform: translateY(-6px) translateX(2px); }
+  75% { transform: translateY(4px) translateX(-2px); }
+}
+
+.landing-float-card {
+  animation: float-card 6s ease-in-out infinite;
+}
+
+.landing-float-card-delay-1 { animation-delay: 0s; }
+.landing-float-card-delay-2 { animation-delay: 1.5s; }
+.landing-float-card-delay-3 { animation-delay: 3s; }
+.landing-float-card-delay-4 { animation-delay: 4.5s; }
+
+/* ---- Perspective wrapper for 3D product shots ---- */
+.landing-perspective {
+  perspective: 1200px;
+}
+
+.landing-3d-tilt {
+  transform: rotateY(-4deg) rotateX(2deg);
+  transition: transform 0.4s ease;
+}
+.landing-3d-tilt:hover {
+  transform: rotateY(0deg) rotateX(0deg);
+}
+
+/* ---- Premium button lift ---- */
+.landing-btn-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.landing-btn-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.15);
+}
+
+/* ---- Card hover elevation ---- */
+.landing-card-hover {
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.landing-card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px -8px rgba(0, 0, 0, 0.12);
+}
+
+/* ---- Fade-in stagger (for grid children) ---- */
+.landing-stagger > * {
+  opacity: 0;
+  transform: translateY(16px);
+  animation: fade-up 0.5s ease-out forwards;
+}
+.landing-stagger > *:nth-child(1) { animation-delay: 0.05s; }
+.landing-stagger > *:nth-child(2) { animation-delay: 0.1s; }
+.landing-stagger > *:nth-child(3) { animation-delay: 0.15s; }
+.landing-stagger > *:nth-child(4) { animation-delay: 0.2s; }
+.landing-stagger > *:nth-child(5) { animation-delay: 0.25s; }
+.landing-stagger > *:nth-child(6) { animation-delay: 0.3s; }
+.landing-stagger > *:nth-child(7) { animation-delay: 0.35s; }
+.landing-stagger > *:nth-child(8) { animation-delay: 0.4s; }
+
+/* ---- Gradient text ---- */
+.landing-gradient-text {
+  background: linear-gradient(135deg, var(--foreground) 0%, oklch(0.55 0.2 162) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ---- Soft grid dots background ---- */
+.landing-dots-bg {
+  background-image: radial-gradient(circle, oklch(0.7 0.01 260 / 0.08) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+html[data-mode="dark"] .landing-dots-bg {
+  background-image: radial-gradient(circle, oklch(0.35 0.01 260 / 0.15) 1px, transparent 1px);
+}
+
+/* ---- Reduced motion ---- */
+@media (prefers-reduced-motion: reduce) {
+  .landing-marquee,
+  .landing-marquee-reverse,
+  .landing-float-word,
+  .landing-product-float,
+  .landing-glow,
+  .landing-float-card {
+    animation: none !important;
+  }
+  .landing-reveal {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  .landing-stagger > * {
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
+  }
+  .landing-3d-tilt {
+    transform: none !important;
+  }
+}

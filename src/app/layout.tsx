@@ -22,10 +22,36 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: "WhatsApp CRM | TZmicha",
-    template: "%s | TZmicha",
+    default: "WhatsApp CRM | Manage Leads, Conversations & Sales | TZMICHA IT SOLUTIONS",
+    template: "%s | TZMICHA IT SOLUTIONS",
   },
-  description: "Self-hostable WhatsApp CRM.",
+  description:
+    "Manage WhatsApp conversations, leads, campaigns, automation and customer relationships from one powerful CRM. Connect Facebook, Instagram and WhatsApp in a single platform.",
+  keywords: [
+    "WhatsApp CRM",
+    "CRM software",
+    "lead management",
+    "WhatsApp Business",
+    "customer management",
+    "sales automation",
+    "campaign management",
+    "FB leads",
+    "Instagram leads",
+  ],
+  openGraph: {
+    title: "WhatsApp CRM | TZMICHA IT SOLUTIONS",
+    description:
+      "Turn conversations into customers. Manage WhatsApp, leads, campaigns and automation from one powerful CRM.",
+    type: "website",
+    locale: "en_US",
+    siteName: "TZMICHA IT SOLUTIONS",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "WhatsApp CRM | TZMICHA IT SOLUTIONS",
+    description:
+      "Turn conversations into customers. Manage WhatsApp, leads, campaigns and automation from one powerful CRM.",
+  },
   robots: {
     index: false,
     follow: false,
