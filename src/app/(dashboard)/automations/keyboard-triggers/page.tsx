@@ -345,14 +345,22 @@ export default function KeyboardTriggersPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <Table>
+          <Table className="table-fixed">
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
-                <TableHead className="w-44 text-muted-foreground">{t("table.action")}</TableHead>
-                <TableHead className="text-muted-foreground hidden md:table-cell">{t("table.description")}</TableHead>
-                <TableHead className="w-52 text-muted-foreground">{t("table.shortcut")}</TableHead>
-                <TableHead className="w-20 text-muted-foreground">{t("table.enabled")}</TableHead>
-                <TableHead className="w-12" />
+                <TableHead className="w-[25%] min-w-40 text-muted-foreground">
+                  {t("table.action")}
+                </TableHead>
+                <TableHead className="w-[40%] min-w-60 text-muted-foreground">
+                  {t("table.description")}
+                </TableHead>
+                <TableHead className="w-[20%] min-w-40 text-center text-muted-foreground">
+                  {t("table.shortcut")}
+                </TableHead>
+                <TableHead className="w-[15%] min-w-20 text-muted-foreground">
+                  {t("table.enabled")}
+                </TableHead>
+                <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -369,16 +377,18 @@ export default function KeyboardTriggersPage() {
 
                   return (
                     <TableRow key={entry.action_key} className="border-border hover:bg-muted/50">
-                      <TableCell className="font-medium text-foreground">
+                      <TableCell className="truncate font-medium text-foreground">
                         {entry.label}
                       </TableCell>
-                      <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
-                        {entry.description}
+                      <TableCell className="text-xs text-muted-foreground">
+                        <p className="truncate" title={entry.description}>
+                          {entry.description}
+                        </p>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-center">
                         {isEditing ? (
                           <div
-                            className="flex items-center gap-2"
+                            className="flex items-center justify-center gap-2"
                             onKeyDown={handleKeyDown}
                             tabIndex={-1}
                           >
@@ -386,7 +396,7 @@ export default function KeyboardTriggersPage() {
                               value={editCombo}
                               readOnly
                               onClick={() => setRecording(true)}
-                              className="h-8 w-36 cursor-pointer bg-muted text-center font-mono text-xs text-foreground"
+                              className="h-8 w-28 cursor-pointer bg-muted text-center font-mono text-xs text-foreground"
                               placeholder={t("dialog.clickToRecord")}
                             />
                             <Button
@@ -399,7 +409,7 @@ export default function KeyboardTriggersPage() {
                             </Button>
                           </div>
                         ) : (
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center justify-center gap-1.5">
                             <kbd className="inline-flex items-center gap-1 rounded border border-border bg-muted px-2 py-1 text-xs font-mono text-foreground">
                               {comboDisplay(entry.current_combo)}
                             </kbd>

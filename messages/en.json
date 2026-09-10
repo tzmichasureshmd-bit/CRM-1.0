@@ -1127,6 +1127,41 @@
         "matchExact": "Exact",
         "closeConversationHint": "Sets the conversation status to \"closed\". No configuration needed."
       }
+    },
+    "keyboardTriggers": {
+      "title": "Keyboard Triggers",
+      "subtitle": "Customize the global keyboard shortcuts used across the CRM.",
+      "shortcutsTitle": "Keyboard Shortcuts",
+      "searchPlaceholder": "Search shortcuts...",
+      "noResults": "No shortcuts match your search.",
+      "table": {
+        "action": "Action",
+        "description": "Description",
+        "shortcut": "Shortcut",
+        "enabled": "Enabled"
+      },
+      "enable": "Enable",
+      "disable": "Disable",
+      "dialog": {
+        "editTitle": "Edit Shortcut",
+        "editDesc": "Change the shortcut for \"{action}\".",
+        "shortcut": "Shortcut",
+        "pressKeys": "Press a shortcut",
+        "record": "Record",
+        "recording": "Recording…",
+        "shortcutHint": "Click the field or press Record, then type the key combination.",
+        "clickToRecord": "Click to record",
+        "resetDefault": "Reset to default",
+        "cancel": "Cancel",
+        "save": "Save Shortcut"
+      },
+      "toast": {
+        "loadError": "Failed to load shortcuts",
+        "emptyCombo": "Type a shortcut first",
+        "saveError": "Failed to save shortcut",
+        "saved": "Shortcut saved",
+        "reset": "Reset to default"
+      }
     }
   },
   "AiCalls": {
@@ -1199,6 +1234,129 @@
       "selectAll": "Select All",
       "selectedCount": "{count} selected",
       "noContacts": "No contacts available. Add contacts first."
+    }
+  },
+  "AiFollowups": {
+    "title": "AI Follow-ups",
+    "subtitle": "Automated sequences that re-engage leads with AI-generated follow-up messages.",
+    "create": "New Follow-up",
+    "stats": {
+      "total": "Total",
+      "active": "Active",
+      "executions": "Total Executions"
+    },
+    "tabs": {
+      "sequences": "Sequences",
+      "history": "History"
+    },
+    "filter": {
+      "all": "All",
+      "draft": "Draft",
+      "active": "Active",
+      "paused": "Paused",
+      "archived": "Archived"
+    },
+    "empty": {
+      "title": "No follow-ups yet",
+      "desc": "Create a sequence to start automating AI follow-up messages."
+    },
+    "card": {
+      "maxFollowups": "{count} max follow-ups",
+      "delay": "Every {hours}h",
+      "runs": "{count} run",
+      "runsPlural": "{count} runs"
+    },
+    "actions": {
+      "start": "Start",
+      "pause": "Pause",
+      "resume": "Resume",
+      "edit": "Edit",
+      "viewHistory": "View History",
+      "archive": "Archive",
+      "delete": "Delete"
+    },
+    "history": {
+      "title": "Execution History",
+      "selectPrompt": "Select a follow-up to view its execution history.",
+      "selectFollowup": "Select a follow-up",
+      "empty": "No executions recorded yet.",
+      "contact": "Contact",
+      "status": "Status",
+      "step": "Step",
+      "lastSent": "Last Sent",
+      "nextAction": "Next Action",
+      "created": "Created",
+      "statuses": {
+        "active": "Active",
+        "completed": "Completed",
+        "stopped": "Stopped",
+        "failed": "Failed",
+        "waiting": "Waiting"
+      }
+    },
+    "triggers": {
+      "manual": "Manual",
+      "new_contact": "New Contact",
+      "tag_added": "Tag Added",
+      "deal_created": "Deal Created",
+      "no_response": "No Response",
+      "keyword": "Keyword"
+    },
+    "dialog": {
+      "createTitle": "Create Follow-up",
+      "editTitle": "Edit Follow-up",
+      "description": "Configure an AI follow-up sequence.",
+      "section": {
+        "general": "General",
+        "trigger": "Trigger",
+        "settings": "Settings",
+        "template": "Message Template",
+        "ai": "AI Settings"
+      },
+      "name": "Name",
+      "namePlaceholder": "e.g. Abandoned cart follow-up",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "What should this follow-up do?",
+      "triggerType": "Trigger type",
+      "maxFollowups": "Max follow-ups",
+      "delayHours": "Delay (hours)",
+      "workingHoursOnly": "Send during working hours only",
+      "workingHoursStart": "Start time",
+      "workingHoursEnd": "End time",
+      "stopOnReply": "Stop when the contact replies",
+      "stopOnOptOut": "Stop on opt-out",
+      "useTemplate": "Use a message template",
+      "template": "Message template",
+      "templatePlaceholder": "Select a template",
+      "aiProvider": "AI provider",
+      "aiModel": "AI model",
+      "systemPrompt": "System prompt",
+      "systemPromptPlaceholder": "Instructions for generating follow-up messages",
+      "temperature": "Temperature",
+      "maxTokens": "Max tokens",
+      "cancel": "Cancel",
+      "save": "Save Changes",
+      "create": "Create"
+    },
+    "delete": {
+      "title": "Delete Follow-up",
+      "desc": "Delete \"{name}\"? This cannot be undone.",
+      "cancel": "Cancel",
+      "confirm": "Delete"
+    },
+    "toasts": {
+      "updated": "Follow-up updated",
+      "created": "Follow-up created",
+      "saveError": "Failed to save follow-up",
+      "deleted": "Follow-up deleted",
+      "deleteError": "Failed to delete follow-up",
+      "draft": "Saved as draft",
+      "active": "Follow-up activated",
+      "paused": "Follow-up paused",
+      "archived": "Follow-up archived"
+    },
+    "validation": {
+      "nameRequired": "Name is required"
     }
   },
   "Flows": {

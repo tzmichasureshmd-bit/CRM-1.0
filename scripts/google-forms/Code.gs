@@ -184,6 +184,7 @@ function syncRow_(sheet, headerIndex, rowIndex, payload) {
   });
   var code = response.getResponseCode();
   var bodyText = response.getContentText();
+  Logger.log('[syncRow_] POST ' + url + ' -> HTTP ' + code + ' | body: ' + bodyText.slice(0, 500));
   var body = null;
   try {
     body = JSON.parse(bodyText);
@@ -323,7 +324,7 @@ function retryFailedSyncs() {
  */
 function installFormTrigger() {
   ScriptApp.newTrigger('onFormSubmit')
-    .forForm(FormApp.getActiveForm ? FormApp.getActiveForm() : SpreadsheetApp.getActiveSpreadsheet())
+    .forSpreadsheet(SpreadsheetApp.getActiveSpreadsheet())
     .onFormSubmit()
     .create();
 }

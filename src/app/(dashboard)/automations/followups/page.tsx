@@ -401,10 +401,14 @@ export default function AiFollowupsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <div className="flex items-center justify-between">
-          <TabsList>
-            <TabsTrigger value="list">{t("tabs.sequences")}</TabsTrigger>
-            <TabsTrigger value="history">{t("tabs.history")}</TabsTrigger>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <TabsList className="gap-1">
+            <TabsTrigger value="list" className="min-w-24 px-4">
+              {t("tabs.sequences")}
+            </TabsTrigger>
+            <TabsTrigger value="history" className="min-w-24 px-4">
+              {t("tabs.history")}
+            </TabsTrigger>
           </TabsList>
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-muted-foreground" />
