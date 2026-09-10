@@ -1162,6 +1162,57 @@
         "saved": "Shortcut saved",
         "reset": "Reset to default"
       }
+    },
+    "quickReplies": {
+      "title": "Quick Replies",
+      "subtitle": "Save reusable messages and insert them into conversations with a shortcut.",
+      "create": "New Reply",
+      "searchPlaceholder": "Search replies...",
+      "all": "All",
+      "emptyTitle": "No quick replies yet",
+      "emptyDesc": "Create a quick reply to respond to customers faster.",
+      "noResults": "No quick replies match your search.",
+      "noResultsDesc": "Try a different keyword or clear the filters.",
+      "table": {
+        "shortcut": "Shortcut",
+        "title": "Title",
+        "message": "Message",
+        "category": "Category",
+        "global": "Global"
+      },
+      "badge": {
+        "global": "Global"
+      },
+      "dialog": {
+        "createTitle": "New Quick Reply",
+        "editTitle": "Edit Quick Reply",
+        "description": "Create a reusable message with a shortcut.",
+        "shortcut": "Shortcut",
+        "shortcutHint": "Start a message with this shortcut to use the reply.",
+        "title": "Title",
+        "titlePlaceholder": "e.g. Pricing question",
+        "message": "Message",
+        "messagePlaceholder": "Write the reply text...",
+        "category": "Category",
+        "globalLabel": "Share with the whole team",
+        "globalHint": "Global replies are visible to every agent in the account.",
+        "cancel": "Cancel",
+        "save": "Save Changes",
+        "create": "Create",
+        "delete": "Delete"
+      },
+      "deleteTitle": "Delete Quick Reply",
+      "deleteDesc": "Delete \"{title}\"? This cannot be undone.",
+      "toast": {
+        "loadError": "Failed to load quick replies",
+        "titleRequired": "Title is required",
+        "messageRequired": "Message is required",
+        "saveError": "Failed to save quick reply",
+        "updated": "Quick reply updated",
+        "created": "Quick reply created",
+        "deleteError": "Failed to delete quick reply",
+        "deleted": "Quick reply deleted"
+      }
     }
   },
   "AiCalls": {
@@ -1240,6 +1291,9 @@
     "title": "AI Follow-ups",
     "subtitle": "Automated sequences that re-engage leads with AI-generated follow-up messages.",
     "create": "New Follow-up",
+    "searchPlaceholder": "Search sequences...",
+    "noResults": "No sequences match your search.",
+    "clear": "Clear",
     "stats": {
       "total": "Total",
       "active": "Active",
@@ -1264,7 +1318,8 @@
       "maxFollowups": "{count} max follow-ups",
       "delay": "Every {hours}h",
       "runs": "{count} run",
-      "runsPlural": "{count} runs"
+      "runsPlural": "{count} runs",
+      "updated": "Updated {date}"
     },
     "actions": {
       "start": "Start",
@@ -1273,12 +1328,14 @@
       "edit": "Edit",
       "viewHistory": "View History",
       "archive": "Archive",
-      "delete": "Delete"
+      "delete": "Delete",
+      "more": "More actions"
     },
     "history": {
       "title": "Execution History",
       "selectPrompt": "Select a follow-up to view its execution history.",
       "selectFollowup": "Select a follow-up",
+      "changeFollowup": "Change follow-up",
       "empty": "No executions recorded yet.",
       "contact": "Contact",
       "status": "Status",
@@ -1357,6 +1414,243 @@
     },
     "validation": {
       "nameRequired": "Name is required"
+    }
+  },
+  "Appointments": {
+    "page": {
+      "title": "Appointments",
+      "subtitle": "Manage your scheduled appointments and reminders.",
+      "newAppointment": "New Appointment",
+      "totalUpcoming": "Upcoming",
+      "todayCount": "Today",
+      "completed": "Completed",
+      "cancelled": "Cancelled",
+      "listView": "List",
+      "upcomingView": "Upcoming",
+      "loading": "Loading...",
+      "noAppointments": "No appointments found.",
+      "createFirst": "Create Appointment",
+      "noUpcoming": "No upcoming appointments.",
+      "today": "Today",
+      "noDescription": "No description",
+      "unknown": "Unknown",
+      "durationMin": "{count} min",
+      "filter": {
+        "allStatuses": "All Statuses",
+        "from": "From",
+        "to": "To",
+        "clear": "Clear"
+      },
+      "table": {
+        "title": "Title",
+        "contact": "Contact",
+        "agent": "Agent",
+        "date": "Date & Time",
+        "duration": "Duration",
+        "status": "Status",
+        "reminders": "Reminders"
+      },
+      "actions": {
+        "edit": "Edit",
+        "confirm": "Confirm",
+        "complete": "Mark Completed",
+        "reschedule": "Reschedule",
+        "cancel": "Cancel",
+        "noShow": "No Show",
+        "delete": "Delete"
+      },
+      "upcoming": {
+        "contact": "Contact:",
+        "agent": "Agent:"
+      },
+      "editTitle": "Edit Appointment",
+      "createTitle": "New Appointment",
+      "editDescription": "Update the appointment details below.",
+      "createDescription": "Fill in the details to schedule a new appointment.",
+      "form": {
+        "title": "Title",
+        "titlePlaceholder": "e.g. Product Demo",
+        "description": "Description",
+        "descriptionPlaceholder": "Brief description...",
+        "contact": "Contact",
+        "selectContact": "Select contact",
+        "agent": "Agent",
+        "selectAgent": "Assign agent",
+        "none": "None",
+        "date": "Date",
+        "time": "Time",
+        "duration": "Duration (min)",
+        "service": "Service",
+        "servicePlaceholder": "e.g. Consultation",
+        "notes": "Notes",
+        "notesPlaceholder": "Additional notes..."
+      },
+      "cancel": "Cancel",
+      "saveChanges": "Save Changes",
+      "createBtn": "Create Appointment",
+      "detail": {
+        "date": "Date",
+        "time": "Time",
+        "duration": "Duration",
+        "contact": "Contact",
+        "agent": "Agent",
+        "reminders": "Reminders",
+        "notes": "Notes"
+      },
+      "rescheduleTitle": "Reschedule Appointment",
+      "rescheduleDescription": "Pick a new date and time.",
+      "rescheduleBtn": "Reschedule",
+      "deleteTitle": "Delete Appointment",
+      "deleteDescription": "This action cannot be undone.",
+      "deleteBtn": "Delete",
+      "status": {
+        "scheduled": "Scheduled",
+        "confirmed": "Confirmed",
+        "completed": "Completed",
+        "cancelled": "Cancelled",
+        "no_show": "No Show",
+        "rescheduled": "Rescheduled"
+      }
+    }
+  },
+  "SaveMoney": {
+    "title": "Save Money",
+    "subtitle": "Control your WhatsApp/CRM spending",
+    "tabs": {
+      "templates": "Templates",
+      "campaigns": "Campaigns",
+      "whatsapp": "WhatsApp Campaigns",
+      "broadcast": "Smart Broadcast",
+      "calculator": "Cost Calculator",
+      "wallet": "Wallet",
+      "usage": "Usage",
+      "savings": "Savings Analytics"
+    },
+    "common": {
+      "loading": "Loading...",
+      "retry": "Retry",
+      "cancel": "Cancel",
+      "perMsg": "/msg",
+      "failedLoad": "Failed to load data",
+      "failedAddFunds": "Failed to add funds"
+    },
+    "templates": {
+      "rejectedBanner": "{count, plural, =1 {# template rejected} other {# templates rejected}} — review and resubmit to avoid delivery failures.",
+      "noTemplates": "No templates found.",
+      "colName": "Template Name",
+      "colCategory": "Category",
+      "colStatus": "Status",
+      "colLanguage": "Language",
+      "colEstCost": "Est. Cost",
+      "colQuality": "Quality",
+      "colLastSubmitted": "Last Submitted"
+    },
+    "txTypes": {
+      "credit_purchase": "Credit Purchase",
+      "campaign_usage": "Campaign Usage",
+      "ai_usage": "AI Usage",
+      "voice_usage": "Voice Usage",
+      "refund": "Refund",
+      "adjustment": "Adjustment",
+      "subscription_payment": "Subscription Payment"
+    },
+    "campaigns": {
+      "totalCampaigns": "Total Campaigns",
+      "totalSent": "Total Sent",
+      "totalCost": "Total Cost",
+      "none": "No campaigns found.",
+      "colCampaign": "Campaign",
+      "colStatus": "Status",
+      "colAudience": "Audience",
+      "colSent": "Sent",
+      "colDelivered": "Delivered",
+      "colFailed": "Failed",
+      "colEstCost": "Est. Cost",
+      "colActualCost": "Actual Cost",
+      "colCreated": "Created"
+    },
+    "calculator": {
+      "title": "Cost Calculator",
+      "description": "Estimate your WhatsApp messaging costs before sending a campaign.",
+      "recipients": "Number of Recipients",
+      "category": "Template Category",
+      "marketing": "Marketing",
+      "utility": "Utility",
+      "authentication": "Authentication",
+      "applicableRate": "Applicable rate: {rate} per message ({destination})",
+      "noActiveRule": "No active pricing rule for this category. Contact admin to configure rates.",
+      "estMetaCost": "Estimated Meta Cost",
+      "serviceFee": "CRM / Service Fee (15%)",
+      "totalEstimate": "Total Estimated",
+      "disclaimer": "Estimated WhatsApp/Meta charges. Actual charges may vary according to Meta's current pricing, category, destination and billing rules.",
+      "activeRules": "Active Pricing Rules",
+      "colCategory": "Category",
+      "colRate": "Rate",
+      "colDestination": "Destination",
+      "colDescription": "Description"
+    },
+    "wallet": {
+      "none": "No wallet found for this account.",
+      "init": "Initialize Wallet",
+      "currentBalance": "Current Balance",
+      "availableCredits": "Available Credits",
+      "reservedCredits": "Reserved Credits",
+      "usedCredits": "Used Credits",
+      "addFunds": "Add Funds",
+      "txHistory": "Transaction History",
+      "noTransactions": "No transactions yet.",
+      "colDate": "Date",
+      "colType": "Type",
+      "colAmount": "Amount",
+      "colBalanceAfter": "Balance After",
+      "colDescription": "Description",
+      "colStatus": "Status"
+    },
+    "usage": {
+      "none": "No usage data available.",
+      "currentPeriod": "Current Period",
+      "periodFrom": "{date} onwards",
+      "monthlyBreakdown": "Monthly Breakdown",
+      "messagesSent": "Messages Sent",
+      "messagesReceived": "Messages Received",
+      "contactsCreated": "Contacts Created",
+      "broadcasts": "Broadcasts",
+      "automations": "Automations",
+      "aiRequests": "AI Requests",
+      "apiRequests": "API Requests",
+      "storage": "Storage",
+      "mb": "MB",
+      "colPeriod": "Period",
+      "colSent": "Sent",
+      "colReceived": "Received",
+      "colContacts": "Contacts",
+      "colBroadcasts": "Broadcasts",
+      "colAutomations": "Automations",
+      "colAi": "AI",
+      "colApi": "API",
+      "colStorage": "Storage"
+    },
+    "savings": {
+      "totalSpent": "Total Spent",
+      "budgetRemaining": "Budget Remaining",
+      "avgDeliveryRate": "Avg. Delivery Rate",
+      "templateApproval": "Template Approval",
+      "optTips": "Cost Optimization Tips",
+      "tipUtility": "Using <utility>utility</utility> templates instead of <marketing>marketing</marketing> saves approximately {percent}% per message.",
+      "tipApproval": "Only {percent}% of templates are approved. Improve approval rates to avoid campaign delays.",
+      "tipDelivery": "Delivery rate is {percent}%. Clean your contact list to reduce failed deliveries and save costs.",
+      "tipGeneral": "Schedule campaigns during off-peak hours and use utility templates for transactional messages to minimize per-message costs.",
+      "spendBreakdown": "Spending Breakdown",
+      "walletBalance": "Wallet Balance",
+      "spent": "Spent: {amount}",
+      "remaining": "Remaining: {amount}",
+      "byCategory": "By Category",
+      "noCampaignData": "No campaign data available."
+    },
+    "dialog": {
+      "addFunds": "Add Funds",
+      "description": "Add credits to your wallet for WhatsApp messaging.",
+      "amount": "Amount"
     }
   },
   "Flows": {

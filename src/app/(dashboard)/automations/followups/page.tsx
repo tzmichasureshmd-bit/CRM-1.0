@@ -3,25 +3,25 @@
 import { useEffect, useState, useCallback } from "react"
 import { toast } from "sonner"
 import {
-  Bot,
-  Plus,
-  MoreVertical,
-  Pencil,
-  Trash2,
-  Play,
-  Pause,
-  RotateCcw,
-  Clock,
-  Loader2,
-  Users,
-  CheckCircle2,
-  XCircle,
-  AlertTriangle,
-  Eye,
-  ChevronDown,
-  ChevronRight,
-  Filter,
+  Activity,
   Archive,
+  Bot,
+  CalendarDays,
+  Clock,
+  Eye,
+  Filter,
+  History,
+  Layers,
+  Loader2,
+  MoreVertical,
+  Pause,
+  Pencil,
+  Play,
+  Plus,
+  RotateCcw,
+  Search,
+  Trash2,
+  Users,
 } from "lucide-react"
 
 import { createClient } from "@/lib/supabase/client"
@@ -35,7 +35,6 @@ import type {
   MessageTemplate,
 } from "@/types"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -155,6 +154,7 @@ export default function AiFollowupsPage() {
   const [deleting, setDeleting] = useState(false)
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [statusFilter, setStatusFilter] = useState<AiFollowupStatus | "all">("all")
+  const [searchQuery, setSearchQuery] = useState("")
   const [activeTab, setActiveTab] = useState("list")
 
   const loadFollowups = useCallback(async () => {
@@ -352,6 +352,18 @@ export default function AiFollowupsPage() {
       }
     : { total: 0, active: 0, totalExecutions: 0 }
 
+  const filteredFollowups = followups
+    ? followups.filter((f) => {
+        const term = searchQuery.trim().toLowerCase()
+        if (!term) return true
+        return (
+          f.name.toLowerCase().includes(term) ||
+          (f.description ?? "").toLowerCase().includes(term) ||
+          f.trigger_type.toLowerCase().includes(term)
+        )
+      })
+    : []
+
   if (followups === null) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -373,29 +385,38 @@ export default function AiFollowupsPage() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">{t("stats.total")}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
+          <CardContent className="flex items-center gap-3 p-4">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10">
+              <Bot className="h-5 w-5 text-primary" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-medium text-muted-foreground">{t("stats.total")}</div>
+              <div className="text-xl font-bold text-foreground">{stats.total}</div>
+            </div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">{t("stats.active")}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.active}</div>
+          <CardContent className="flex items-center gap-3 p-4">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-green-100 dark:bg-green-900/30">
+              <Activity className="h-5 w-5 text-green-600 dark:text-green-400" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-medium text-muted-foreground">{t("stats.active")}</div>
+              <div className="text-xl font-bold text-foreground">{stats.active}</div>
+            </div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">{t("stats.executions")}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalExecutions}</div>
+          <CardContent className="flex items-center gap-3 p-4">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-muted">
+              <Clock className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-medium text-muted-foreground">{t("stats.executions")}</div>
+              <div className="text-xl font-bold text-foreground">{stats.totalExecutions}</div>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -404,19 +425,29 @@ export default function AiFollowupsPage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <TabsList className="gap-1">
             <TabsTrigger value="list" className="min-w-24 px-4">
+              <Layers className="size-4" />
               {t("tabs.sequences")}
             </TabsTrigger>
             <TabsTrigger value="history" className="min-w-24 px-4">
+              <History className="size-4" />
               {t("tabs.history")}
             </TabsTrigger>
           </TabsList>
           <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={t("searchPlaceholder")}
+                className="h-9 w-44 pl-8 sm:w-56"
+              />
+            </div>
             <Select
               value={statusFilter}
               onValueChange={(val) => setStatusFilter(val as AiFollowupStatus | "all")}
             >
-              <SelectTrigger className="w-36">
+              <SelectTrigger className="h-9 w-36">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -443,9 +474,17 @@ export default function AiFollowupsPage() {
                 {t("create")}
               </Button>
             </div>
+          ) : filteredFollowups.length === 0 ? (
+            <div className="flex h-48 flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card/40">
+              <Search className="h-6 w-6 text-muted-foreground" />
+              <p className="mt-3 text-sm font-medium text-foreground">{t("noResults")}</p>
+              <Button variant="ghost" className="mt-2" onClick={() => setSearchQuery("")}>
+                {t("clear")}
+              </Button>
+            </div>
           ) : (
             <div className="space-y-3">
-              {followups.map((f) => (
+              {filteredFollowups.map((f) => (
                 <FollowupCard
                   key={f.id}
                   followup={f}
@@ -469,13 +508,14 @@ export default function AiFollowupsPage() {
         <TabsContent value="history" className="mt-4">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <History className="h-4 w-4 text-primary" />
                   {historyTarget
                     ? t("history.title") + " — " + historyTarget.name
                     : t("history.selectPrompt")}
                 </CardTitle>
-                {!historyTarget && (
+                {!historyTarget ? (
                   <Select
                     value=""
                     onValueChange={(val) => {
@@ -483,7 +523,7 @@ export default function AiFollowupsPage() {
                       if (f) loadExecutionHistory(f)
                     }}
                   >
-                    <SelectTrigger className="w-64">
+                    <SelectTrigger className="w-full sm:w-64">
                       <SelectValue placeholder={t("history.selectFollowup")} />
                     </SelectTrigger>
                     <SelectContent>
@@ -494,6 +534,10 @@ export default function AiFollowupsPage() {
                       ))}
                     </SelectContent>
                   </Select>
+                ) : historyTarget && (
+                  <Button variant="outline" size="sm" onClick={() => setHistoryTarget(null)}>
+                    {t("history.changeFollowup")}
+                  </Button>
                 )}
               </div>
             </CardHeader>
@@ -503,13 +547,15 @@ export default function AiFollowupsPage() {
                   <Loader2 className="h-5 w-5 animate-spin text-primary" />
                 </div>
               ) : historyTarget && executions.length === 0 ? (
-                <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
+                <div className="flex h-32 flex-col items-center justify-center gap-1 text-sm text-muted-foreground">
+                  <History className="h-5 w-5" />
                   {t("history.empty")}
                 </div>
               ) : historyTarget ? (
                 <ExecutionTable executions={executions} t={t} />
               ) : (
-                <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
+                <div className="flex h-32 flex-col items-center justify-center gap-1 text-sm text-muted-foreground">
+                  <History className="h-5 w-5" />
                   {t("history.selectPrompt")}
                 </div>
               )}
@@ -829,10 +875,15 @@ function FollowupCard({
 }) {
   const statusLabel = t(`filter.${followup.status}`)
   const triggerLabel = t(`triggers.${followup.trigger_type}`)
+  const updatedLabel = followup.updated_at
+    ? new Date(followup.updated_at).toLocaleDateString()
+    : followup.created_at
+      ? new Date(followup.created_at).toLocaleDateString()
+      : ""
 
   return (
-    <li className="rounded-xl border border-border bg-card transition-colors hover:border-border">
-      <div className="flex items-center gap-4 p-4">
+    <li className="rounded-xl border border-border bg-card transition-colors hover:shadow-sm">
+      <div className="flex flex-wrap items-center gap-4 p-4">
         <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10">
           <Bot className="h-5 w-5 text-primary" />
         </div>
@@ -841,15 +892,18 @@ function FollowupCard({
           <div className="flex items-center gap-2">
             <span className="truncate text-sm font-semibold text-foreground">{followup.name}</span>
             <span
-              className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_STYLES[followup.status]}`}
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_STYLES[followup.status]}`}
             >
+              <span className="size-1.5 rounded-full bg-current" aria-hidden="true" />
               {statusLabel}
             </span>
           </div>
           {followup.description && (
-            <p className="mt-0.5 truncate text-xs text-muted-foreground">{followup.description}</p>
+            <p className="mt-0.5 truncate text-xs text-muted-foreground" title={followup.description}>
+              {followup.description}
+            </p>
           )}
-          <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1">
               <Filter className="h-3 w-3" />
               {triggerLabel}
@@ -862,11 +916,20 @@ function FollowupCard({
               <Clock className="h-3 w-3" />
               {t("card.delay", { hours: followup.delay_hours })}
             </span>
-            <span>{t("card.runs", { count: followup.execution_count })}</span>
+            <span className="inline-flex items-center gap-1">
+              <Activity className="h-3 w-3" />
+              {t("card.runs", { count: followup.execution_count })}
+            </span>
+            {updatedLabel && (
+              <span className="inline-flex items-center gap-1">
+                <CalendarDays className="h-3 w-3" />
+                {t("card.updated", { date: updatedLabel })}
+              </span>
+            )}
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {followup.status === "draft" && (
             <Button size="sm" variant="outline" onClick={onStart}>
               <Play className="h-3 w-3" />
@@ -888,7 +951,8 @@ function FollowupCard({
 
           <DropdownMenu>
             <DropdownMenuTrigger
-              aria-label="Open menu"
+              aria-label={t("actions.more")}
+              title={t("actions.more")}
               className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
               <MoreVertical className="h-4 w-4" />
@@ -929,48 +993,52 @@ function ExecutionTable({
   t: ReturnType<typeof useTranslations>
 }) {
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>{t("history.contact")}</TableHead>
-          <TableHead>{t("history.status")}</TableHead>
-          <TableHead>{t("history.step")}</TableHead>
-          <TableHead>{t("history.lastSent")}</TableHead>
-          <TableHead>{t("history.nextAction")}</TableHead>
-          <TableHead>{t("history.created")}</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {executions.map((ex) => (
-          <TableRow key={ex.id}>
-            <TableCell className="font-medium">
-              {((ex as unknown as Record<string, unknown>).contacts
-                ? ((ex as unknown as Record<string, unknown>).contacts as { name?: string; phone: string }).name ||
-                  ((ex as unknown as Record<string, unknown>).contacts as { phone: string }).phone
-                : ex.contact_id) ?? ""}
-            </TableCell>
-            <TableCell>
-              <span
-                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${EXECUTION_STATUS_STYLES[ex.status] ?? ""}`}
-              >
-                {t(`history.statuses.${ex.status}`)}
-              </span>
-            </TableCell>
-            <TableCell>
-              {ex.current_step} / {ex.total_steps}
-            </TableCell>
-            <TableCell className="text-xs text-muted-foreground">
-              {ex.last_sent_at ? new Date(ex.last_sent_at).toLocaleString() : "—"}
-            </TableCell>
-            <TableCell className="text-xs text-muted-foreground">
-              {ex.next_action_at ? new Date(ex.next_action_at).toLocaleString() : "—"}
-            </TableCell>
-            <TableCell className="text-xs text-muted-foreground">
-              {new Date(ex.created_at).toLocaleString()}
-            </TableCell>
+    <div className="overflow-x-auto">
+      <Table className="min-w-[680px]">
+        <TableHeader>
+          <TableRow>
+            <TableHead>{t("history.contact")}</TableHead>
+            <TableHead>{t("history.status")}</TableHead>
+            <TableHead>{t("history.step")}</TableHead>
+            <TableHead>{t("history.lastSent")}</TableHead>
+            <TableHead>{t("history.nextAction")}</TableHead>
+            <TableHead>{t("history.created")}</TableHead>
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {executions.map((ex) => (
+            <TableRow key={ex.id}>
+              <TableCell className="max-w-0 truncate font-medium text-foreground">
+                <span className="truncate" title={ex.contact_id}>
+                  {((ex as unknown as Record<string, unknown>).contacts
+                    ? ((ex as unknown as Record<string, unknown>).contacts as { name?: string; phone: string }).name ||
+                      ((ex as unknown as Record<string, unknown>).contacts as { phone: string }).phone
+                    : ex.contact_id) ?? ""}
+                </span>
+              </TableCell>
+              <TableCell>
+                <span
+                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${EXECUTION_STATUS_STYLES[ex.status] ?? ""}`}
+                >
+                  {t(`history.statuses.${ex.status}`)}
+                </span>
+              </TableCell>
+              <TableCell className="text-xs text-muted-foreground">
+                {ex.current_step} / {ex.total_steps}
+              </TableCell>
+              <TableCell className="text-xs text-muted-foreground" title={ex.last_sent_at ?? undefined}>
+                {ex.last_sent_at ? new Date(ex.last_sent_at).toLocaleString() : "—"}
+              </TableCell>
+              <TableCell className="text-xs text-muted-foreground" title={ex.next_action_at ?? undefined}>
+                {ex.next_action_at ? new Date(ex.next_action_at).toLocaleString() : "—"}
+              </TableCell>
+              <TableCell className="text-xs text-muted-foreground" title={ex.created_at}>
+                {new Date(ex.created_at).toLocaleString()}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   )
 }

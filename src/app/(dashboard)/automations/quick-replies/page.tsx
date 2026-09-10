@@ -275,7 +275,7 @@ export default function QuickRepliesPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t("searchPlaceholder")}
-            className="pl-8 bg-card border-border text-foreground placeholder:text-muted-foreground"
+            className="h-9 pl-8 bg-card border-border text-foreground placeholder:text-muted-foreground"
           />
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -360,7 +360,7 @@ export default function QuickRepliesPage() {
                     {qr.title}
                   </TableCell>
                   <TableCell className="hidden md:table-cell">
-                    <p className="max-w-md truncate text-xs text-muted-foreground">
+                    <p className="max-w-xl truncate text-xs text-muted-foreground" title={qr.message}>
                       {qr.message}
                     </p>
                   </TableCell>

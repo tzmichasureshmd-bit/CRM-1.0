@@ -149,15 +149,15 @@ interface SmartBroadcast {
   updated_at: string;
 }
 
-const TX_TYPE_LABELS: Record<string, string> = {
-  credit_purchase: "Credit Purchase",
-  campaign_usage: "Campaign Usage",
-  ai_usage: "AI Usage",
-  voice_usage: "Voice Usage",
-  refund: "Refund",
-  adjustment: "Adjustment",
-  subscription_payment: "Subscription Payment",
-};
+const TX_TYPE_KEYS = [
+  "credit_purchase",
+  "campaign_usage",
+  "ai_usage",
+  "voice_usage",
+  "refund",
+  "adjustment",
+  "subscription_payment",
+];
 
 function txTypeBadgeClasses(type: string) {
   switch (type) {
@@ -229,6 +229,8 @@ function TemplatesTab({
   loading: boolean;
   currency: string;
 }) {
+  const t = useTranslations("SaveMoney");
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -255,8 +257,7 @@ function TemplatesTab({
           <CardContent className="flex items-center gap-3 py-3">
             <AlertCircle className="h-4 w-4 text-amber-500" />
             <p className="text-sm text-amber-600 dark:text-amber-400">
-              {rejected.length} template{rejected.length > 1 ? "s" : ""} rejected{" "}
-              — review and resubmit to avoid delivery failures.
+              {t("templates.rejectedBanner", { count: rejected.length })}
             </p>
           </CardContent>
         </Card>
@@ -265,20 +266,20 @@ function TemplatesTab({
       {templates.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-16 text-muted-foreground">
           <FileText className="h-8 w-8" />
-          <p className="text-sm">No templates found.</p>
+          <p className="text-sm">{t("templates.noTemplates")}</p>
         </div>
       ) : (
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Template Name</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Language</TableHead>
-                <TableHead>Est. Cost</TableHead>
-                <TableHead>Quality</TableHead>
-                <TableHead>Last Submitted</TableHead>
+                <TableHead>{t("templates.colName")}</TableHead>
+                <TableHead>{t("templates.colCategory")}</TableHead>
+                <TableHead>{t("templates.colStatus")}</TableHead>
+                <TableHead>{t("templates.colLanguage")}</TableHead>
+                <TableHead>{t("templates.colEstCost")}</TableHead>
+                <TableHead>{t("templates.colQuality")}</TableHead>
+                <TableHead>{t("templates.colLastSubmitted")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -311,7 +312,7 @@ function TemplatesTab({
                         }
                       >
                         {formatCurrency(rate / 100, currency)}
-                        {isHighCost && " /msg"}
+                        {isHighCost && <>{t("common.perMsg")}</>}
                       </span>
                     </TableCell>
                     <TableCell>
@@ -359,6 +360,8 @@ function CampaignsTab({
   loading: boolean;
   currency: string;
 }) {
+  const t = useTranslations("SaveMoney");
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -378,19 +381,19 @@ function CampaignsTab({
       <div className="grid gap-3 sm:grid-cols-3">
         <Card>
           <CardContent className="py-3">
-            <p className="text-xs text-muted-foreground">Total Campaigns</p>
+            <p className="text-xs text-muted-foreground">{t("campaigns.totalCampaigns")}</p>
             <p className="text-xl font-bold">{broadcasts.length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="py-3">
-            <p className="text-xs text-muted-foreground">Total Sent</p>
+            <p className="text-xs text-muted-foreground">{t("campaigns.totalSent")}</p>
             <p className="text-xl font-bold">{totalSent.toLocaleString()}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="py-3">
-            <p className="text-xs text-muted-foreground">Total Cost</p>
+            <p className="text-xs text-muted-foreground">{t("campaigns.totalCost")}</p>
             <p className="text-xl font-bold">
               {formatCurrency(totalCost / 100, currency)}
             </p>
@@ -401,22 +404,22 @@ function CampaignsTab({
       {broadcasts.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-16 text-muted-foreground">
           <Send className="h-8 w-8" />
-          <p className="text-sm">No campaigns found.</p>
+          <p className="text-sm">{t("campaigns.none")}</p>
         </div>
       ) : (
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Campaign</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Audience</TableHead>
-                <TableHead>Sent</TableHead>
-                <TableHead>Delivered</TableHead>
-                <TableHead>Failed</TableHead>
-                <TableHead>Est. Cost</TableHead>
-                <TableHead>Actual Cost</TableHead>
-                <TableHead>Created</TableHead>
+                <TableHead>{t("campaigns.colCampaign")}</TableHead>
+                <TableHead>{t("campaigns.colStatus")}</TableHead>
+                <TableHead>{t("campaigns.colAudience")}</TableHead>
+                <TableHead>{t("campaigns.colSent")}</TableHead>
+                <TableHead>{t("campaigns.colDelivered")}</TableHead>
+                <TableHead>{t("campaigns.colFailed")}</TableHead>
+                <TableHead>{t("campaigns.colEstCost")}</TableHead>
+                <TableHead>{t("campaigns.colActualCost")}</TableHead>
+                <TableHead>{t("campaigns.colCreated")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -476,6 +479,7 @@ function CostCalculatorTab({
   pricingRules: PricingRule[];
   currency: string;
 }) {
+  const t = useTranslations("SaveMoney");
   const [recipients, setRecipients] = useState(1000);
   const [category, setCategory] = useState("marketing");
 
@@ -500,16 +504,16 @@ function CostCalculatorTab({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Calculator className="h-4 w-4 text-primary" />
-            Cost Calculator
+            {t("calculator.title")}
           </CardTitle>
           <CardDescription>
-            Estimate your WhatsApp messaging costs before sending a campaign.
+            {t("calculator.description")}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="recipients">Number of Recipients</Label>
+              <Label htmlFor="recipients">{t("calculator.recipients")}</Label>
               <Input
                 id="recipients"
                 type="number"
@@ -521,15 +525,15 @@ function CostCalculatorTab({
               />
             </div>
             <div className="space-y-2">
-              <Label>Template Category</Label>
+              <Label>{t("calculator.category")}</Label>
               <Select value={category} onValueChange={(v) => { if (v != null) setCategory(v); }}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="marketing">Marketing</SelectItem>
-                  <SelectItem value="utility">Utility</SelectItem>
-                  <SelectItem value="authentication">Authentication</SelectItem>
+                  <SelectItem value="marketing">{t("calculator.marketing")}</SelectItem>
+                  <SelectItem value="utility">{t("calculator.utility")}</SelectItem>
+                  <SelectItem value="authentication">{t("calculator.authentication")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -537,20 +541,21 @@ function CostCalculatorTab({
 
           {matchedRule ? (
             <p className="text-xs text-muted-foreground">
-              Applicable rate: {formatCurrency(metaRate / 100, currency)} per
-              message ({matchedRule.destination})
+              {t("calculator.applicableRate", {
+                rate: formatCurrency(metaRate / 100, currency),
+                destination: matchedRule.destination,
+              })}
             </p>
           ) : (
             <p className="text-xs text-amber-600 dark:text-amber-400">
-              No active pricing rule for this category. Contact admin to
-              configure rates.
+              {t("calculator.noActiveRule")}
             </p>
           )}
 
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="rounded-lg bg-muted/50 p-4 text-center">
               <p className="text-xs text-muted-foreground">
-                Estimated Meta Cost
+                {t("calculator.estMetaCost")}
               </p>
               <p className="mt-1 text-lg font-bold text-foreground">
                 {formatCurrency(metaCost, currency)}
@@ -558,7 +563,7 @@ function CostCalculatorTab({
             </div>
             <div className="rounded-lg bg-muted/50 p-4 text-center">
               <p className="text-xs text-muted-foreground">
-                CRM / Service Fee (15%)
+                {t("calculator.serviceFee")}
               </p>
               <p className="mt-1 text-lg font-bold text-foreground">
                 {formatCurrency(serviceFee, currency)}
@@ -566,7 +571,7 @@ function CostCalculatorTab({
             </div>
             <div className="rounded-lg bg-primary/5 p-4 text-center ring-1 ring-primary/20">
               <p className="text-xs font-medium text-primary">
-                Total Estimated
+                {t("calculator.totalEstimate")}
               </p>
               <p className="mt-1 text-lg font-bold text-primary">
                 {formatCurrency(totalEstimate, currency)}
@@ -577,9 +582,7 @@ function CostCalculatorTab({
           <div className="flex items-start gap-2 rounded-lg bg-muted/30 p-3 text-xs text-muted-foreground">
             <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <p>
-              Estimated WhatsApp/Meta charges. Actual charges may vary according
-              to Meta&apos;s current pricing, category, destination and billing
-              rules.
+              {t("calculator.disclaimer")}
             </p>
           </div>
         </CardContent>
@@ -588,16 +591,16 @@ function CostCalculatorTab({
       {activeRules.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">Active Pricing Rules</CardTitle>
+            <CardTitle className="text-sm">{t("calculator.activeRules")}</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Rate</TableHead>
-                  <TableHead>Destination</TableHead>
-                  <TableHead>Description</TableHead>
+                  <TableHead>{t("calculator.colCategory")}</TableHead>
+                  <TableHead>{t("calculator.colRate")}</TableHead>
+                  <TableHead>{t("calculator.colDestination")}</TableHead>
+                  <TableHead>{t("calculator.colDescription")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -607,7 +610,7 @@ function CostCalculatorTab({
                       {rule.category}
                     </TableCell>
                     <TableCell>
-                      {formatCurrency(rule.rate_cents / 100, rule.currency)} /msg
+                      {formatCurrency(rule.rate_cents / 100, rule.currency)} {t("common.perMsg")}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {rule.destination}
@@ -639,6 +642,11 @@ function WalletTab({
   currency: string;
   onAddFunds: () => void;
 }) {
+  const t = useTranslations("SaveMoney");
+
+  const txTypeLabel = (type: string) =>
+    TX_TYPE_KEYS.includes(type) ? t(`txTypes.${type}`) : type;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -651,9 +659,9 @@ function WalletTab({
     return (
       <div className="flex flex-col items-center gap-3 py-16 text-muted-foreground">
         <Wallet className="h-8 w-8" />
-        <p className="text-sm">No wallet found for this account.</p>
+        <p className="text-sm">{t("wallet.none")}</p>
         <Button variant="outline" size="sm" onClick={onAddFunds}>
-          <Plus className="mr-1 h-3 w-3" /> Initialize Wallet
+          <Plus className="mr-1 h-3 w-3" /> {t("wallet.init")}
         </Button>
       </div>
     );
@@ -666,7 +674,7 @@ function WalletTab({
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="py-3">
-            <p className="text-xs text-muted-foreground">Current Balance</p>
+            <p className="text-xs text-muted-foreground">{t("wallet.currentBalance")}</p>
             <p className="mt-1 text-xl font-bold text-foreground">
               {formatCurrency(wallet.balance_cents / 100, currency)}
             </p>
@@ -674,7 +682,7 @@ function WalletTab({
         </Card>
         <Card>
           <CardContent className="py-3">
-            <p className="text-xs text-muted-foreground">Available Credits</p>
+            <p className="text-xs text-muted-foreground">{t("wallet.availableCredits")}</p>
             <p className="mt-1 text-xl font-bold text-emerald-600 dark:text-emerald-400">
               {formatCurrency(available / 100, currency)}
             </p>
@@ -682,7 +690,7 @@ function WalletTab({
         </Card>
         <Card>
           <CardContent className="py-3">
-            <p className="text-xs text-muted-foreground">Reserved Credits</p>
+            <p className="text-xs text-muted-foreground">{t("wallet.reservedCredits")}</p>
             <p className="mt-1 text-xl font-bold text-amber-600 dark:text-amber-400">
               {formatCurrency(wallet.reserved_cents / 100, currency)}
             </p>
@@ -690,7 +698,7 @@ function WalletTab({
         </Card>
         <Card>
           <CardContent className="py-3">
-            <p className="text-xs text-muted-foreground">Used Credits</p>
+            <p className="text-xs text-muted-foreground">{t("wallet.usedCredits")}</p>
             <p className="mt-1 text-xl font-bold text-muted-foreground">
               {formatCurrency(wallet.used_cents / 100, currency)}
             </p>
@@ -700,30 +708,30 @@ function WalletTab({
 
       <div className="flex justify-end">
         <Button onClick={onAddFunds}>
-          <Plus className="mr-1 h-4 w-4" /> Add Funds
+          <Plus className="mr-1 h-4 w-4" /> {t("wallet.addFunds")}
         </Button>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Transaction History</CardTitle>
+          <CardTitle className="text-sm">{t("wallet.txHistory")}</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {transactions.length === 0 ? (
             <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
-              No transactions yet.
+              {t("wallet.noTransactions")}
             </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Balance After</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>{t("wallet.colDate")}</TableHead>
+                    <TableHead>{t("wallet.colType")}</TableHead>
+                    <TableHead>{t("wallet.colAmount")}</TableHead>
+                    <TableHead>{t("wallet.colBalanceAfter")}</TableHead>
+                    <TableHead>{t("wallet.colDescription")}</TableHead>
+                    <TableHead>{t("wallet.colStatus")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -736,7 +744,7 @@ function WalletTab({
                         <span
                           className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${txTypeBadgeClasses(tx.type)}`}
                         >
-                          {TX_TYPE_LABELS[tx.type] ?? tx.type}
+                          {txTypeLabel(tx.type)}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -790,6 +798,8 @@ function UsageTab({
   usage: ResourceUsage[];
   loading: boolean;
 }) {
+  const t = useTranslations("SaveMoney");
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -802,7 +812,7 @@ function UsageTab({
     return (
       <div className="flex flex-col items-center gap-3 py-16 text-muted-foreground">
         <BarChart3 className="h-8 w-8" />
-        <p className="text-sm">No usage data available.</p>
+        <p className="text-sm">{t("usage.none")}</p>
       </div>
     );
   }
@@ -811,44 +821,44 @@ function UsageTab({
 
   const metrics = [
     {
-      label: "Messages Sent",
+      label: t("usage.messagesSent"),
       value: current.messages_sent,
       icon: <Send className="h-4 w-4" />,
     },
     {
-      label: "Messages Received",
+      label: t("usage.messagesReceived"),
       value: current.messages_received,
       icon: <MessageSquare className="h-4 w-4" />,
     },
     {
-      label: "Contacts Created",
+      label: t("usage.contactsCreated"),
       value: current.contacts_created,
       icon: <Zap className="h-4 w-4" />,
     },
     {
-      label: "Broadcasts",
+      label: t("usage.broadcasts"),
       value: current.broadcasts_created,
       icon: <Send className="h-4 w-4" />,
     },
     {
-      label: "Automations",
+      label: t("usage.automations"),
       value: current.automations_executed,
       icon: <Zap className="h-4 w-4" />,
     },
     {
-      label: "AI Requests",
+      label: t("usage.aiRequests"),
       value: current.ai_requests,
       icon: <Zap className="h-4 w-4" />,
     },
     {
-      label: "API Requests",
+      label: t("usage.apiRequests"),
       value: current.api_requests,
       icon: <Zap className="h-4 w-4" />,
     },
     {
-      label: "Storage",
+      label: t("usage.storage"),
       value: Math.round(current.storage_used_bytes / 1024 / 1024),
-      suffix: "MB",
+      suffix: t("usage.mb"),
       icon: <Zap className="h-4 w-4" />,
     },
   ];
@@ -857,9 +867,9 @@ function UsageTab({
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Current Period</CardTitle>
+          <CardTitle className="text-sm">{t("usage.currentPeriod")}</CardTitle>
           <CardDescription>
-            {formatDate(current.period_start)} onwards
+            {t("usage.periodFrom", { date: formatDate(current.period_start) })}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -887,22 +897,22 @@ function UsageTab({
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Monthly Breakdown</CardTitle>
+          <CardTitle className="text-sm">{t("usage.monthlyBreakdown")}</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Period</TableHead>
-                  <TableHead>Sent</TableHead>
-                  <TableHead>Received</TableHead>
-                  <TableHead>Contacts</TableHead>
-                  <TableHead>Broadcasts</TableHead>
-                  <TableHead>Automations</TableHead>
-                  <TableHead>AI</TableHead>
-                  <TableHead>API</TableHead>
-                  <TableHead>Storage</TableHead>
+                  <TableHead>{t("usage.colPeriod")}</TableHead>
+                  <TableHead>{t("usage.colSent")}</TableHead>
+                  <TableHead>{t("usage.colReceived")}</TableHead>
+                  <TableHead>{t("usage.colContacts")}</TableHead>
+                  <TableHead>{t("usage.colBroadcasts")}</TableHead>
+                  <TableHead>{t("usage.colAutomations")}</TableHead>
+                  <TableHead>{t("usage.colAi")}</TableHead>
+                  <TableHead>{t("usage.colApi")}</TableHead>
+                  <TableHead>{t("usage.colStorage")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -930,7 +940,7 @@ function UsageTab({
                     <TableCell>{row.ai_requests.toLocaleString()}</TableCell>
                     <TableCell>{row.api_requests.toLocaleString()}</TableCell>
                     <TableCell>
-                      {(row.storage_used_bytes / 1024 / 1024).toFixed(1)} MB
+                      {(row.storage_used_bytes / 1024 / 1024).toFixed(1)} {t("usage.mb")}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -958,6 +968,8 @@ function SavingsAnalyticsTab({
   currency: string;
   loading: boolean;
 }) {
+  const t = useTranslations("SaveMoney");
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -1008,7 +1020,7 @@ function SavingsAnalyticsTab({
         <Card>
           <CardContent className="py-3">
             <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">Total Spent</p>
+              <p className="text-xs text-muted-foreground">{t("savings.totalSpent")}</p>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </div>
             <p className="mt-1 text-xl font-bold">
@@ -1019,7 +1031,7 @@ function SavingsAnalyticsTab({
         <Card>
           <CardContent className="py-3">
             <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">Budget Remaining</p>
+              <p className="text-xs text-muted-foreground">{t("savings.budgetRemaining")}</p>
               {budgetRemaining >= 0 ? (
                 <TrendingUp className="h-4 w-4 text-emerald-500" />
               ) : (
@@ -1035,7 +1047,7 @@ function SavingsAnalyticsTab({
         </Card>
         <Card>
           <CardContent className="py-3">
-            <p className="text-xs text-muted-foreground">Avg. Delivery Rate</p>
+            <p className="text-xs text-muted-foreground">{t("savings.avgDeliveryRate")}</p>
             <p className="mt-1 text-xl font-bold">
               {(avgDeliveryRate * 100).toFixed(1)}%
             </p>
@@ -1043,7 +1055,7 @@ function SavingsAnalyticsTab({
         </Card>
         <Card>
           <CardContent className="py-3">
-            <p className="text-xs text-muted-foreground">Template Approval</p>
+            <p className="text-xs text-muted-foreground">{t("savings.templateApproval")}</p>
             <p className="mt-1 text-xl font-bold">
               {approvalRate.toFixed(0)}%
             </p>
@@ -1054,16 +1066,18 @@ function SavingsAnalyticsTab({
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">Cost Optimization Tips</CardTitle>
+            <CardTitle className="text-sm">{t("savings.optTips")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {potentialSaving > 0 && (
               <div className="flex items-start gap-2 rounded-lg bg-emerald-500/5 p-3 text-sm">
                 <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
                 <p>
-                  Using <strong>utility</strong> templates instead of{" "}
-                  <strong>marketing</strong> saves approximately{" "}
-                  {potentialSaving.toFixed(0)}% per message.
+                  {t.rich("savings.tipUtility", {
+                    utility: (chunks) => <strong>{chunks}</strong>,
+                    marketing: (chunks) => <strong>{chunks}</strong>,
+                    percent: potentialSaving.toFixed(0),
+                  })}
                 </p>
               </div>
             )}
@@ -1071,8 +1085,7 @@ function SavingsAnalyticsTab({
               <div className="flex items-start gap-2 rounded-lg bg-amber-500/5 p-3 text-sm">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
                 <p>
-                  Only {approvalRate.toFixed(0)}% of templates are approved.
-                  Improve approval rates to avoid campaign delays.
+                  {t("savings.tipApproval", { percent: approvalRate.toFixed(0) })}
                 </p>
               </div>
             )}
@@ -1080,17 +1093,14 @@ function SavingsAnalyticsTab({
               <div className="flex items-start gap-2 rounded-lg bg-amber-500/5 p-3 text-sm">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
                 <p>
-                  Delivery rate is {(avgDeliveryRate * 100).toFixed(0)}%. Clean
-                  your contact list to reduce failed deliveries and save costs.
+                  {t("savings.tipDelivery", { percent: (avgDeliveryRate * 100).toFixed(0) })}
                 </p>
               </div>
             )}
             <div className="flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-sm">
               <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
               <p>
-                Schedule campaigns during off-peak hours and use utility
-                templates for transactional messages to minimize per-message
-                costs.
+                {t("savings.tipGeneral")}
               </p>
             </div>
           </CardContent>
@@ -1098,12 +1108,12 @@ function SavingsAnalyticsTab({
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">Spending Breakdown</CardTitle>
+            <CardTitle className="text-sm">{t("savings.spendBreakdown")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Wallet Balance</span>
+                <span className="text-muted-foreground">{t("savings.walletBalance")}</span>
                 <span className="font-medium">
                   {formatCurrency(totalBudget / 100, currency)}
                 </span>
@@ -1117,17 +1127,16 @@ function SavingsAnalyticsTab({
                 />
               </div>
               <div className="flex justify-between text-xs text-muted-foreground">
-                <span>Spent: {formatCurrency(totalSpent / 100, currency)}</span>
+                <span>{t("savings.spent", { amount: formatCurrency(totalSpent / 100, currency) })}</span>
                 <span>
-                  Remaining:{" "}
-                  {formatCurrency(Math.max(0, budgetRemaining) / 100, currency)}
+                  {t("savings.remaining", { amount: formatCurrency(Math.max(0, budgetRemaining) / 100, currency) })}
                 </span>
               </div>
             </div>
 
             <div className="mt-4 space-y-2">
               <p className="text-xs font-medium text-muted-foreground">
-                By Category
+                {t("savings.byCategory")}
               </p>
               {broadcasts.length > 0 ? (
                 Object.entries(
@@ -1156,7 +1165,7 @@ function SavingsAnalyticsTab({
                   ))
               ) : (
                 <p className="text-xs text-muted-foreground">
-                  No campaign data available.
+                  {t("savings.noCampaignData")}
                 </p>
               )}
             </div>
@@ -1247,12 +1256,12 @@ export default function SaveMoneyPage() {
       setUsage((usageRes.data ?? []) as ResourceUsage[]);
     } catch (err: unknown) {
       const message =
-        err instanceof Error ? err.message : "Failed to load data";
+        err instanceof Error ? err.message : t("common.failedLoad");
       setError(message);
     } finally {
       setLoading(false);
     }
-  }, [accountId, supabase]);
+  }, [accountId, supabase, t]);
 
   useEffect(() => {
     loadData();
@@ -1282,12 +1291,12 @@ export default function SaveMoneyPage() {
       await loadData();
     } catch (err: unknown) {
       const message =
-        err instanceof Error ? err.message : "Failed to add funds";
+        err instanceof Error ? err.message : t("common.failedAddFunds");
       setError(message);
     } finally {
       setAdding(false);
     }
-  }, [wallet, addAmount, supabase, loadData]);
+  }, [wallet, addAmount, supabase, loadData, t]);
 
   const currency = wallet?.currency ?? defaultCurrency;
 
@@ -1298,7 +1307,7 @@ export default function SaveMoneyPage() {
         <p className="text-sm text-destructive">{error}</p>
         <Button variant="outline" onClick={loadData}>
           <Loader2 className="mr-2 h-4 w-4" />
-          Retry
+          {t("common.retry")}
         </Button>
       </div>
     );
@@ -1308,23 +1317,23 @@ export default function SaveMoneyPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">
-          {t("title", { fallback: "Save Money" })}
+          {t("title")}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {t("subtitle", { fallback: "Control your WhatsApp/CRM spending" })}
+          {t("subtitle")}
         </p>
       </div>
 
       <Tabs defaultValue="templates">
         <TabsList className="flex-wrap">
-          <TabsTrigger value="templates">Templates</TabsTrigger>
-          <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
-          <TabsTrigger value="whatsapp">WhatsApp Campaigns</TabsTrigger>
-          <TabsTrigger value="broadcast">Smart Broadcast</TabsTrigger>
-          <TabsTrigger value="calculator">Cost Calculator</TabsTrigger>
-          <TabsTrigger value="wallet">Wallet</TabsTrigger>
-          <TabsTrigger value="usage">Usage</TabsTrigger>
-          <TabsTrigger value="savings">Savings Analytics</TabsTrigger>
+          <TabsTrigger value="templates">{t("tabs.templates")}</TabsTrigger>
+          <TabsTrigger value="campaigns">{t("tabs.campaigns")}</TabsTrigger>
+          <TabsTrigger value="whatsapp">{t("tabs.whatsapp")}</TabsTrigger>
+          <TabsTrigger value="broadcast">{t("tabs.broadcast")}</TabsTrigger>
+          <TabsTrigger value="calculator">{t("tabs.calculator")}</TabsTrigger>
+          <TabsTrigger value="wallet">{t("tabs.wallet")}</TabsTrigger>
+          <TabsTrigger value="usage">{t("tabs.usage")}</TabsTrigger>
+          <TabsTrigger value="savings">{t("tabs.savings")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="templates">
@@ -1405,14 +1414,14 @@ export default function SaveMoneyPage() {
       <Dialog open={addFundsOpen} onOpenChange={setAddFundsOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add Funds</DialogTitle>
+            <DialogTitle>{t("dialog.addFunds")}</DialogTitle>
             <DialogDescription>
-              Add credits to your wallet for WhatsApp messaging.
+              {t("dialog.description")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label htmlFor="fund-amount">Amount</Label>
+              <Label htmlFor="fund-amount">{t("dialog.amount")}</Label>
               <div className="relative">
                 <DollarSign className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -1434,14 +1443,14 @@ export default function SaveMoneyPage() {
               onClick={() => setAddFundsOpen(false)}
               disabled={adding}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={handleAddFunds}
               disabled={adding || !addAmount || parseFloat(addAmount) <= 0}
             >
               {adding && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Add Funds
+              {t("dialog.addFunds")}
             </Button>
           </DialogFooter>
         </DialogContent>
