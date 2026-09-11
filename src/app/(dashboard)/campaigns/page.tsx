@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Megaphone,
   Plus,
@@ -16,7 +17,25 @@ import {
   Radio,
   FileEdit,
   Clock,
+  Search,
+  MoreVertical,
+  Copy,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { PageHeader } from '@/components/shared/page-header';
 import { EmptyState } from '@/components/shared/empty-state';
 
@@ -48,18 +67,27 @@ const STATUS_STYLES: Record<string, { label: string; classes: string }> = {
   failed: { label: 'Failed', classes: 'bg-red-600/20 text-red-400 border-red-600/30' },
 };
 
+const STATUS_FILTERS = ['all', 'draft', 'scheduled', 'sending', 'sent', 'failed'] as const;
+
+const PAGE_SIZE = 25;
+
 function rate(part: number | null | undefined, total: number | null | undefined): string {
   if (!total) return '—';
   return `${Math.round(((part ?? 0) / total) * 100)}%`;
 }
 
 export default function CampaignsPage() {
-  const { accountId, loading: authLoading } = useAuth();
+  const { accountId, user, loading: authLoading } = useAuth();
   const supabase = createClient();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -73,18 +101,28 @@ export default function CampaignsPage() {
       try {
         setLoading(true);
         setError(null);
-        // Latest 50 campaigns; aggregate KPIs computed over this window.
-        const { data, error: err } = await supabase
+        let query = supabase
           .from('broadcasts')
           .select(
             'id, name, status, total_recipients, sent_count, delivered_count, read_count, failed_count, replied_count, scheduled_at, created_at',
+            { count: 'exact' },
           )
           .eq('account_id', accountId)
           .order('created_at', { ascending: false })
-          .limit(50);
+          .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
+
+        if (statusFilter !== 'all') {
+          query = query.eq('status', statusFilter);
+        }
+        if (search.trim()) {
+          query = query.ilike('name', `%${search.trim()}%`);
+        }
+
+        const { data, error: err, count } = await query;
         if (err) throw err;
         if (!cancelled && seq === ((window as unknown as Record<string, number>).__campaignsSeq ?? 0)) {
           setCampaigns((data ?? []) as CampaignRow[]);
+          setTotal(count ?? 0);
         }
       } catch (err) {
         console.error('Failed to load campaigns:', err);
@@ -96,7 +134,55 @@ export default function CampaignsPage() {
     return () => {
       cancelled = true;
     };
-  }, [accountId, authLoading, supabase]);
+  }, [accountId, authLoading, supabase, search, statusFilter, page]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter]);
+
+  async function handleDuplicate(id: string) {
+    if (!accountId || !user) return;
+    setDuplicatingId(id);
+    try {
+      const { data: src, error: srcErr } = await supabase
+        .from('broadcasts')
+        .select(
+          'name, template_name, template_language, template_variables, audience_filter, scheduled_at',
+        )
+        .eq('id', id)
+        .eq('account_id', accountId)
+        .maybeSingle();
+      if (srcErr) throw srcErr;
+      if (!src) throw new Error('Campaign not found');
+
+      const { data: clone, error: insertErr } = await supabase
+        .from('broadcasts')
+        .insert({
+          user_id: user.id,
+          account_id: accountId,
+          name: `Copy of ${src.name}`.slice(0, 255),
+          template_name: src.template_name,
+          template_language: src.template_language,
+          template_variables: (src.template_variables ?? {}) as Record<string, unknown>,
+          audience_filter: (src.audience_filter ?? {}) as Record<string, unknown>,
+          scheduled_at: null,
+          status: 'draft',
+        })
+        .select(
+          'id, name, status, total_recipients, sent_count, delivered_count, read_count, failed_count, replied_count, scheduled_at, created_at',
+        )
+        .single();
+      if (insertErr) throw insertErr;
+
+      setCampaigns((prev) => [clone as CampaignRow, ...prev]);
+      setTotal((prev) => prev + 1);
+    } catch (err) {
+      console.error('Failed to duplicate campaign:', err);
+      setError('Failed to duplicate campaign. Please try again.');
+    } finally {
+      setDuplicatingId(null);
+    }
+  }
 
   const totals = campaigns.reduce(
     (acc, c) => {
@@ -114,6 +200,8 @@ export default function CampaignsPage() {
     },
     { recipients: 0, sent: 0, delivered: 0, read: 0, failed: 0, replied: 0, active: 0, completed: 0, failedCampaigns: 0, drafts: 0 },
   );
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
     <div className="space-y-6">
@@ -163,6 +251,31 @@ export default function CampaignsPage() {
         />
       </div>
 
+      {/* Filters */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search campaigns…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v ?? 'all')}>
+          <SelectTrigger className="w-full sm:w-[180px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {STATUS_FILTERS.map((s) => (
+              <SelectItem key={s} value={s}>
+                {s === 'all' ? 'All statuses' : (STATUS_STYLES[s]?.label ?? s)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       {/* Campaign table */}
       <div className="overflow-hidden rounded-xl border border-border bg-card">
         {loading || authLoading ? (
@@ -181,8 +294,12 @@ export default function CampaignsPage() {
         ) : campaigns.length === 0 ? (
           <EmptyState
             icon={Megaphone}
-            title="No campaigns yet"
-            description="Create your first campaign to send an approved template to a targeted audience and track delivery end-to-end."
+            title={search.trim() || statusFilter !== 'all' ? 'No campaigns match' : 'No campaigns yet'}
+            description={
+              search.trim() || statusFilter !== 'all'
+                ? 'Try adjusting your search or filter to see more campaigns.'
+                : 'Create your first campaign to send an approved template to a targeted audience and track delivery end-to-end.'
+            }
             action={
               <Link
                 href="/broadcasts/new"
@@ -205,6 +322,7 @@ export default function CampaignsPage() {
                   <th className="px-4 py-3">Read</th>
                   <th className="px-4 py-3">Failed</th>
                   <th className="px-4 py-3">Created</th>
+                  <th className="w-12 px-4 py-3"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -251,11 +369,64 @@ export default function CampaignsPage() {
                       <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
                         {new Date(c.created_at).toLocaleDateString()}
                       </td>
+                      <td className="px-4 py-3 text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                              {duplicatingId === c.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <MoreVertical className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              disabled={duplicatingId === c.id}
+                              onSelect={() => handleDuplicate(c.id)}
+                            >
+                              <Copy className="h-4 w-4 mr-2" />
+                              Duplicate as draft
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {total > PAGE_SIZE && (
+          <div className="flex items-center justify-between border-t border-border px-4 py-3">
+            <p className="text-xs text-muted-foreground">
+              Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Previous
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                Page {page} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Next
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
           </div>
         )}
       </div>

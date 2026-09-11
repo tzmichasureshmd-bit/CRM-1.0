@@ -1177,7 +1177,7 @@ function SavingsAnalyticsTab({
 }
 
 export default function SaveMoneyPage() {
-  const { accountId, defaultCurrency } = useAuth();
+  const { accountId, user, defaultCurrency } = useAuth();
   const t = useTranslations("SaveMoney");
   const supabase = createClient();
 
@@ -1274,16 +1274,24 @@ export default function SaveMoneyPage() {
       const amountCents = Math.round(parseFloat(addAmount) * 100);
       if (isNaN(amountCents) || amountCents <= 0) return;
 
-      const { error: updateErr } = await supabase
-        .from("wallets")
-        .update({ balance_cents: wallet.balance_cents + amountCents })
-        .eq("id", wallet.id);
+      const { data, error: rpcErr } = await supabase.rpc("update_wallet_balance", {
+        p_wallet_id: wallet.id,
+        p_amount_cents: amountCents,
+        p_type: "credit_purchase",
+        p_description: "Manual wallet top-up",
+        p_created_by: user?.id ?? null,
+      });
 
-      if (updateErr) throw updateErr;
+      if (rpcErr) throw rpcErr;
+
+      const result = (data ?? {}) as { success: boolean; balance_after?: number; error?: string };
+      if (!result.success) {
+        throw new Error(result.error ?? "Failed to update wallet balance");
+      }
 
       setWallet((prev) =>
         prev
-          ? { ...prev, balance_cents: prev.balance_cents + amountCents }
+          ? { ...prev, balance_cents: result.balance_after ?? prev.balance_cents + amountCents }
           : prev,
       );
       setAddFundsOpen(false);
@@ -1296,7 +1304,7 @@ export default function SaveMoneyPage() {
     } finally {
       setAdding(false);
     }
-  }, [wallet, addAmount, supabase, loadData, t]);
+  }, [wallet, addAmount, supabase, loadData, t, user?.id]);
 
   const currency = wallet?.currency ?? defaultCurrency;
 

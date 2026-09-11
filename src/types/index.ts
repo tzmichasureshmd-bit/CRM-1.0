@@ -887,6 +887,8 @@ export interface AuditLogEntry {
 export type TicketStatus = "open" | "in_progress" | "waiting" | "resolved" | "closed";
 export type TicketPriority = "low" | "medium" | "high" | "urgent";
 
+export type TicketCategory = "general" | "billing" | "technical" | "feature_request" | "other";
+
 export interface Ticket {
   id: string;
   account_id: string;
@@ -897,6 +899,7 @@ export interface Ticket {
   description?: string;
   status: TicketStatus;
   priority: TicketPriority;
+  category: TicketCategory;
   assigned_agent_id?: string;
   tags: string[];
   created_by?: string;
@@ -1270,4 +1273,25 @@ export interface CostEstimate {
   service_fee_cents: number;
   total_estimated_cents: number;
   currency: string;
+}
+
+// ============================================================
+// Preset Campaigns (reusable campaign templates — 066)
+// ============================================================
+
+export interface PresetCampaign {
+  id: string;
+  account_id: string;
+  created_by?: string;
+  name: string;
+  category: string;
+  description?: string;
+  template_name: string;
+  template_language: string;
+  audience_filter: Record<string, unknown>;
+  template_variables: Record<string, unknown>;
+  header_media_url?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }

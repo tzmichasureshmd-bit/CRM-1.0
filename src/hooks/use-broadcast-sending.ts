@@ -52,6 +52,7 @@ interface BroadcastPayload {
 
 interface UseBroadcastSendingReturn {
   createAndSendBroadcast: (payload: BroadcastPayload) => Promise<string>;
+  scheduleBroadcast: (payload: BroadcastPayload, scheduledAtISO: string) => Promise<string>;
   isProcessing: boolean;
   progress: number;
 }
@@ -414,6 +415,97 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
       .eq('id', contactId);
   }
 
+  /**
+   * Persist a broadcast to be delivered later by the server-side
+   * scheduler (`/api/whatsapp/cron-broadcasts`). Records the audience
+   * by resolving it now (so recipients + reach are locked in at
+   * scheduling time) but sends nothing.
+   */
+  async function scheduleBroadcast(
+    payload: BroadcastPayload,
+    scheduledAtISO: string,
+  ): Promise<string> {
+    const supabase = createClient();
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const user = session?.user;
+    if (!user) {
+      throw new Error('You are not signed in.');
+    }
+    if (!accountId) {
+      throw new Error('Your profile is not linked to an account.');
+    }
+
+    const scheduledAt = new Date(scheduledAtISO);
+    if (isNaN(scheduledAt.getTime()) || scheduledAt.getTime() <= Date.now()) {
+      throw new Error('Schedule time must be in the future.');
+    }
+
+    const contacts = await resolveAudience(payload.audience);
+    if (contacts.length === 0) {
+      throw new Error('No contacts found for this audience.');
+    }
+
+    const { data: broadcast, error: broadcastError } = await supabase
+      .from('broadcasts')
+      .insert({
+        user_id: user.id,
+        account_id: accountId,
+        name: payload.name,
+        template_name: payload.template.name,
+        template_language: payload.template.language ?? 'en_US',
+        template_variables: payload.variables,
+        audience_filter: {
+          type: payload.audience.type,
+          tagIds: payload.audience.tagIds,
+          customField: payload.audience.customField,
+          excludeTagIds: payload.audience.excludeTagIds,
+        },
+        status: 'scheduled',
+        scheduled_at: scheduledAt.toISOString(),
+        total_recipients: contacts.length,
+        sent_count: 0,
+        delivered_count: 0,
+        read_count: 0,
+        replied_count: 0,
+        failed_count: 0,
+      })
+      .select()
+      .single();
+
+    if (broadcastError || !broadcast) {
+      throw new Error(
+        `Failed to schedule broadcast: ${broadcastError?.message ?? 'unknown error'}`,
+      );
+    }
+
+    const recipientRows = contacts.map((contact) => ({
+      broadcast_id: broadcast.id,
+      contact_id: contact.id,
+      status: 'pending' as const,
+    }));
+
+    for (let i = 0; i < recipientRows.length; i += INSERT_BATCH_SIZE) {
+      const batch = recipientRows.slice(i, i + INSERT_BATCH_SIZE);
+      const { error: recipientError } = await supabase
+        .from('broadcast_recipients')
+        .insert(batch);
+      if (recipientError) {
+        await supabase
+          .from('broadcasts')
+          .update({ status: 'failed' })
+          .eq('id', broadcast.id);
+        throw new Error(
+          `Failed to insert recipient batch ${i / INSERT_BATCH_SIZE + 1}: ${recipientError.message}`,
+        );
+      }
+    }
+
+    return broadcast.id;
+  }
+
   async function createAndSendBroadcast(payload: BroadcastPayload): Promise<string> {
     setIsProcessing(true);
     setProgress(0);
@@ -690,5 +782,5 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
     }
   }
 
-  return { createAndSendBroadcast, isProcessing, progress };
+  return { createAndSendBroadcast, scheduleBroadcast, isProcessing, progress };
 }

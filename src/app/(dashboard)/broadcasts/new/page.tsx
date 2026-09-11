@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
@@ -26,7 +26,7 @@ export default function NewBroadcastPage() {
   const searchParams = useSearchParams();
   const t = useTranslations('Broadcasts.new');
   const { accountId } = useAuth();
-  const { createAndSendBroadcast, isProcessing, progress } = useBroadcastSending();
+  const { createAndSendBroadcast, scheduleBroadcast, isProcessing, progress } = useBroadcastSending();
 
   const [currentStep, setCurrentStep] = useState(0);
   const [template, setTemplate] = useState<MessageTemplate | null>(null);
@@ -61,6 +61,40 @@ export default function NewBroadcastPage() {
   >({});
   const [headerMediaUrl, setHeaderMediaUrl] = useState('');
   const [name, setName] = useState('');
+
+  // Prefill from preset query param: /broadcasts/new?preset=<id>
+  useEffect(() => {
+    const presetId = searchParams.get('preset');
+    if (!presetId || !accountId) return;
+    let cancelled = false;
+    (async () => {
+      const supabase = createClient();
+      const { data: preset, error } = await supabase
+        .from('preset_campaigns')
+        .select('*')
+        .eq('id', presetId)
+        .eq('account_id', accountId)
+        .maybeSingle();
+      if (error || !preset || cancelled) return;
+
+      setName(preset.name);
+      setVariables(preset.template_variables as Record<string, { type: 'static' | 'field' | 'custom_field'; value: string }> ?? {});
+      if (preset.audience_filter && typeof preset.audience_filter === 'object') {
+        setAudience(preset.audience_filter as typeof audience);
+      }
+      if (preset.header_media_url) setHeaderMediaUrl(preset.header_media_url);
+
+      // Try to auto-select the template by name
+      const { data: tpl } = await supabase
+        .from('message_templates')
+        .select('*')
+        .eq('account_id', accountId)
+        .eq('name', preset.template_name)
+        .maybeSingle();
+      if (tpl && !cancelled) setTemplate(tpl as unknown as MessageTemplate);
+    })();
+    return () => { cancelled = true; };
+  }, [accountId, searchParams]);
 
   async function handleSend() {
     if (!template) return;
@@ -144,6 +178,35 @@ export default function NewBroadcastPage() {
     }
     toast.success(t('toastDraftSaved'));
     router.push('/broadcasts');
+  }
+
+  async function handleSchedule(scheduledAtISO: string) {
+    if (!template) return;
+    try {
+      const broadcastId = await scheduleBroadcast(
+        {
+          name,
+          template,
+          audience: {
+            type: audience.type,
+            tagIds: audience.tagIds,
+            customField: audience.customField,
+            csvContacts: audience.csvContacts,
+            excludeTagIds: audience.excludeTagIds,
+            contactIds: audience.contactIds,
+          },
+          variables,
+          headerMediaUrl,
+        },
+        scheduledAtISO,
+      );
+      toast.success('Campaign scheduled');
+      router.push(`/campaigns/${broadcastId}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to schedule';
+      console.error('Schedule failed:', err);
+      toast.error(message);
+    }
   }
 
   return (
@@ -239,6 +302,7 @@ export default function NewBroadcastPage() {
               template={template}
               audience={audience}
               onSend={handleSend}
+              onSchedule={handleSchedule}
               onSaveDraft={handleSaveDraft}
               onBack={() => setCurrentStep(2)}
               isProcessing={isProcessing}

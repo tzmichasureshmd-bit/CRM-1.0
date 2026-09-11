@@ -63,18 +63,20 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
     }
 
-    const { body: commentBody, is_internal } = body
+    const { body: commentBody, content: rawContent, is_internal } = body
+    const commentText = typeof rawContent === 'string' ? rawContent : typeof commentBody === 'string' ? commentBody : ''
 
-    if (!commentBody || typeof commentBody !== 'string') {
-      return NextResponse.json({ error: 'body is required' }, { status: 400 })
+    if (!commentText) {
+      return NextResponse.json({ error: 'content is required' }, { status: 400 })
     }
 
     const { data, error } = await ctx.supabase
       .from('ticket_comments')
       .insert({
+        account_id: ctx.accountId,
         ticket_id: id,
         user_id: ctx.userId,
-        body: commentBody.trim(),
+        content: commentText.trim(),
         is_internal: is_internal === true,
       })
       .select('*')

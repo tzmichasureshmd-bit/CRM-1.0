@@ -14,7 +14,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { ArrowLeft, Send, Loader2, Users, Save } from 'lucide-react';
+import { ArrowLeft, Send, Loader2, Users, Save, CalendarClock } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
 interface AudienceConfig {
@@ -29,6 +29,7 @@ interface Step4Props {
   template: MessageTemplate;
   audience: AudienceConfig;
   onSend: () => void;
+  onSchedule: (scheduledAtISO: string) => void;
   onSaveDraft?: () => void;
   onBack: () => void;
   isProcessing: boolean;
@@ -41,6 +42,7 @@ export function Step4ScheduleSend({
   template,
   audience,
   onSend,
+  onSchedule,
   onSaveDraft,
   onBack,
   isProcessing,
@@ -48,8 +50,27 @@ export function Step4ScheduleSend({
 }: Step4Props) {
   const t = useTranslations('Broadcasts.wizard');
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showSchedule, setShowSchedule] = useState(false);
+  const [scheduledAt, setScheduledAt] = useState('');
   const [estimatedReach, setEstimatedReach] = useState<number>(0);
   const [loadingReach, setLoadingReach] = useState(true);
+
+  const minDatetime = (() => {
+    const d = new Date(Date.now() + 5 * 60 * 1000);
+    d.setSeconds(0, 0);
+    const offset = d.getTimezoneOffset() * 60000;
+    return new Date(d.getTime() - offset).toISOString().slice(0, 16);
+  })();
+
+  function confirmSchedule() {
+    if (!scheduledAt) return;
+    const iso = new Date(scheduledAt).toISOString();
+    if (isNaN(new Date(iso).getTime()) || new Date(iso).getTime() <= Date.now()) {
+      return;
+    }
+    setShowSchedule(false);
+    onSchedule(iso);
+  }
 
   useEffect(() => {
     async function calculateReach() {
@@ -187,6 +208,16 @@ export function Step4ScheduleSend({
             </Button>
           )}
 
+          <Button
+            variant="outline"
+            onClick={() => setShowSchedule(true)}
+            disabled={!name.trim() || isProcessing}
+            className="border-border text-muted-foreground hover:bg-muted disabled:opacity-50"
+          >
+            <CalendarClock className="h-4 w-4" />
+            Schedule
+          </Button>
+
           <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
           <DialogTrigger
             render={
@@ -230,9 +261,48 @@ export function Step4ScheduleSend({
               </Button>
             </DialogFooter>
           </DialogContent>
-        </Dialog>
-        </div>
+</Dialog>
+          </div>
       </div>
+
+      {/* Schedule dialog */}
+      <Dialog open={showSchedule} onOpenChange={setShowSchedule}>
+        <DialogContent className="border-border bg-popover sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-popover-foreground">Schedule Broadcast</DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Pick a future date and time to send this campaign. The message will be delivered automatically at the scheduled time.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 pt-2">
+            <label className="text-sm font-medium text-foreground">Date &amp; Time</label>
+            <input
+              type="datetime-local"
+              value={scheduledAt}
+              min={minDatetime}
+              onChange={(e) => setScheduledAt(e.target.value)}
+              className="flex h-9 w-full rounded-lg border border-border bg-background px-3 py-1 text-sm text-foreground"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => { setShowSchedule(false); setScheduledAt(''); }}
+              className="border-border text-muted-foreground"
+            >
+              {t('cancel')}
+            </Button>
+            <Button
+              disabled={!name.trim() || !scheduledAt || isProcessing}
+              onClick={confirmSchedule}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            >
+              <CalendarClock className="h-4 w-4" />
+              Schedule
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

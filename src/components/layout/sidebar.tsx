@@ -8,6 +8,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { useTotalUnread } from "@/hooks/use-total-unread";
 import { useUnreadNotifications } from "@/hooks/use-unread-notifications";
 import {
+  BookOpen,
+  Bookmark,
   Bell,
   Bot,
   Calendar,
@@ -109,6 +111,7 @@ const navSections: NavSection[] = [
       { href: "/campaigns", labelKey: "campaigns", icon: Megaphone },
       { href: "/broadcasts", labelKey: "broadcasts", icon: Radio },
       { href: "/templates", labelKey: "templates", icon: Layers },
+      { href: "/presets", labelKey: "presetCampaigns", icon: Bookmark },
     ],
     defaultOpen: true,
   },
@@ -123,7 +126,6 @@ const navSections: NavSection[] = [
       { href: "/automations/quick-replies", labelKey: "quickReplies", icon: StickyNote },
       { href: "/automations/keyboard-triggers", labelKey: "keyboardTriggers", icon: Timer },
       { href: "/automations/appointments", labelKey: "appointments", icon: Calendar },
-      { href: "/automations/tickets", labelKey: "tickets", icon: Ticket },
     ],
     defaultOpen: true,
   },
@@ -141,6 +143,7 @@ const navSections: NavSection[] = [
       { href: "/notifications", labelKey: "notifications", icon: Bell },
       { href: "/media-library", labelKey: "mediaLibrary", icon: Images },
       { href: "/api", labelKey: "apiDeveloper", icon: Code },
+      { href: "/guide", labelKey: "userGuide", icon: BookOpen },
     ],
   },
 ];
@@ -277,6 +280,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
             {[
               { href: "/dashboard", labelKey: "dashboard", icon: LayoutDashboard },
               { href: "/social-media", labelKey: "socialMedia", icon: Share2 },
+              { href: "/tickets", labelKey: "tickets", icon: Ticket },
             ].map((item) => {
               const isActive = pathname === item.href;
               return (
