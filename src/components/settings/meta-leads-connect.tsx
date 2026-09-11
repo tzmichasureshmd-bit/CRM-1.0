@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ThumbsUp, Camera, Link2, Unlink, RefreshCw } from "lucide-react";
+import { Loader2, ThumbsUp, Camera, Link2, Unlink, RefreshCw, Download } from "lucide-react";
 
 interface PageConnection {
   id: string;
@@ -69,7 +69,7 @@ export function MetaLeadsConnect() {
       toast.error("You declined the connection with Meta");
     } else if (status === "config_error") {
       toast.error(
-        "Meta integration configuration is incomplete. Please contact your CRM administrator.",
+        "Meta isn't configured on this server yet. Ask your administrator to set META_APP_ID and META_APP_SECRET, then try again.",
       );
     } else if (status === "error_no_pages") {
       toast.error(
@@ -103,6 +103,42 @@ export function MetaLeadsConnect() {
       void fetchConnections();
     } else {
       toast.error("Could not remove connection");
+    }
+  };
+
+  const [syncing, setSyncing] = useState(false);
+
+  // Re-pull recent leads from the connected Pages through the official
+  // Graph API, reusing the same idempotent pipeline the webhook uses.
+  // Safe after a disconnect/reconnect gap or a missed webhook delivery.
+  const syncNow = async () => {
+    if (syncing || connections.length === 0) return;
+    setSyncing(true);
+    try {
+      const res = await fetch("/api/meta/leads/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        toast.error(
+          data?.error ?? "Sync failed. Please try again.",
+        );
+        return;
+      }
+      const created = data?.created ?? 0;
+      const updated = data?.updated ?? 0;
+      const duplicates = data?.duplicates ?? 0;
+      const errors = data?.errors ?? 0;
+      toast.success(
+        `Sync complete — ${created} new, ${updated} updated, ${duplicates} already known${errors > 0 ? `, ${errors} error(s)` : ""}.`,
+      );
+      void fetchConnections();
+    } catch (err) {
+      console.error("Meta sync failed:", err);
+      toast.error("Sync failed. Please try again.");
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -165,6 +201,16 @@ export function MetaLeadsConnect() {
           className="border-border text-muted-foreground hover:bg-muted"
         >
           <RefreshCw className="size-4" /> Refresh
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => void syncNow()}
+          disabled={syncing || connections.length === 0}
+          className="border-border text-muted-foreground hover:bg-muted"
+          title="Pull recent leads from Meta manually (idempotent — already-synced leads are skipped)"
+        >
+          {syncing ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+          {syncing ? "Syncing…" : "Sync now"}
         </Button>
       </div>
 

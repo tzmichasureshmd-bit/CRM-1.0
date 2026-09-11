@@ -1,11 +1,30 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ClipboardCopy, KeyRound, FileJson } from "lucide-react";
+import {
+  ClipboardCopy,
+  KeyRound,
+  FileJson,
+  CheckCircle2,
+  Loader2,
+  AlertCircle,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
+
+const GOOGLE_FORM_SOURCE = "google_form";
+
+function fmtDate(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString();
+}
 
 /**
  * Google Forms → CRM integration guide. The credential for this
@@ -17,6 +36,14 @@ import { Button } from "@/components/ui/button";
 export function GoogleFormsSettings() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { accountId, loading: authLoading } = useAuth();
+
+  const [status, setStatus] = useState<{
+    contactCount: number;
+    lastSubmission: string | null;
+  } | null>(null);
+  const [statusLoading, setStatusLoading] = useState(true);
+  const [statusError, setStatusError] = useState(false);
 
   const goApi = () => {
     const params = new URLSearchParams(searchParams.toString());
@@ -32,6 +59,40 @@ export function GoogleFormsSettings() {
       )
       .catch(() => toast.error("Could not copy snippet"));
   };
+
+  // Live status: count contacts that actually arrived via the Google
+  // Forms integration + the most recent submission. If the Apps Script
+  // has never delivered anything, the panel says "Not connected yet".
+  useEffect(() => {
+    if (authLoading || !accountId) return;
+    const supabase = createClient();
+    (async () => {
+      try {
+        const { data, count, error } = await supabase
+          .from("contacts")
+          .select("created_at", { count: "exact", head: false })
+          .eq("account_id", accountId)
+          .eq("source", GOOGLE_FORM_SOURCE)
+          .order("created_at", { ascending: false })
+          .limit(1);
+        if (error) {
+          setStatusError(true);
+          return;
+        }
+        setStatus({
+          contactCount: count ?? 0,
+          lastSubmission: data?.[0]?.created_at ?? null,
+        });
+      } catch (e) {
+        console.error("Google Forms status failed:", e);
+        setStatusError(true);
+      } finally {
+        setStatusLoading(false);
+      }
+    })();
+  }, [accountId, authLoading]);
+
+  const connected = Boolean(status && status.contactCount > 0);
 
   return (
     <div className="space-y-6">
@@ -49,6 +110,60 @@ export function GoogleFormsSettings() {
         <Badge variant="outline" className="border-emerald-500/40 bg-emerald-500/10 text-emerald-400">
           Auto-sync via Apps Script
         </Badge>
+      </div>
+
+      {/* Live status — derived from contacts the integration actually
+          delivered (source = google_form), never a guessed state. */}
+      <div className="rounded-xl border border-border bg-card p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-medium text-foreground">Connection status</h3>
+            {statusLoading ? (
+              <Loader2 className="size-4 animate-spin text-muted-foreground" />
+            ) : statusError ? (
+              <Badge variant="outline" className="border-red-500/40 bg-red-500/10 text-red-400">
+                <AlertCircle className="size-3" /> Unknown
+              </Badge>
+            ) : connected ? (
+              <Badge variant="outline" className="border-emerald-500/40 bg-emerald-500/10 text-emerald-400">
+                <CheckCircle2 className="size-3" /> Connected
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="border-border text-muted-foreground">
+                Not started
+              </Badge>
+            )}
+          </div>
+        </div>
+
+        {!statusLoading && !statusError && status && (
+          <div className="mt-3 grid grid-cols-2 gap-4">
+            <div className="rounded-lg bg-muted/40 px-3 py-2">
+              <p className="text-xs text-muted-foreground">Contacts synced</p>
+              <p className="text-lg font-bold tabular-nums text-foreground">
+                {status.contactCount.toLocaleString()}
+              </p>
+            </div>
+            <div className="rounded-lg bg-muted/40 px-3 py-2">
+              <p className="text-xs text-muted-foreground">Last submission</p>
+              <p className="text-lg font-bold tabular-nums text-foreground">
+                {fmtDate(status.lastSubmission)}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {!statusLoading && !statusError && !connected && (
+          <p className="mt-3 text-xs text-muted-foreground">
+            No submissions have reached the CRM yet. Follow the setup steps
+            below — once a form response arrives it appears here as a contact
+            with the{" "}
+            <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-400 text-[10px]">
+              Google Form
+            </Badge>{" "}
+            source badge.
+          </p>
+        )}
       </div>
 
       {/* Endpoint */}

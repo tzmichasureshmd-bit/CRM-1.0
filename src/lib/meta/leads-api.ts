@@ -375,3 +375,42 @@ export async function getPageLeadForms(
   const data = (await res.json()) as { data?: LeadFormSummary[] }
   return data.data ?? []
 }
+
+/**
+ * Fetch the most recent lead submissions for a lead form
+ * (leads_retrieval). Backs the manual "Sync now" action after a
+ * disconnect/reconnect gap — pulls the same fields the webhook uses so
+ * `processMetaLead` can attribute campaign/ad/form details, and
+ * `meta_lead_events` dedupes anything the webhook already delivered.
+ * `limit` is capped at 100 per the Graph API.
+ */
+export async function getLeadFormLeads(
+  formId: string,
+  accessToken: string,
+  limit = 25,
+): Promise<MetaLead[]> {
+  const fields = [
+    'id',
+    'created_time',
+    'form_id',
+    'form_name',
+    'ad_id',
+    'ad_name',
+    'adset_id',
+    'adset_name',
+    'campaign_id',
+    'campaign_name',
+    'is_organic',
+    'field_data',
+  ].join(',')
+  const capped = Math.max(1, Math.min(limit, 100))
+  const url =
+    `${META_LEADS_API_BASE}/${formId}/leads?fields=${encodeURIComponent(fields)}` +
+    `&limit=${capped}`
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  await throwIfNotOk(res, 'get_lead_form_leads')
+  const data = (await res.json()) as { data?: MetaLead[] }
+  return data.data ?? []
+}

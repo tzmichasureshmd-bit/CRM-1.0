@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   Settings2,
   Unlink,
+  Download,
 } from "lucide-react";
 import { LeadStatCards, type LeadStats } from "@/components/social-media/lead-stat-cards";
 import { RecentLeads, type RecentLead } from "@/components/social-media/recent-leads";
@@ -90,6 +91,7 @@ function SocialMediaContent() {
   const searchParams = useSearchParams();
   const [data, setData] = useState<OverviewPayload | null>(null);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   // Default to true so a failed /failure of the config endpoint never shows
   // a false alarm; it flips to false only on an explicit server response.
   const [metaConfigured, setMetaConfigured] = useState(true);
@@ -157,7 +159,7 @@ function SocialMediaContent() {
       );
     } else if (status === "config_error") {
       toast.error(
-        "Meta integration configuration is incomplete. Please contact your CRM administrator.",
+        "Meta isn't configured on this server yet. Ask your administrator to set META_APP_ID and META_APP_SECRET.",
       );
     }
 
@@ -194,6 +196,37 @@ function SocialMediaContent() {
     ? `@${instagramConnections[0].instagramUsername}`
     : null;
 
+  // Manual "Sync now" — re-pulls recent leads from Meta through the same
+  // idempotent pipeline the webhook uses (meta_lead_events dedupes).
+  const syncNow = async () => {
+    if (syncing) return;
+    setSyncing(true);
+    try {
+      const res = await fetch("/api/meta/leads/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        toast.error(payload?.error ?? "Sync failed. Please try again.");
+        return;
+      }
+      const created = payload?.created ?? 0;
+      const updated = payload?.updated ?? 0;
+      const duplicates = payload?.duplicates ?? 0;
+      const errors = payload?.errors ?? 0;
+      toast.success(
+        `Sync complete — ${created} new, ${updated} updated, ${duplicates} already known${errors > 0 ? `, ${errors} error(s)` : ""}.`,
+      );
+      void load();
+    } catch (err) {
+      console.error("Meta sync failed:", err);
+      toast.error("Sync failed. Please try again.");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -211,19 +244,47 @@ function SocialMediaContent() {
           className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-300"
         >
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-          <div>
-            <p className="font-semibold">Meta integration configuration is incomplete.</p>
+          <div className="flex-1">
+            <p className="font-semibold">Meta integration not configured</p>
             <p className="text-amber-300/80">
-              Facebook/Instagram connection is not enabled on this deployment yet. Please contact your
-              CRM administrator.
+              Facebook and Instagram Lead Ads require
+              <code className="mx-1 rounded bg-amber-950/60 px-1.5 py-0.5 font-mono text-[11px]">META_APP_ID</code>
+              and
+              <code className="ml-1 rounded bg-amber-950/60 px-1.5 py-0.5 font-mono text-[11px]">META_APP_SECRET</code>
+              on the server. Ask your administrator to set these environment
+              variables, then come back here and connect.
             </p>
+            <Link
+              href="/integrations"
+              className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-amber-200 underline underline-offset-2 hover:text-amber-100"
+            >
+              View all integrations
+            </Link>
           </div>
         </div>
       )}
 
       {/* Lead Overview */}
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-foreground">Lead Overview</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-foreground">Lead Overview</h2>
+          {facebookConnected && (
+            <button
+              type="button"
+              onClick={() => void syncNow()}
+              disabled={syncing}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-60"
+              title="Pull recent leads from Meta manually (already-synced leads are skipped)"
+            >
+              {syncing ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Download className="size-3.5" />
+              )}
+              {syncing ? "Syncing…" : "Sync now"}
+            </button>
+          )}
+        </div>
         <LeadStatCards stats={data?.stats ?? null} loading={loading} />
       </section>
 

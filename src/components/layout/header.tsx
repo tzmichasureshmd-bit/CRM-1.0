@@ -44,6 +44,7 @@ const pageTitles: Record<string, string> = {
   "/media-library": "mediaLibrary",
   "/api": "apiDeveloper",
   "/save-money": "saveMoney",
+  "/integrations": "integrations",
 };
 
 function getPageTitleKey(pathname: string): string {

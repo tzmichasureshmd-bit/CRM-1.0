@@ -42,6 +42,7 @@ import {
   Timer,
   BarChart3,
   Share2,
+  Plug,
 } from "lucide-react";
 import type { AccountRole } from "@/lib/auth/roles";
 import {
@@ -281,6 +282,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
               { href: "/dashboard", labelKey: "dashboard", icon: LayoutDashboard },
               { href: "/social-media", labelKey: "socialMedia", icon: Share2 },
               { href: "/tickets", labelKey: "tickets", icon: Ticket },
+              { href: "/integrations", labelKey: "integrations", icon: Plug },
             ].map((item) => {
               const isActive = pathname === item.href;
               return (

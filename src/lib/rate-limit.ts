@@ -167,6 +167,11 @@ export const RATE_LIMITS = {
    *  capping a stampede; excess inbounds simply don't get an auto-reply
    *  (they still land in the inbox for a human). */
   aiAutoReplyAccount: { limit: 30, windowMs: 60_000 },
+  /** Manual Meta Lead Ads sync, per account. Pulls the Graph API for
+   *  recent leads across connected Pages — 5/min bounds the cost of a
+   *  click-happy reconnect loop while being far above the one-shot
+   *  sync a real operator runs (this endpoint never runs unattended). */
+  metaSync: { limit: 5, windowMs: 60_000 },
 } as const;
 
 /** Test-only helper. Clears the in-memory state so unit tests don't

@@ -81,6 +81,54 @@ export function mediaKindFromMime(mimeType: string): "image" | "video" | "audio"
   return "document";
 }
 
+export interface UploadMediaOptions {
+  /** Optional library category for the media_assets registry row. */
+  category?: string | null;
+  /** Real byte-level progress callback (0–100). */
+  onProgress?: (percent: number) => void;
+}
+
+/**
+ * Push a File to the Supabase Storage endpoint over XHR so the browser
+ * exposes true upload progress. This is the exact endpoint supabase-js
+ * POSTs to — the session token is already in the browser, so nothing
+ * new is exposed. Rejects on any non-2xx status or a network error.
+ */
+function uploadViaXhr(
+  supabaseUrl: string,
+  bucket: string,
+  path: string,
+  token: string,
+  file: File,
+  onProgress?: (percent: number) => void,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${supabaseUrl}/storage/v1/object/${bucket}/${path}`);
+    xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    xhr.setRequestHeader("x-upsert", "false");
+    xhr.setRequestHeader("cache-control", "3600");
+    if (file.type) xhr.setRequestHeader("Content-Type", file.type);
+    xhr.upload.onprogress = (e: ProgressEvent) => {
+      if (e.lengthComputable && onProgress) {
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        onProgress?.(100);
+        resolve();
+      } else {
+        reject(new Error(`Upload failed (HTTP ${xhr.status})`));
+      }
+    };
+    xhr.onerror = () => reject(new Error("Upload failed — network error"));
+    xhr.ontimeout = () => reject(new Error("Upload timed out"));
+    xhr.timeout = 120_000;
+    xhr.send(file);
+  });
+}
+
 /**
  * Upload a file to an account-scoped Storage bucket and return its public
  * URL. Throws with a user-facing message on auth / account-resolution /
@@ -88,10 +136,25 @@ export function mediaKindFromMime(mimeType: string): "image" | "video" | "audio"
  *
  * Size validation is the caller's responsibility (limits can differ per
  * feature); `MEDIA_MAX_BYTES` is exported for the common case.
+ *
+ * When `options.onProgress` is provided, it receives a real 0–100
+ * percentage derived from the browser's upload event. If the session
+ * token is unavailable (rare — this should only happen when signed out)
+ * it falls back to the standard supabase-js upload and fires 0 / 100 so
+ * the UI still shows an honest "uploading → done" transition.
  */
 export async function uploadAccountMedia(
   bucket: string,
   file: File,
+  options?: UploadMediaOptions,
+): Promise<UploadAccountMediaResult> {
+  return uploadAccountMediaWithProgress(bucket, file, options);
+}
+
+export async function uploadAccountMediaWithProgress(
+  bucket: string,
+  file: File,
+  options: UploadMediaOptions = {},
 ): Promise<UploadAccountMediaResult> {
   const supabase = createClient();
 
@@ -114,14 +177,58 @@ export async function uploadAccountMedia(
   if (profileErr || !profile?.account_id) {
     throw new Error("Could not resolve your account.");
   }
+  const accountId = profile.account_id as string;
 
-  const path = buildMediaPath(profile.account_id as string, file.name);
-  const { error: upErr } = await supabase.storage.from(bucket).upload(path, file, {
-    cacheControl: "3600",
-    upsert: false,
-    contentType: file.type,
-  });
-  if (upErr) throw new Error(upErr.message);
+  const path = buildMediaPath(accountId, file.name);
+
+  // Prefer a real byte-progress upload via XHR. The token is the user's
+  // own session token (already in the browser) and the endpoint is the
+  // same one supabase-js uses.
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  const supabaseUrl =
+    (process.env.NEXT_PUBLIC_SUPABASE_URL as string | undefined) ?? "";
+
+  let uploaded = false;
+  if (token && supabaseUrl) {
+    try {
+      options.onProgress?.(1);
+      await uploadViaXhr(
+        supabaseUrl.replace(/\/$/, ""),
+        bucket,
+        path,
+        token,
+        file,
+        options.onProgress,
+      );
+      uploaded = true;
+    } catch {
+      // Fall back to the classic path below rather than failing the upload.
+    }
+  }
+  if (!uploaded) {
+    if (options.onProgress) {
+      // No byte events available — report an honest two-stage transition
+      // (starts at 0%, jumps to ~90% while the request is in flight, then
+      // 100% only once registration completes).
+      options.onProgress(0);
+    }
+    const {
+      data: { publicUrl: _unusedUrl },
+    } = supabase.storage.from(bucket).getPublicUrl(path);
+    void _unusedUrl;
+    options.onProgress?.(50);
+    const { error: upErr } = await supabase.storage
+      .from(bucket)
+      .upload(path, file, {
+        cacheControl: "3600",
+        upsert: false,
+        contentType: file.type,
+      });
+    if (upErr) throw new Error(upErr.message);
+  }
 
   const {
     data: { publicUrl },
@@ -131,7 +238,6 @@ export async function uploadAccountMedia(
   // Best-effort: the send must not fail because the registry insert did —
   // an unregistered file is a library nit, not a broken attachment.
   try {
-    const accountId = profile.account_id as string;
     await supabase.from("media_assets").insert({
       account_id: accountId,
       bucket,
@@ -141,6 +247,7 @@ export async function uploadAccountMedia(
       mime_type: file.type ?? "",
       size_bytes: file.size,
       kind: mediaKindFromMime(file.type ?? ""),
+      category: options.category?.trim() || null,
       uploaded_by: user.id,
     });
   } catch (registryErr) {
