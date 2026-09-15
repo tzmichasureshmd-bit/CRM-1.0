@@ -125,7 +125,35 @@
       "openDealsCountLabel": "진행 중인 딜",
       "unassignedConversations": "미배정 대화",
       "overdueFollowUps": "기한 경과 팔로업",
-      "there": "사용자"
+      "there": "사용자",
+      "salesOverviewTitle": "영업 개요",
+      "salesOverviewLink": "파이프라인 열기"
+    },
+    "salesOverview": {
+      "totalLeads": "총 리드",
+      "qualifiedLeads": "자격 리드",
+      "openPipelineValue": "진행 중 파이프라인",
+      "wonValue": "성사 금액",
+      "winRate": "성사율 {rate}%",
+      "winRateEmpty": "아직 종료된 딜이 없습니다",
+      "dealsByMonth": "월별 딜",
+      "dealsByMonthHint": "월별 생성된 딜을 상태별로 표시합니다(진행/성사/실패).",
+      "noDeals": "아직 딜이 없습니다",
+      "noDealsHint": "파이프라인에서 딜을 만들면 여기에 표시됩니다.",
+      "chartOpen": "진행",
+      "chartWon": "성사",
+      "chartLost": "실패",
+      "leadSources": "리드 출처",
+      "noSources": "아직 리드 출처가 없습니다",
+      "noSourcesHint": "WhatsApp, Meta, Google Forms, 웹사이트로 유입된 리드가 여기에 집계됩니다.",
+      "source": {
+        "facebook": "페이스북",
+        "instagram": "인스타그램",
+        "google_form": "구글 폼",
+        "whatsapp": "WhatsApp",
+        "website": "웹사이트",
+        "manual": "수동"
+      }
     },
     "quickActions": {
       "newContact": "새 연락처",
@@ -225,7 +253,18 @@
       "selectConversation": "대화를 선택하세요",
       "selectConversationHint": "왼쪽에서 대화를 선택해 메시지를 시작하세요",
       "today": "오늘",
-      "yesterday": "어제"
+      "yesterday": "어제",
+      "aiAssistant": "AI 어시스턴트"
+    },
+    "aiAssistant": {
+      "aiAssistantTitle": "AI 어시스턴트",
+      "aiAssistantDesc": "계정의 AI 공급자를 이용해 이 대화를 분석하거나 메시지를 작성합니다.",
+      "aiAssistantNeedsText": "먼저 초안을 입력하세요(또는 메시지를 선택하세요).",
+      "aiAssistantEmpty": "AI가 아무것도 반환하지 않았습니다.",
+      "aiAssistantNoConversation": "이 기능을 사용하려면 대화를 여세요.",
+      "aiAssistantResult": "결과",
+      "aiAssistantCopy": "복사",
+      "aiAssistantCopied": "복사됨"
     },
     "sessionTimer": {
       "expired": "만료됨",
@@ -457,7 +496,25 @@
         "deals": "딜",
         "noTags": "태그 없음",
         "noDeals": "딜 없음",
-        "addNotePlaceholder": "메모 추가..."
+        "addNotePlaceholder": "메모 추가...",
+        "overview": "360"
+      },
+      "leadScore": {
+        "title": "AI 리드 점수",
+        "recompute": "재계산",
+        "recomputing": "재계산 중...",
+        "updatedAt": "{time} 갱신됨",
+        "notScored": "아직 점수가 없습니다. 실제 대화, 딜, 미팅 데이터를 기반으로 리드를 평가하려면 재계산하세요.",
+        "recommendedAction": "권장 다음 단계",
+        "whatsappName": "WhatsApp 표시 이름",
+        "signals": "참여 신호",
+        "messagesIn": "수신 {count}건",
+        "messagesOut": "발신 {count}건",
+        "dealsValue": "진행 중 딜 {count}건",
+        "appointments": "미팅 {count}건",
+        "leadStatusLabel": "리드 상태",
+        "toastRecomputed": "리드 점수가 재계산되었습니다",
+        "toastFailed": "리드 점수 재계산 실패"
       },
       "actions": {
         "edit": "수정",

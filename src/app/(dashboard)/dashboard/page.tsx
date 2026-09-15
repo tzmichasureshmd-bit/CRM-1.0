@@ -37,6 +37,7 @@ import type {
 import { MetricCard } from '@/components/dashboard/metric-card'
 import { SkeletonCard } from '@/components/dashboard/skeleton'
 import { QuickActions } from '@/components/dashboard/quick-actions'
+import { SalesOverview } from '@/components/dashboard/sales-overview'
 import { ConversationsChart } from '@/components/dashboard/conversations-chart'
 import { PipelineDonut } from '@/components/dashboard/pipeline-donut'
 import { ResponseTimeChart } from '@/components/dashboard/response-time-chart'
@@ -357,6 +358,18 @@ export default function DashboardPage() {
       </div>
 
       <QuickActions />
+
+      {/* Sales Overview — real pipeline + lead-source aggregates keyed off
+          the account's contacts/deals tables (see /api/dashboard/sales-overview). */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-foreground">{t('salesOverviewTitle')}</h2>
+          <Link href="/pipelines" className="text-xs font-medium text-primary hover:underline">
+            {t('salesOverviewLink')}
+          </Link>
+        </div>
+        <SalesOverview defaultCurrency={defaultCurrency} />
+      </section>
 
       {/* Lead Overview — Meta Lead Ads stats (clickable → filtered Contacts) */}
       <section className="space-y-3">

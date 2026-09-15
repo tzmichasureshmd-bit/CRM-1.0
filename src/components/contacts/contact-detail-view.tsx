@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import type { Contact, Tag, ContactTag, ContactNote, CustomField, ContactCustomValue, Deal, MessageTemplate, Message, FollowUp, LeadStatus } from '@/types';
 import { TemplatePicker, type TemplateSendValues } from '@/components/inbox/template-picker';
 import { ContactTimeline } from './contact-timeline';
+import { Contact360Panel } from './contact-360-panel';
 import {
   Sheet,
   SheetContent,
@@ -681,6 +682,12 @@ export function ContactDetailView({
                   {t('tabs.details')}
                 </TabsTrigger>
                 <TabsTrigger
+                  value="overview"
+                  className="data-active:bg-muted data-active:text-primary text-muted-foreground"
+                >
+                  {t('tabs.overview', { fallback: '360' })}
+                </TabsTrigger>
+                <TabsTrigger
                   value="activity"
                   className="data-active:bg-muted data-active:text-primary text-muted-foreground"
                 >
@@ -901,6 +908,17 @@ export function ContactDetailView({
                     {t('saveChangesBtn')}
                   </Button>
                 </div>
+              </TabsContent>
+
+              {/* Customer 360 / Overview Tab */}
+              <TabsContent value="overview" className="flex-1 overflow-y-auto px-4 py-3">
+                {contact ? (
+                  <Contact360Panel key={contact.id} contact={contact} />
+                ) : (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="size-5 animate-spin text-muted-foreground" />
+                  </div>
+                )}
               </TabsContent>
 
               {/* Activity / Timeline Tab */}

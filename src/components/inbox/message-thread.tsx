@@ -30,6 +30,7 @@ import {
   Search,
   Phone,
   User,
+  Sparkles,
 } from "lucide-react";
 import { format, isToday, isYesterday, differenceInHours } from "date-fns";
 import { useTranslations } from "next-intl";
@@ -52,6 +53,7 @@ import {
 import { deleteAccountMedia } from "@/lib/storage/upload-media";
 import { TemplatePicker } from "./template-picker";
 import { AiThreadBanner } from "./ai-thread-banner";
+import { AiAssistant } from "./ai-assistant";
 import { buildReplyPreview } from "./reply-quote";
 import { toast } from "sonner";
 
@@ -185,6 +187,7 @@ export function MessageThread({
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
+  const [aiAssistantOpen, setAiAssistantOpen] = useState(false);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [reactions, setReactions] = useState<MessageReaction[]>([]);
   // Purely visual spin state for the manual-refresh button. The actual
@@ -1043,6 +1046,21 @@ export function MessageThread({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* AI Assistant — analysis + composition actions backed by the
+              account's configured provider (see /api/ai/assistant). */}
+          <button
+            type="button"
+            onClick={() => setAiAssistantOpen(true)}
+            disabled={!conversation?.id}
+            aria-label={t("aiAssistant", { fallback: "AI Assistant" })}
+            title={t("aiAssistant", { fallback: "AI Assistant" })}
+            className={cn(
+              "inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50",
+            )}
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+          </button>
+
           {/* Contact-panel toggle — desktop only. The contact sidebar
               eats a chunk of horizontal width that crowds the thread on
               smaller laptops; this lets agents reclaim it when they just
@@ -1346,6 +1364,12 @@ export function MessageThread({
         open={templateModalOpen}
         onOpenChange={setTemplateModalOpen}
         onSelect={handleSendTemplate}
+      />
+
+      <AiAssistant
+        open={aiAssistantOpen}
+        onOpenChange={setAiAssistantOpen}
+        conversationId={conversation.id}
       />
     </div>
   );

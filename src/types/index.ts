@@ -156,6 +156,17 @@ export interface Contact {
   /** When this contact was last messaged (individual or broadcast).
     *  Maintained by the send paths; enables "already contacted" filtering. */
   last_contacted_at?: string | null;
+  /** WhatsApp profile display name (migration 068). Synced on every
+    *  inbound message's profile payload, independent of the CRM `name`. */
+  whatsapp_name?: string | null;
+  /** AI lead-scoring fields (migration 068). `lead_score` is 0-100 and
+    *  `lead_score_tier` one of cold/warm/hot; maintained by the
+    *  compute_lead_score RPC + lead-score route. */
+  lead_score?: number | null;
+  lead_score_reason?: string | null;
+  lead_score_tier?: 'cold' | 'warm' | 'hot' | null;
+  lead_score_updated_at?: string | null;
+  last_customer_reply_at?: string | null;
   created_at: string;
   updated_at: string;
   /** Hydrated by queries that embed `contact_tags(tags(*))` (e.g. the
@@ -257,7 +268,12 @@ export type NotificationType =
   | 'mention'
   | 'whatsapp_disconnected'
   | 'whatsapp_error'
-  | 'new_lead';
+  | 'new_lead'
+  | 'hot_lead'
+  | 'unanswered_conversation'
+  | 'follow_up_sent'
+  | 'appointment_reminder_24h'
+  | 'appointment_reminder_1h';
 
 export interface Notification {
   id: string;

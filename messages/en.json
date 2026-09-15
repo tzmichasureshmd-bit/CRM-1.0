@@ -136,7 +136,35 @@
       "openDealsCountLabel": "Open Deals",
       "unassignedConversations": "Unassigned Conversations",
       "overdueFollowUps": "Overdue Follow-ups",
-      "there": "there"
+      "there": "there",
+      "salesOverviewTitle": "Sales Overview",
+      "salesOverviewLink": "Open pipeline"
+    },
+    "salesOverview": {
+      "totalLeads": "Total Leads",
+      "qualifiedLeads": "Qualified Leads",
+      "openPipelineValue": "Open Pipeline",
+      "wonValue": "Won Value",
+      "winRate": "Win rate {rate}%",
+      "winRateEmpty": "No closed deals yet",
+      "dealsByMonth": "Deals by Month",
+      "dealsByMonthHint": "Deals created per month, split by status (open / won / lost).",
+      "noDeals": "No deals yet",
+      "noDealsHint": "Create deals in the pipeline and they'll appear here.",
+      "chartOpen": "Open",
+      "chartWon": "Won",
+      "chartLost": "Lost",
+      "leadSources": "Lead Sources",
+      "noSources": "No sourced leads yet",
+      "noSourcesHint": "Leads arriving via WhatsApp, Meta, Google Forms, or your website will be broken down here.",
+      "source": {
+        "facebook": "Facebook",
+        "instagram": "Instagram",
+        "google_form": "Google Form",
+        "whatsapp": "WhatsApp",
+        "website": "Website",
+        "manual": "Manual"
+      }
     },
     "quickActions": {
       "title": "Quick Actions",
@@ -259,7 +287,18 @@
       "selectConversation": "Select a conversation",
       "selectConversationHint": "Choose a conversation from the left to start messaging",
       "today": "Today",
-      "yesterday": "Yesterday"
+      "yesterday": "Yesterday",
+      "aiAssistant": "AI Assistant"
+    },
+    "aiAssistant": {
+      "aiAssistantTitle": "AI Assistant",
+      "aiAssistantDesc": "Analyse this conversation or compose a message with the account's AI provider.",
+      "aiAssistantNeedsText": "Type a draft first (or select a message).",
+      "aiAssistantEmpty": "AI returned nothing.",
+      "aiAssistantNoConversation": "Open a conversation to use this.",
+      "aiAssistantResult": "Result",
+      "aiAssistantCopy": "Copy",
+      "aiAssistantCopied": "Copied"
     },
     "sessionTimer": {
       "expired": "Expired",
@@ -493,9 +532,27 @@
         "deals": "Deals",
         "tags": "Tags",
         "followups": "Follow-ups",
+        "overview": "360",
       "noTags": "No tags",
       "noDeals": "No deals",
       "addNotePlaceholder": "Add a note..."
+      },
+      "leadScore": {
+        "title": "AI Lead Score",
+        "recompute": "Recompute",
+        "recomputing": "Recomputing...",
+        "updatedAt": "Updated {time}",
+        "notScored": "No score yet. Recompute to score this lead from your real conversation, deal, and appointment data.",
+        "recommendedAction": "Recommended next step",
+        "whatsappName": "WhatsApp display name",
+        "signals": "Engagement signals",
+        "messagesIn": "{count} inbound",
+        "messagesOut": "{count} outbound",
+        "dealsValue": "{count} open deal",
+        "appointments": "{count} meeting",
+        "leadStatusLabel": "Lead status",
+        "toastRecomputed": "Lead score recomputed",
+        "toastFailed": "Failed to recompute lead score"
       },
       "actions": {
         "edit": "Edit",

@@ -826,6 +826,26 @@ async function processMessage(
     message.id
   )
 
+  // Record the customer's latest inbound time on the contact — feeds the
+  // lead-score RPC's recency signal and the scheduler's hot-lead logic.
+  void supabaseAdmin()
+    .from('contacts')
+    .update({
+      last_customer_reply_at: new Date(
+        parseInt(message.timestamp) * 1000
+      ).toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', contactRecord.id)
+    .then(({ error }: { error: unknown }) => {
+      if (error) {
+        console.warn(
+          '[webhook] contacts.last_customer_reply_at update skipped:',
+          (error as { message?: string })?.message ?? error
+        )
+      }
+    })
+
   // Record "last inbound message" + clear any stale registration error on
   // the owning config (diagnostics). The number demonstrably routes events
   // to this app, so if it wasn't yet marked registered we now know inbound
@@ -1163,12 +1183,24 @@ async function findOrCreateContact(
       'phone:',
       phone
     )
-    // Update name if it changed
+    // Always sync the WhatsApp profile name so the CRM stays current
+    // with whatever Meta reports. When the name differs from our stored
+    // `name` column we update both `name` and `whatsapp_name` so agents
+    // see the latest display name.
     if (name && name !== existingContact.name) {
       await supabaseAdmin()
         .from('contacts')
-        .update({ name, updated_at: new Date().toISOString() })
+        .update({ name, whatsapp_name: name, updated_at: new Date().toISOString() })
         .eq('id', existingContact.id)
+    } else if (name) {
+      // Same name — still keep whatsapp_name in sync in case it was
+      // previously null (contact created before this column existed).
+      if (!existingContact.whatsapp_name) {
+        await supabaseAdmin()
+          .from('contacts')
+          .update({ whatsapp_name: name, updated_at: new Date().toISOString() })
+          .eq('id', existingContact.id)
+      }
     }
     return { contact: existingContact, wasCreated: false }
   }
@@ -1184,6 +1216,7 @@ async function findOrCreateContact(
       user_id: configOwnerUserId,
       phone,
       name: name || phone,
+      whatsapp_name: name || null,
     })
     .select()
     .single()

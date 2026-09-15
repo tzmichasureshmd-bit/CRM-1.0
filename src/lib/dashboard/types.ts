@@ -81,3 +81,33 @@ export interface RecentConversation {
     avatar_url?: string | null
   } | null
 }
+
+// --- 7. Sales overview (dashboard "Sales Overview" section) -----------
+
+export interface SalesSource {
+  key: string
+  count: number
+}
+
+export interface DealsByMonthPoint {
+  label: string
+  open: number
+  won: number
+  lost: number
+  wonValue: number
+}
+
+export interface SalesOverviewResponse {
+  cards: {
+    totalLeads: number
+    qualifiedLeads: number
+    openDealsValue: number
+    wonDealsValue: number
+    openCount: number
+    wonCount: number
+    lostCount: number
+    winRate: number | null
+  }
+  sources: SalesSource[]
+  dealsByMonth: DealsByMonthPoint[]
+}

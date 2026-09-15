@@ -28,14 +28,15 @@ import {
 } from "lucide-react";
 import jsPDF from "jspdf";
 
-type ReportType = "leads" | "customers" | "conversations" | "sales" | "employees" | "daily" | "monthly";
+type ReportType = "leads" | "customers" | "conversations" | "sales" | "employees" | "agent-performance" | "daily" | "monthly";
 
 const REPORT_TYPES: { value: ReportType; label: string; icon: typeof Users }[] = [
   { value: "leads", label: "Leads", icon: Users },
   { value: "customers", label: "Customers", icon: Users },
   { value: "conversations", label: "WhatsApp Conversations", icon: MessageSquare },
   { value: "sales", label: "Sales", icon: TrendingUp },
-  { value: "employees", label: "Employee Performance", icon: Users },
+  { value: "agent-performance", label: "Agent Performance", icon: Users },
+  { value: "employees", label: "Employee Directory", icon: Users },
   { value: "daily", label: "Daily Summary", icon: BarChart3 },
   { value: "monthly", label: "Monthly Summary", icon: BarChart3 },
 ];

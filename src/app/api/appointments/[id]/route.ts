@@ -1,6 +1,17 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { getCurrentAccount, requireRole, toErrorResponse } from '@/lib/auth/account'
 
+const STATUSES = [
+  'scheduled',
+  'confirmed',
+  'rescheduled',
+  'cancelled',
+  'completed',
+  'no_show',
+] as const
+
+const TYPES = ['consultation', 'demo', 'follow_up', 'site_visit', 'other'] as const
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -47,14 +58,34 @@ export async function PUT(
     for (const k of [
       'title',
       'description',
+      'service',
       'contact_id',
-      'scheduled_at',
+      'conversation_id',
+      'agent_id',
+      'appointment_date',
+      'appointment_time',
       'duration_minutes',
-      'location',
       'notes',
-      'status',
+      'appointment_type',
     ] as const) {
       if (k in body) update[k] = body[k]
+    }
+
+    if ('status' in body) {
+      const status = body.status
+      if (!STATUSES.includes(status as (typeof STATUSES)[number])) {
+        return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
+      }
+      update.status = status
+      if (status === 'completed') update.completed_at = new Date().toISOString()
+      if (status === 'cancelled') update.cancelled_at = new Date().toISOString()
+    }
+
+    if ('appointment_type' in body) {
+      const type = body.appointment_type
+      if (!TYPES.includes(type as (typeof TYPES)[number])) {
+        return NextResponse.json({ error: 'Invalid appointment_type' }, { status: 400 })
+      }
     }
 
     if (Object.keys(update).length === 0) {
