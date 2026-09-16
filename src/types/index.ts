@@ -1311,3 +1311,52 @@ export interface PresetCampaign {
   created_at: string;
   updated_at: string;
 }
+
+// ============================================================
+// Platform Lead Alerts (migration 069) — Super Admin lead
+// monitoring + automatic two-recipient "new lead" email alerts.
+// ============================================================
+
+export interface PlatformLeadNotificationSettings {
+  id: number;
+  enabled: boolean;
+  recipient_1_email?: string | null;
+  recipient_2_email?: string | null;
+  from_email: string;
+  from_name: string;
+  updated_by?: string | null;
+  updated_at: string;
+}
+
+export type LeadNotificationEventStatus =
+  | "pending"
+  | "sending"
+  | "sent"
+  | "failed";
+
+export interface LeadNotificationEvent {
+  id: string;
+  deal_id: string;
+  account_id: string;
+  recipient_email: string;
+  status: LeadNotificationEventStatus;
+  created_at: string;
+  sent_at?: string | null;
+  error_message?: string | null;
+  retry_count: number;
+  lease_expires_at?: string | null;
+}
+
+/** Shape returned by the get_platform_lead_stats() SQL RPC. */
+export interface PlatformLeadStats {
+  total_leads: number;
+  new_today: number;
+  new_week: number;
+  qualified: number;
+  follow_up_required: number;
+  converted: number;
+  lost: number;
+  alert_sent: number;
+  alert_pending: number;
+  alert_failed: number;
+}

@@ -19,7 +19,10 @@ import {
   Radio,
   Zap,
   DollarSign,
+  Target,
 } from "lucide-react";
+import type { PlatformLeadStats } from "@/types";
+import { sourceBadgeInfo } from "@/lib/crm/leads";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +38,7 @@ interface AdminDashboardProps {
  */
 export async function AdminDashboard({ basePath = "/admin" }: AdminDashboardProps) {
   const supabase = await createClient();
+  const isPlatform = basePath === "/super-admin";
 
   const { data: user } = await supabase.auth.getUser();
   const { data: profile } = await supabase
@@ -111,6 +115,37 @@ export async function AdminDashboard({ basePath = "/admin" }: AdminDashboardProp
     (sum, row) => sum + ((row.amount_cents as number | null) ?? 0),
     0
   );
+
+  // Super-admin only: platform-wide lead stats + recently received leads
+  // (cross-tenant via RLS, super admin bypasses account scoping).
+  let leadStats: PlatformLeadStats | undefined;
+  let recentLeads: Array<{
+    id: string;
+    title: string;
+    status: string;
+    created_at: string;
+    contact?: { name?: string | null; phone?: string | null; email?: string | null; source?: string | null; source_platform?: string | null } | null;
+    account?: { name?: string | null } | null;
+    assignee?: { full_name?: string | null } | null;
+  }> = [];
+
+  if (isPlatform) {
+    const [statsRes, recentRes] = await Promise.all([
+      supabase.rpc("get_platform_lead_stats"),
+      supabase
+        .from("deals")
+        .select(
+          "id, title, status, created_at, " +
+            "contact:contacts(name, phone, email, source, source_platform), " +
+            "account:accounts(name), " +
+            "assignee:profiles!deals_assigned_to_fkey(full_name)"
+        )
+        .order("created_at", { ascending: false })
+        .limit(8),
+    ]);
+    if (!statsRes.error) leadStats = statsRes.data as PlatformLeadStats;
+    if (!recentRes.error) recentLeads = (recentRes.data as unknown as typeof recentLeads) ?? [];
+  }
 
   const formatMoney = (cents: number) =>
     `$${(cents / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
@@ -207,6 +242,41 @@ export async function AdminDashboard({ basePath = "/admin" }: AdminDashboardProp
       href: `${basePath}/payments`,
     },
   ];
+
+  if (isPlatform) {
+    stats.push(
+      {
+        label: "New Leads Today",
+        value: leadStats?.new_today ?? 0,
+        icon: Target,
+        href: `${basePath}/leads`,
+      },
+      {
+        label: "New This Week",
+        value: leadStats?.new_week ?? 0,
+        icon: Target,
+        href: `${basePath}/leads`,
+      },
+      {
+        label: "Qualified Leads",
+        value: leadStats?.qualified ?? 0,
+        icon: Target,
+        href: `${basePath}/leads`,
+      },
+      {
+        label: "Follow-up Required",
+        value: leadStats?.follow_up_required ?? 0,
+        icon: Target,
+        href: `${basePath}/leads`,
+      },
+      {
+        label: "Alerts Sent",
+        value: leadStats?.alert_sent ?? 0,
+        icon: Zap,
+        href: `${basePath}/leads/alerts`,
+      },
+    );
+  }
 
   const quickLinks = [
     { label: "Businesses", href: `${basePath}/businesses`, icon: Building2 },
@@ -357,14 +427,76 @@ export async function AdminDashboard({ basePath = "/admin" }: AdminDashboardProp
                   </div>
                 ))}
               </div>
+) : (
+                <p className="py-4 text-center text-sm text-muted-foreground">
+                  No audit log entries yet.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+      {isPlatform && (
+        <Card className="border-border bg-card">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <div>
+              <CardTitle>Recent Leads</CardTitle>
+              <CardDescription>Newest leads received across all customer accounts</CardDescription>
+            </div>
+            <Link href={`${basePath}/leads`} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+              Lead Monitoring
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </CardHeader>
+          <CardContent>
+            {recentLeads.length > 0 ? (
+              <div className="space-y-3">
+                {recentLeads.map((lead) => {
+                  const info = sourceBadgeInfo(lead.contact?.source ?? null, lead.contact?.source_platform ?? null);
+                  return (
+                    <Link
+                      key={lead.id}
+                      href={`${basePath}/leads?lead=${lead.id}`}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-muted/50"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-foreground">
+                          {lead.contact?.name ?? lead.title}
+                        </p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {lead.account?.name ?? "—"}
+                          {info ? ` · ${info.label}` : ""}
+                          {lead.assignee?.full_name ? ` · ${lead.assignee.full_name}` : ""}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span
+                          className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                            lead.status === "won"
+                              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                              : lead.status === "lost"
+                                ? "bg-destructive/10 text-destructive"
+                                : "bg-sky-500/10 text-sky-600 dark:text-sky-400"
+                          }`}
+                        >
+                          {lead.status}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(lead.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
             ) : (
               <p className="py-4 text-center text-sm text-muted-foreground">
-                No audit log entries yet.
+                No leads received yet.
               </p>
             )}
           </CardContent>
         </Card>
-      </div>
+      )}
     </div>
   );
 }

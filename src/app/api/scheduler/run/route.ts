@@ -6,15 +6,17 @@ import { buildConversationContext } from '@/lib/ai/context'
 import { generateReply } from '@/lib/ai/generate'
 import { logAiUsage } from '@/lib/ai/usage'
 import { sendMessageToConversation } from '@/lib/whatsapp/send-message'
+import { processPendingLeadNotifications } from '@/lib/lead-notifications/process'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 /**
  * GET /api/scheduler/run  (cron — x-cron-secret required)
  *
- * Drainable cron endpoint that processes three categories:
+ * Drainable cron endpoint that processes four categories:
  *   1. AI follow-up executions (waiting/active with next_action_at <= now)
  *   2. Appointment reminders (24 h / 1 h before the appointment)
  *   3. Hot-lead & unanswered-conversation notifications
+ *   4. Pending lead-notification emails (Super Admin two-person alerts)
  *
  * Safe to re-invoke while still running — every claim step is an
  * optimistic UPDATE ... WHERE status = 'expected' so overlapping
@@ -44,6 +46,7 @@ export async function GET(request: Request) {
     followups: { processed: 0, failed: 0 },
     reminders: { sent: 0 },
     notifications: { created: 0 },
+    leadNotifications: { sent: 0, retryable: 0, failed: 0, paused: false },
   }
 
   // ── 1. AI follow-up execution drain ──────────────────────────────
@@ -54,6 +57,13 @@ export async function GET(request: Request) {
 
   // ── 3. Hot-lead & unanswered-conversation notifications ──────────
   await createSmartNotifications(admin, now, results)
+
+  // ── 4. Pending lead-notification emails (two-person alerts) ──────
+  const leadNotifs = await processPendingLeadNotifications()
+  results.leadNotifications.sent = leadNotifs.sent
+  results.leadNotifications.retryable = leadNotifs.retryable
+  results.leadNotifications.failed = leadNotifs.failed
+  results.leadNotifications.paused = leadNotifs.paused
 
   return NextResponse.json({ ok: true, ...results })
 }

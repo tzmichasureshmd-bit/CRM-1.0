@@ -19,6 +19,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { SuperAdminMembersCard } from "@/components/admin/super-admin-members-card";
+import { SuperAdminLeadNotificationSettings } from "@/components/admin/super-admin-lead-notification-settings";
 
 export const dynamic = "force-dynamic";
 
@@ -199,23 +200,14 @@ export default async function SuperAdminSettingsPage() {
                 Notifications
               </CardTitle>
               <CardDescription>
-                Notification configuration is managed per-account. Platform-wide
-                notification settings are not yet available.
+                Per-account notification preferences are stored per customer; the platform-wide
+                two-person new-lead email alerts are configured in the Lead Alerts card below.
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="rounded-lg border border-border bg-muted/50 p-4">
-                <p className="text-sm text-muted-foreground">
-                  Per-account notification preferences are stored in the{" "}
-                  <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">
-                    notification_preferences
-                  </code>{" "}
-                  table. Platform-wide notification controls are not yet
-                  implemented.
-                </p>
-              </div>
-            </CardContent>
           </Card>
+
+          {/* Platform-wide two-person lead alerts */}
+          <SuperAdminLeadNotificationSettings />
 
           {/* Security */}
           <Card className="border-border bg-card">

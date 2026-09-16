@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import {
   Activity,
   BarChart3,
+  BellRing,
   Building2,
   CreditCard,
   DollarSign,
@@ -20,6 +21,7 @@ import {
   ScrollText,
   Settings,
   Smartphone,
+  Target,
   TrendingUp,
   Users,
   Workflow,
@@ -51,7 +53,7 @@ interface NavSection {
 }
 
 function buildNavSections(basePath: string): NavSection[] {
-  return [
+  const sections: NavSection[] = [
     {
       title: "Platform",
       items: [
@@ -93,6 +95,20 @@ function buildNavSections(basePath: string): NavSection[] {
       ],
     },
   ];
+
+  // Platform-wide lead monitoring + two-person alert log. Only mounted
+  // under the /super-admin tree (the pages are not part of /admin).
+  if (basePath === "/super-admin") {
+    sections.splice(1, 0, {
+      title: "Leads",
+      items: [
+        { href: `${basePath}/leads`, label: "Lead Monitoring", icon: Target },
+        { href: `${basePath}/leads/alerts`, label: "Lead Alerts", icon: BellRing },
+      ],
+    });
+  }
+
+  return sections;
 }
 
 function isActive(pathname: string, href: string, basePath: string) {
