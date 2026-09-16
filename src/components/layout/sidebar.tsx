@@ -43,6 +43,7 @@ import {
   BarChart3,
   Share2,
   Plug,
+  Target,
 } from "lucide-react";
 import type { AccountRole } from "@/lib/auth/roles";
 import {
@@ -133,6 +134,7 @@ const navSections: NavSection[] = [
   {
     labelKey: "sectionGrowth",
     items: [
+      { href: "/crm", labelKey: "crm", icon: Target },
       { href: "/pipelines", labelKey: "pipelines", icon: GitBranch },
       { href: "/reports", labelKey: "reports", icon: BarChart3 },
       { href: "/save-money", labelKey: "saveMoney", icon: PiggyBank },

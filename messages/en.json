@@ -28,6 +28,7 @@
     "integrations": "Integrations",
     "notifications": "Notifications",
     "contacts": "Contacts",
+    "crm": "CRM",
     "pipelines": "Pipelines",
     "broadcasts": "Broadcasts",
     "campaigns": "Campaigns",
@@ -76,6 +77,7 @@
     "notifications": "Notifications",
     "socialMedia": "Social Media",
     "contacts": "Contacts",
+    "crm": "CRM",
     "integrations": "Integrations",
     "pipelines": "Pipelines",
     "broadcasts": "Broadcasts",
@@ -105,6 +107,124 @@
     "menuProfile": "Profile",
     "menuSettings": "Settings",
     "menuSignOut": "Sign out"
+  },
+  "Crm": {
+    "page": {
+      "title": "CRM",
+      "description": "Track leads across your sales pipeline, nurture them with follow-ups and close deals from WhatsApp."
+    },
+    "nav": {
+      "kanban": "Kanban",
+      "list": "List",
+      "analytics": "Analytics"
+    },
+    "stats": {
+      "totalLeads": "Total Leads",
+      "newLeads": "New Leads",
+      "inProgress": "In Progress",
+      "qualified": "Qualified",
+      "followUpRequired": "Follow-up Required",
+      "converted": "Converted",
+      "lost": "Lost",
+      "conversionRate": "Conversion Rate",
+      "pipelineValue": "Pipeline Value",
+      "avgDealValue": "Avg. Deal Value"
+    },
+    "filters": {
+      "searchPlaceholder": "Search leads, contacts, phone…",
+      "allStages": "All Stages",
+      "allAgents": "All Agents",
+      "allStatuses": "All Statuses",
+      "allSources": "All Sources",
+      "allTags": "All Tags",
+      "clear": "Clear filters",
+      "showing": "{count} of {total} leads",
+      "quickAll": "All",
+      "quickNew": "New",
+      "quickQualified": "Qualified",
+      "quickFollowUp": "Follow-up",
+      "quickWon": "Won",
+      "quickLost": "Lost",
+      "wonBanner": "Won",
+      "lostBanner": "Lost"
+    },
+    "board": {
+      "addLead": "Add Lead",
+      "stageSettings": "Stage Settings",
+      "viewLeads": "View Leads",
+      "stageMenu": "Stage menu",
+      "noLeadsInStage": "No leads in this stage"
+    },
+    "card": {
+      "nextFollowUp": "Next follow-up",
+      "overdue": "Overdue",
+      "lastActivity": "Last activity",
+      "noPhone": "No phone",
+      "openWhatsApp": "Open WhatsApp",
+      "assignedTo": "Assigned to",
+      "unassigned": "Unassigned"
+    },
+    "list": {
+      "columnLead": "Lead",
+      "columnStage": "Stage",
+      "columnProgress": "Progress",
+      "columnAgent": "Agent",
+      "columnSource": "Source",
+      "columnScore": "Score",
+      "columnValue": "Value",
+      "columnLastActivity": "Last Activity",
+      "columnNextFollowUp": "Next Follow-up",
+      "columnActions": "Actions",
+      "noLeads": "No leads match your filters."
+    },
+    "analytics": {
+      "funnel": "Conversion Funnel",
+      "funnelDesc": "Leads in each pipeline stage (all statuses)",
+      "stageCount": "{count} leads",
+      "stagePercent": "{value}% of new leads",
+      "conversion": "Stage Conversion",
+      "conversionDesc": "Share of leads that reached this stage",
+      "converted": "Converted",
+      "convertedDesc": "Deals marked Won",
+      "lost": "Lost",
+      "lostDesc": "Deals marked Lost",
+      "noData": "No data yet. Add leads to see analytics."
+    },
+    "attention": {
+      "title": "Needs Attention",
+      "subtitle": "Overdue follow-ups, silent leads and untouched opportunities",
+      "overdueFollowUp": "Follow-up overdue",
+      "noActivity": "No activity",
+      "daysSilent": "Silent for {days} days",
+      "viewAll": "View all",
+      "empty": "Nothing needs attention right now."
+    },
+    "empty": {
+      "title": "No leads yet",
+      "description": "Start by adding your first lead to this pipeline.",
+      "addFirstLead": "Add your first lead"
+    },
+    "loadError": {
+      "title": "Couldn't load your CRM",
+      "description": "There was a problem loading your pipeline. Please try again.",
+      "retry": "Try again"
+    },
+    "selectPipeline": "Pipeline",
+    "addLead": "Add Lead",
+    "loading": "Loading your pipeline…",
+    "leadsLabel": "leads",
+    "wonBanner": "Won",
+    "lostBanner": "Lost",
+    "mainActions": {
+      "newPipeline": "New Pipeline",
+      "createPipeline": "Create Pipeline",
+      "creating": "Creating…",
+      "cancel": "Cancel",
+      "managePipelines": "Manage Pipelines",
+      "pipelineName": "Pipeline Name",
+      "pipelineNamePlaceholder": "e.g. Real Estate 2026",
+      "newPipelineDesc": "New Pipeline · New Lead → Qualified → Proposal Sent → Negotiation → Won → Lost"
+    }
   },
   "ModeToggle": {
     "switchMode": "Switch to {mode} mode"

@@ -77,6 +77,7 @@
     "integrations": "연동",
     "notifications": "알림",
     "contacts": "연락처",
+    "crm": "CRM",
     "pipelines": "파이프라인",
     "broadcasts": "브로드캐스트",
     "automations": "자동화",
@@ -96,6 +97,124 @@
     "menuProfile": "프로필",
     "menuSettings": "설정",
     "menuSignOut": "로그아웃"
+  },
+  "Crm": {
+    "page": {
+      "title": "CRM",
+      "description": "세일즈 파이프라인의 리드를 추적하고, 팔로업을 관리하며 WhatsApp에서 거래를 성사시키세요."
+    },
+    "nav": {
+      "kanban": "칸반",
+      "list": "리스트",
+      "analytics": "분석"
+    },
+    "stats": {
+      "totalLeads": "전체 리드",
+      "newLeads": "신규 리드",
+      "inProgress": "진행 중",
+      "qualified": "적격 리드",
+      "followUpRequired": "팔로업 필요",
+      "converted": "전환됨",
+      "lost": "탈락",
+      "conversionRate": "전환율",
+      "pipelineValue": "파이프라인 가치",
+      "avgDealValue": "평균 거래액"
+    },
+    "filters": {
+      "searchPlaceholder": "리드, 연락처, 전화번호 검색…",
+      "allStages": "전체 단계",
+      "allAgents": "전체 담당자",
+      "allStatuses": "전체 상태",
+      "allSources": "전체 소스",
+      "allTags": "전체 태그",
+      "clear": "필터 초기화",
+      "showing": "전체 {total}개 중 {count}개 리드",
+      "quickAll": "전체",
+      "quickNew": "신규",
+      "quickQualified": "적격",
+      "quickFollowUp": "팔로업",
+      "quickWon": "성사",
+      "quickLost": "탈락",
+      "wonBanner": "성사",
+      "lostBanner": "탈락"
+    },
+    "board": {
+      "addLead": "리드 추가",
+      "stageSettings": "단계 설정",
+      "viewLeads": "리드 보기",
+      "stageMenu": "단계 메뉴",
+      "noLeadsInStage": "이 단계에 리드가 없습니다"
+    },
+    "card": {
+      "nextFollowUp": "다음 팔로업",
+      "overdue": "기한 초과",
+      "lastActivity": "마지막 활동",
+      "noPhone": "전화번호 없음",
+      "openWhatsApp": "WhatsApp 열기",
+      "assignedTo": "담당자",
+      "unassigned": "담당자 없음"
+    },
+    "list": {
+      "columnLead": "리드",
+      "columnStage": "단계",
+      "columnProgress": "진행률",
+      "columnAgent": "담당자",
+      "columnSource": "소스",
+      "columnScore": "점수",
+      "columnValue": "가치",
+      "columnLastActivity": "마지막 활동",
+      "columnNextFollowUp": "다음 팔로업",
+      "columnActions": "작업",
+      "noLeads": "필터와 일치하는 리드가 없습니다."
+    },
+    "analytics": {
+      "funnel": "전환 퍼널",
+      "funnelDesc": "각 파이프라인 단계의 리드 (모든 상태)",
+      "stageCount": "{count}개 리드",
+      "stagePercent": "신규 리드의 {value}%",
+      "conversion": "단계 전환",
+      "conversionDesc": "이 단계에 도달한 리드 비율",
+      "converted": "전환됨",
+      "convertedDesc": "성사(Won) 처리된 거래",
+      "lost": "탈락",
+      "lostDesc": "탈락(Lost) 처리된 거래",
+      "noData": "데이터가 아직 없습니다. 리드를 추가하면 분석이 표시됩니다."
+    },
+    "attention": {
+      "title": "주의 필요",
+      "subtitle": "기한 지난 팔로업, 소극적인 리드, 미처리 기회",
+      "overdueFollowUp": "팔로업 기한 초과",
+      "noActivity": "활동 없음",
+      "daysSilent": "{days}일 동안 연락 없음",
+      "viewAll": "모두 보기",
+      "empty": "현재 주의가 필요한 항목이 없습니다."
+    },
+    "empty": {
+      "title": "아직 리드가 없습니다",
+      "description": "이 파이프라인에 첫 번째 리드를 추가해 보세요.",
+      "addFirstLead": "첫 리드 추가"
+    },
+    "loadError": {
+      "title": "CRM을 불러오지 못했습니다",
+      "description": "파이프라인을 불러오는 중 문제가 발생했습니다. 다시 시도해 주세요.",
+      "retry": "다시 시도"
+    },
+    "selectPipeline": "파이프라인",
+    "addLead": "리드 추가",
+    "loading": "파이프라인을 불러오는 중…",
+    "leadsLabel": "리드",
+    "wonBanner": "성사",
+    "lostBanner": "탈락",
+    "mainActions": {
+      "newPipeline": "새 파이프라인",
+      "createPipeline": "파이프라인 만들기",
+      "creating": "만드는 중…",
+      "cancel": "취소",
+      "managePipelines": "파이프라인 관리",
+      "pipelineName": "파이프라인 이름",
+      "pipelineNamePlaceholder": "예: 부동산 2026",
+      "newPipelineDesc": "새 파이프라인 · 신규 리드 → 적격 → 견적 발송 → 협상 → 성사 → 탈락"
+    }
   },
   "ModeToggle": {
     "switchMode": "{mode} 모드로 전환"
