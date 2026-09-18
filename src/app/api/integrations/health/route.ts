@@ -166,8 +166,8 @@ export async function GET() {
         .eq("account_id", ctx.accountId),
     ]);
 
-    const waRows = waRes.data ?? [];
-    const connRows = fbRes.data ?? [];
+    const waRows = (waRes.data ?? []) as unknown as Array<Record<string, unknown>>;
+    const connRows = (fbRes.data ?? []) as unknown as Array<Record<string, unknown>>;
 
     // ---- WhatsApp -----------------------------------------------------
     const waNumbers: WhatsappNumberHealth[] = [];
@@ -221,7 +221,7 @@ export async function GET() {
     }
 
     // ---- Facebook + Instagram -----------------------------------------
-    let pages: FacebookPageHealth[] = [];
+    const pages: FacebookPageHealth[] = [];
     let accounts: InstagramAccountHealth[] = [];
     const igPromises: Promise<InstagramAccountHealth>[] = [];
 
@@ -259,7 +259,7 @@ export async function GET() {
             const igId = (row.instagram_account_id as string | null) ?? null;
             let api: CheckStatus = "unverified";
             let apiError: string | null = null;
-            let username = (row.instagram_username as string | null) ?? null;
+            const username = (row.instagram_username as string | null) ?? null;
             if (igId && token) {
               const { ok, status } = await graphGet(igId, token);
               api = ok ? "ok" : "error";

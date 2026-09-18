@@ -187,6 +187,33 @@ function ConnectionBadge({ state, label }: ConnectionBadgeProps) {
   );
 }
 
+function HealthChip({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: HealthTone;
+}) {
+  const styles: Record<HealthTone, string> = {
+    ok: "border-emerald-500/30 bg-emerald-500/10 text-emerald-400",
+    warn: "border-amber-500/30 bg-amber-500/10 text-amber-300",
+    error: "border-red-500/30 bg-red-500/10 text-red-400",
+    idle: "border-border bg-muted text-muted-foreground",
+  };
+  return (
+    <span
+      title={tone === "error" ? `${label}: ${value}` : undefined}
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${styles[tone]}`}
+    >
+      <span className="size-1.5 rounded-full bg-current" />
+      <span className="text-muted-foreground">{label}</span>
+      {value}
+    </span>
+  );
+}
+
 interface IntegrationCard {
   id: string;
   category: Exclude<Category, "all">;
