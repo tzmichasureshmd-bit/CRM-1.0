@@ -11,6 +11,7 @@ import {
   Mail,
   MessageCircle,
   Plug,
+  RefreshCw,
   Settings2,
   ThumbsUp,
   Webhook,
@@ -69,6 +70,55 @@ interface OverviewPayload {
     google_form: number;
   };
 }
+
+/** Live Graph-API health from /api/integrations/health. */
+interface HealthPayload {
+  checkedAt: string;
+  config: {
+    metaConfigured: boolean;
+    whatsappConfigured: boolean;
+  };
+  whatsapp: {
+    connected: boolean;
+    numbers: {
+      id: string;
+      phoneNumberId: string;
+      displayPhoneNumber: string | null;
+      businessName: string | null;
+      connectionMethod: string | null;
+      api: "ok" | "error" | "unverified" | "unknown";
+      apiError: string | null;
+      webhook: "ok" | "error" | "unverified" | "unknown";
+      lastWebhookAt: string | null;
+      lastInboundAt: string | null;
+    }[];
+  };
+  facebook: {
+    connected: boolean;
+    pages: {
+      id: string;
+      pageId: string;
+      pageName: string | null;
+      api: "ok" | "error" | "unverified" | "unknown";
+      apiError: string | null;
+      leadgenWebhook: "ok" | "error" | "unverified" | "unknown";
+      messagesWebhook: "ok" | "error" | "unverified" | "unknown";
+    }[];
+  };
+  instagram: {
+    connected: boolean;
+    accounts: {
+      id: string;
+      instagramAccountId: string | null;
+      username: string | null;
+      pageName: string | null;
+      api: "ok" | "error" | "unverified" | "unknown";
+      apiError: string | null;
+    }[];
+  };
+}
+
+type HealthTone = "ok" | "warn" | "error" | "idle";
 
 type Category =
   | "all"
@@ -147,6 +197,9 @@ interface IntegrationCard {
   description: string;
   sections: (payload: OverviewPayload) => { label: string; value: string }[];
   state: (payload: OverviewPayload) => ConnectionBadgeProps;
+  /** Optional live Graph-API health rows (checked when the user runs a
+   *  health check). Rendered as tone chips under the detail list. */
+  health?: (payload: HealthPayload) => { label: string; value: string; tone: HealthTone }[];
   action:
     | { href: string; label: string; primary?: boolean }[]
     | ((payload: OverviewPayload) => { href: string; label: string; primary?: boolean }[]);
@@ -181,6 +234,26 @@ function buildCards(): IntegrationCard[] {
         p.whatsapp.connected
           ? { state: "connected", label: "Connected" }
           : { state: "notConnected", label: "Not connected" },
+      health: (h) => {
+        const nums = h.whatsapp.numbers;
+        if (nums.length === 0) return [];
+        const apiOk = nums.every((n) => n.api === "ok");
+        const apiError = nums.some((n) => n.api === "error");
+        const webhookOk = nums.some((n) => n.webhook === "ok");
+        const webhookError = nums.some((n) => n.webhook === "error");
+        return [
+          {
+            label: "Cloud API",
+            value: apiOk ? "Reachable" : apiError ? "Unreachable" : "Not verified",
+            tone: apiError ? "error" : apiOk ? "ok" : "warn",
+          },
+          {
+            label: "Webhook",
+            value: webhookOk ? "Subscribed" : webhookError ? "Error" : "Not verified",
+            tone: webhookError ? "error" : webhookOk ? "ok" : "warn",
+          },
+        ];
+      },
       action: [
         {
           href: "/settings?tab=whatsapp",
@@ -232,6 +305,32 @@ function buildCards(): IntegrationCard[] {
           : p.meta.connected
             ? { state: "connected", label: "Connected" }
             : { state: "notConnected", label: "Not connected" },
+      health: (h) => {
+        if (h.facebook.pages.length === 0) return [];
+        const apiOk = h.facebook.pages.every((pg) => pg.api === "ok");
+        const apiError = h.facebook.pages.some((pg) => pg.api === "error");
+        const leadgenOk = h.facebook.pages.some((pg) => pg.leadgenWebhook === "ok");
+        const leadgenError = h.facebook.pages.some((pg) => pg.leadgenWebhook === "error");
+        const msgOk = h.facebook.pages.some((pg) => pg.messagesWebhook === "ok");
+        const msgError = h.facebook.pages.some((pg) => pg.messagesWebhook === "error");
+        return [
+          {
+            label: "Pages API",
+            value: apiOk ? "Reachable" : apiError ? "Unreachable" : "Not verified",
+            tone: apiError ? "error" : apiOk ? "ok" : "warn",
+          },
+          {
+            label: "Lead webhook",
+            value: leadgenOk ? "Subscribed" : leadgenError ? "Error" : "Not verified",
+            tone: leadgenError ? "error" : leadgenOk ? "ok" : "warn",
+          },
+          {
+            label: "Messenger/IG webhook",
+            value: msgOk ? "Subscribed" : msgError ? "Error" : "Not verified",
+            tone: msgError ? "error" : msgOk ? "ok" : "warn",
+          },
+        ];
+      },
       action: [
         { href: "/social-media", label: "Open lead center", primary: true },
         { href: "/settings?tab=meta-leads", label: "Settings" },
@@ -302,19 +401,27 @@ function buildCards(): IntegrationCard[] {
 
 export default function IntegrationsPage() {
   const [payload, setPayload] = useState<OverviewPayload | null>(null);
+  const [health, setHealth] = useState<HealthPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [category, setCategory] = useState<Category>("all");
+  // True while a manual health check is running (the checks hit the Meta
+  // Graph API and can take a moment).
+  const [checkingHealth, setCheckingHealth] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/integrations/overview", { cache: "no-store" });
-      if (!res.ok) {
+      const [ovRes, hRes] = await Promise.all([
+        fetch("/api/integrations/overview", { cache: "no-store" }),
+        fetch("/api/integrations/health", { cache: "no-store" }),
+      ]);
+      if (!ovRes.ok || !hRes.ok) {
         setError("Could not load integration status. Please try again.");
         return;
       }
-      setPayload(await res.json());
+      setPayload(await ovRes.json());
+      setHealth((await hRes.json()) as HealthPayload);
     } catch (err) {
       console.error("Integrations overview load failed:", err);
       setError("Could not load integration status. Please try again.");
@@ -327,23 +434,57 @@ export default function IntegrationsPage() {
     void load();
   }, [load]);
 
+  const checkHealth = useCallback(async () => {
+    setCheckingHealth(true);
+    try {
+      const res = await fetch("/api/integrations/health", { cache: "no-store" });
+      if (!res.ok) throw new Error("health failed");
+      setHealth((await res.json()) as HealthPayload);
+    } catch (err) {
+      console.error("Health check failed:", err);
+    } finally {
+      setCheckingHealth(false);
+    }
+  }, []);
+
   const cards = payload ? buildCards() : [];
   const visible =
     category === "all" ? cards : cards.filter((c) => c.category === category);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-foreground">
-          <Plug className="h-6 w-6 text-primary" />
-          Integrations
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Connect the tools your business already uses and they show up here with
-          live status. Only real connections are listed — every card reflects an
-          actual, verified integration in your account.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-foreground">
+            <Plug className="h-6 w-6 text-primary" />
+            Integrations
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Connect the tools your business already uses and they show up here with
+            live status. Only real connections are listed — every card reflects an
+            actual, verified integration in your account.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void checkHealth()}
+          disabled={loading || checkingHealth}
+          title="Re-check every connection against the Meta Graph API"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+        >
+          <RefreshCw className={checkingHealth ? "size-3.5 animate-spin" : "size-3.5"} />
+          {checkingHealth ? "Checking…" : "Check status"}
+        </button>
       </div>
+
+      {/* Last checked timestamp */}
+      {health && !loading && (
+        <p className="-mt-3 text-[11px] text-muted-foreground">
+          Health verified{" "}
+          {new Date(health.checkedAt).toLocaleTimeString()} · checks hit the live Meta
+          Graph API; credentials are never exposed.
+        </p>
+      )}
 
       {/* Category tabs */}
       <div className="flex flex-wrap gap-1.5">
@@ -437,6 +578,14 @@ export default function IntegrationsPage() {
                     </div>
                   ))}
                 </dl>
+
+                {card.health && health && (
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {card.health(health).map((h) => (
+                      <HealthChip key={h.label} label={h.label} value={h.value} tone={h.tone} />
+                    ))}
+                  </div>
+                )}
 
                 <div className="mt-4 flex flex-wrap gap-2 pt-1">
                   {actions.map((a) =>
