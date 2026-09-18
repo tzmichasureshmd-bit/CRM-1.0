@@ -17,6 +17,7 @@ import {
   isRecipientNotAllowedError,
 } from '@/lib/whatsapp/phone-utils'
 import { supabaseAdmin } from './admin-client'
+import { sendMessagingToConversation } from '@/lib/meta/messaging-send'
 
 // ------------------------------------------------------------
 // Flows-side Meta sender (interactive variants).
@@ -67,6 +68,39 @@ export async function engineSendText(
   args: SendTextEngineArgs,
 ): Promise<{ whatsapp_message_id: string }> {
   const db = supabaseAdmin()
+
+  const { data: conversation, error: convErr } = await db
+    .from('conversations')
+    .select('platform, channel_page_id, channel_recipient_id, contact_id')
+    .eq('id', args.conversationId)
+    .eq('account_id', args.accountId)
+    .maybeSingle()
+  if (convErr || !conversation) {
+    throw new Error('conversation not found for this account')
+  }
+
+  // Messenger / Instagram conversations send through the Graph API
+  // path (platform-aware core) — AI auto-reply + flow text sends ride
+  // the same rail as the dashboard composer.
+  const platform =
+    (conversation.platform as 'whatsapp' | 'facebook' | 'instagram' | null) ??
+    'whatsapp'
+  if (platform !== 'whatsapp') {
+    const { metaMessageId } = await sendMessagingToConversation(
+      db,
+      args.accountId,
+      {
+        id: args.conversationId,
+        platform,
+        channel_page_id: conversation.channel_page_id as string | null,
+        channel_recipient_id: conversation.channel_recipient_id as string | null,
+        contact: { id: conversation.contact_id as string },
+      },
+      { messageType: 'text', contentText: args.text },
+      args.aiGenerated ?? false,
+    )
+    return { whatsapp_message_id: metaMessageId }
+  }
 
   const { data: contact, error: contactErr } = await db
     .from('contacts')

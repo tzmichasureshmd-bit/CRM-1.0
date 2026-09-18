@@ -1276,6 +1276,7 @@ async function findOrCreateConversation(
     .select('*')
     .eq('account_id', accountId)
     .eq('contact_id', contactId)
+    .eq('platform', 'whatsapp')
     .order('created_at', { ascending: true })
     .limit(1)
 
@@ -1295,13 +1296,15 @@ async function findOrCreateConversation(
   }
 
   // Create new conversation. Same tenancy + audit split as
-  // findOrCreateContact above.
+  // findOrCreateContact above. platform defaults to 'whatsapp'; it's
+  // set explicitly for clarity beside the unicast-footgun comment.
   const { data: newConv, error: createError } = await supabaseAdmin()
     .from('conversations')
     .insert({
       account_id: accountId,
       user_id: configOwnerUserId,
       contact_id: contactId,
+      platform: 'whatsapp',
     })
     .select()
     .single()
@@ -1317,6 +1320,7 @@ async function findOrCreateConversation(
         .select('*')
         .eq('account_id', accountId)
         .eq('contact_id', contactId)
+        .eq('platform', 'whatsapp')
         .order('created_at', { ascending: true })
         .limit(1)
       if (raced && raced.length > 0) {

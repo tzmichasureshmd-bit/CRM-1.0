@@ -9,7 +9,24 @@ import {
   normalizeConversations,
 } from "@/lib/inbox/conversations";
 import { cn } from "@/lib/utils";
-import type { Conversation, ConversationStatus, Tag } from "@/types";
+import type {
+  Conversation,
+  ConversationPlatform,
+  ConversationStatus,
+  Tag,
+} from "@/types";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  pointerWithin,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
 import { Search, ChevronDown, X } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useTranslations } from "next-intl";
@@ -43,6 +60,12 @@ const STATUS_COLORS: Record<ConversationStatus, string> = {
   closed: "bg-muted-foreground",
 };
 
+const PLATFORM_BADGE: Record<ConversationPlatform, string> = {
+  whatsapp: "bg-[#25D366]/15 text-[#0f9d58]",
+  facebook: "bg-[#1877F2]/15 text-[#1877F2]",
+  instagram: "bg-[#E1306C]/15 text-[#E1306C]",
+};
+
 
 
 type InboxFilter =
@@ -51,6 +74,8 @@ type InboxFilter =
   | "assigned_me"
   | "ai"
   | "archived";
+
+type PlatformFilter = ConversationPlatform | "all";
 
 export function ConversationList({
   activeConversationId,
@@ -78,6 +103,23 @@ export function ConversationList({
   const [tags, setTags] = useState<Tag[]>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
+
+  // Multi-channel: filter to one platform. The chip row stays hidden until
+  // a non-WhatsApp conversation actually exists, so WhatsApp-only inboxes
+  // look exactly as before.
+  const [platformFilter, setPlatformFilter] = useState<PlatformFilter>("all");
+
+  // Drag-and-drop status organization. Track only the id being dragged;
+  // the payload is derived from `conversations` so the overlay stays in
+  // sync with realtime updates.
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      // Small distance so plain clicks still select a conversation instead
+      // of always starting a drag.
+      activationConstraint: { distance: 6 },
+    })
+  );
 
   // Keep the latest callback in a ref so the fetch effect below can
   // have a stable, empty-dep identity. Previously the fetch useCallback
@@ -189,6 +231,10 @@ export function ConversationList({
       );
     }
 
+    if (platformFilter !== "all") {
+      result = result.filter((c) => c.platform === platformFilter);
+    }
+
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter((c) => {
@@ -200,7 +246,7 @@ export function ConversationList({
     }
 
     return result;
-  }, [conversations, filter, search, selectedTagIds, selectedCompany, user?.id]);
+  }, [conversations, filter, search, selectedTagIds, selectedCompany, user?.id, platformFilter]);
 
   const toggleTag = useCallback((id: string) => {
     setSelectedTagIds((prev) =>
@@ -227,6 +273,65 @@ export function ConversationList({
       onSelect(conv);
     },
     [onSelect]
+  );
+
+  // The platform chip row only appears once Messenger/Instagram data
+  // exists — zero visual change for WhatsApp-only inboxes.
+  const hasMultiPlatform = useMemo(
+    () => conversations.some((c) => c.platform !== "whatsapp"),
+    [conversations]
+  );
+
+  const PLATFORM_CHIPS: { value: PlatformFilter; label: string }[] = useMemo(
+    () => [
+      { value: "all", label: t("platformAll") },
+      { value: "whatsapp", label: t("platformWhatsapp") },
+      { value: "facebook", label: t("platformMessenger") },
+      { value: "instagram", label: t("platformInstagram") },
+    ],
+    [t]
+  );
+
+  const draggableConversation = useMemo(
+    () => conversations.find((c) => c.id === activeDragId) ?? null,
+    [conversations, activeDragId]
+  );
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveDragId(event.active.id.toString());
+  }, []);
+
+  const handleDragEnd = useCallback(
+    async (event: DragEndEvent) => {
+      setActiveDragId(null);
+      const { active, over } = event;
+      if (!over) return;
+      const dropId = over.id.toString();
+      if (!dropId.startsWith("status-")) return;
+      const conv = conversations.find((c) => c.id === active.id);
+      if (!conv) return;
+      const newStatus = dropId.slice("status-".length) as ConversationStatus;
+      if (conv.status === newStatus) return;
+      // Optimistic update through the existing loading callback (the
+      // parent owns the array); realtime reconciles any race below.
+      onConversationsLoadedRef.current(
+        conversations.map((c) =>
+          c.id === conv.id ? { ...c, status: newStatus } : c
+        )
+      );
+      const supabase = createClient();
+      const { error } = await supabase
+        .from("conversations")
+        .update({ status: newStatus })
+        .eq("id", conv.id);
+      if (error) {
+        console.error(
+          "[inbox] failed to move conversation to " + newStatus + ":",
+          error.message
+        );
+      }
+    },
+    [conversations]
   );
 
   const activeFilter = FILTER_OPTIONS.find((o) => o.value === filter);
@@ -364,6 +469,25 @@ export function ConversationList({
           )}
         </div>
 
+        {hasMultiPlatform && (
+          <div className="flex flex-wrap items-center gap-1">
+            {PLATFORM_CHIPS.map((chip) => (
+              <button
+                key={chip.value}
+                onClick={() => setPlatformFilter(chip.value)}
+                className={cn(
+                  "inline-flex h-6 items-center rounded-full px-2.5 text-[11px] font-medium transition-colors",
+                  platformFilter === chip.value
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {hasContactFilters && (
           <div className="flex flex-wrap items-center gap-1">
             {selectedTagIds.map((id) => {
@@ -408,41 +532,75 @@ export function ConversationList({
           every conversation instead of shrinking to the remaining
           space — the list then overflows and gets clipped by the
           parent's overflow-hidden with no scrollbar (issue #229). */}
-      <ScrollArea className="min-h-0 flex-1">
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 mb-3">
-              <Search className="h-6 w-6 text-primary" />
-            </div>
-            <p className="text-sm font-medium text-foreground">
-              {search.trim() || selectedTagIds.length > 0 || selectedCompany !== null || filter !== "all"
-                ? t("noConversationsFilteredDesc")
-                : t("noConversationsTitle")}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={pointerWithin}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        {!loading && conversations.length > 0 && (
+          <div className="border-b border-border px-3 py-2">
+            <p className="mb-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+              {t("dropStatusHint")}
             </p>
-            {(!search.trim() && selectedTagIds.length === 0 && selectedCompany === null && filter === "all") && (
-              <p className="mt-1 text-xs text-muted-foreground max-w-xs">
-                {t("noConversationsDesc")}
-              </p>
-            )}
-          </div>
-        ) : (
-          <div className="flex flex-col">
-            {filtered.map((conv) => (
-              <ConversationItem
-                key={conv.id}
-                conversation={conv}
-                isActive={conv.id === activeConversationId}
-                onSelect={handleSelect}
-                t={t}
-              />
-            ))}
+            <div className="flex items-center gap-1.5">
+              {(["open", "pending", "closed"] as ConversationStatus[]).map(
+                (status) => (
+                  <StatusDropZone key={status} status={status} t={t} />
+                )
+              )}
+            </div>
           </div>
         )}
-      </ScrollArea>
+        <ScrollArea className="min-h-0 flex-1">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 mb-3">
+                <Search className="h-6 w-6 text-primary" />
+              </div>
+              <p className="text-sm font-medium text-foreground">
+                {search.trim() ||
+                  selectedTagIds.length > 0 ||
+                  selectedCompany !== null ||
+                  filter !== "all" ||
+                  platformFilter !== "all"
+                  ? t("noConversationsFilteredDesc")
+                  : t("noConversationsTitle")}
+              </p>
+              {(!search.trim() &&
+                selectedTagIds.length === 0 &&
+                selectedCompany === null &&
+                filter === "all" &&
+                platformFilter === "all") && (
+                  <p className="mt-1 text-xs text-muted-foreground max-w-xs">
+                    {t("noConversationsDesc")}
+                  </p>
+                )}
+            </div>
+          ) : (
+            <div className="flex flex-col">
+              {filtered.map((conv) => (
+                <ConversationItem
+                  key={conv.id}
+                  conversation={conv}
+                  isActive={conv.id === activeConversationId}
+                  onSelect={handleSelect}
+                  t={t}
+                />
+              ))}
+            </div>
+          )}
+        </ScrollArea>
+        <DragOverlay>
+          {draggableConversation && (
+            <DragOverlayCard conversation={draggableConversation} t={t} />
+          )}
+        </DragOverlay>
+      </DndContext>
     </div>
   );
 }
@@ -464,6 +622,10 @@ function ConversationItem({
   const displayName = contact?.name || contact?.phone || t("unknown");
   const initials = displayName.charAt(0).toUpperCase();
 
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: conversation.id,
+  });
+
   const handleClick = useCallback(() => {
     onSelect(conversation);
   }, [onSelect, conversation]);
@@ -474,12 +636,19 @@ function ConversationItem({
       })
     : "";
 
+  const isNonWhatsapp =
+    conversation.platform && conversation.platform !== "whatsapp";
+
   return (
     <button
+      ref={setNodeRef}
       onClick={handleClick}
+      {...attributes}
+      {...listeners}
       className={cn(
         "flex w-full items-start gap-3 px-3 py-3 text-left transition-colors hover:bg-muted/50",
-        isActive && "border-l-2 border-primary bg-muted/70"
+        isActive && "border-l-2 border-primary bg-muted/70",
+        isDragging && "opacity-40"
       )}
     >
       {/* Avatar */}
@@ -498,9 +667,23 @@ function ConversationItem({
       {/* Content */}
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
-          <span className="truncate text-sm font-medium text-foreground">
-            {displayName}
-          </span>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className="truncate text-sm font-medium text-foreground">
+              {displayName}
+            </span>
+            {isNonWhatsapp && (
+              <span
+                className={cn(
+                  "shrink-0 rounded px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide",
+                  PLATFORM_BADGE[conversation.platform!]
+                )}
+              >
+                {conversation.platform === "facebook"
+                  ? t("platformMessenger")
+                  : t("platformInstagram")}
+              </span>
+            )}
+          </div>
           <span className="shrink-0 text-[10px] text-muted-foreground">{timeAgo}</span>
         </div>
         <div className="mt-0.5 flex items-center justify-between gap-2">
@@ -524,5 +707,80 @@ function ConversationItem({
         </div>
       </div>
     </button>
+  );
+}
+
+/** Drop target for one conversation status, used by the drag strip. */
+function StatusDropZone({
+  status,
+  t,
+}: {
+  status: ConversationStatus;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: `status-${status}` });
+  const label =
+    status === "open"
+      ? t("dropOpen")
+      : status === "pending"
+        ? t("dropPending")
+        : t("dropClosed");
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "flex-1 rounded-md border border-dashed px-2 py-1.5 text-center text-[11px] font-medium transition-colors",
+        isOver
+          ? status === "open"
+            ? "border-primary bg-primary/5 text-primary"
+            : status === "pending"
+              ? "border-amber-500 bg-amber-500/5 text-amber-600"
+              : "border-muted-foreground/60 bg-muted/40 text-muted-foreground"
+          : "border-border text-muted-foreground/70"
+      )}
+    >
+      {label}
+    </div>
+  );
+}
+
+/** Static preview shown under the pointer while dragging an item. */
+function DragOverlayCard({
+  conversation,
+  t,
+}: {
+  conversation: Conversation;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const contact = conversation.contact;
+  const displayName = contact?.name || contact?.phone || t("unknown");
+
+  return (
+    <div className="flex w-72 items-center gap-3 rounded-lg border border-border bg-card px-3 py-3 shadow-lg">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium text-foreground">
+        {displayName.charAt(0).toUpperCase()}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-foreground">
+          {displayName}
+        </p>
+        <p className="truncate text-xs text-muted-foreground">
+          {conversation.last_message_text || t("noMessagesYet")}
+        </p>
+      </div>
+      {conversation.platform && conversation.platform !== "whatsapp" && (
+        <span
+          className={cn(
+            "shrink-0 rounded px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide",
+            PLATFORM_BADGE[conversation.platform]
+          )}
+        >
+          {conversation.platform === "facebook"
+            ? t("platformMessenger")
+            : t("platformInstagram")}
+        </span>
+      )}
+    </div>
   );
 }

@@ -6,6 +6,7 @@ import {
   discoverPages,
   exchangeCodeForLongLivedToken,
   subscribePageToLeadgen,
+  subscribePageToMessaging,
   MetaLeadsApiError,
 } from "@/lib/meta/leads-api";
 import { buildRedirectUri, normalizeReturnTo } from "../../connect/route";
@@ -128,7 +129,10 @@ export async function GET(request: Request) {
 
     const admin = supabaseAdmin();
 
-    // 3. Subscribe each Page to the leadgen webhook, then persist.
+    // 3. Subscribe each Page to the leadgen + messages webhooks, then
+    //    persist. `messages` bring Messenger/IG DMs into the unified
+    //    inbox; it's best-effort (a Page without messaging permission
+    //    still connects for lead ads).
     const records = [];
     for (const page of pages) {
       try {
@@ -137,6 +141,7 @@ export async function GET(request: Request) {
         // best-effort; still record the connection and let the webhook
         // status show 'error'
       }
+      await subscribePageToMessaging(page.id, page.pageAccessToken);
 
       const encryptedToken = encrypt(page.pageAccessToken);
 

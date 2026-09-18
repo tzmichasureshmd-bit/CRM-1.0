@@ -59,7 +59,7 @@ import {
   blankButtonsPayload,
 } from "@/components/interactive/interactive-builder";
 import { validateInteractivePayload } from "@/lib/whatsapp/interactive";
-import type { InteractiveMessagePayload, QuickReply } from "@/types";
+import type { ConversationPlatform, InteractiveMessagePayload, QuickReply } from "@/types";
 import { QuickReplyPicker } from "./quick-reply-picker";
 
 /** Media content types an agent can send from the composer. */
@@ -117,6 +117,10 @@ interface MediaDraft {
 
 interface MessageComposerProps {
   conversationId: string;
+  /** The conversation's channel. WhatsApp keeps its 24h-window rules,
+   *  templates and interactive messages; Messenger/Instagram only get the
+   *  free-form media + text path the send route supports for them. */
+  platform: ConversationPlatform;
   sessionExpired: boolean;
   onSend: (text: string, replyToId?: string) => void;
   onSendMedia: (payload: SendMediaPayload) => void;
@@ -139,6 +143,7 @@ const OPUS_ENCODER_PATH = "/opus/encoderWorker.min.js";
 
 export function MessageComposer({
   conversationId,
+  platform,
   sessionExpired,
   onSend,
   onSendMedia,
@@ -148,6 +153,13 @@ export function MessageComposer({
   onClearReply,
 }: MessageComposerProps) {
   const t = useTranslations("Inbox.composer");
+
+  // WhatsApp-only affordances: interactive messages, quick replies and
+  // templates (the send route rejects them for Messenger/Instagram).
+  // Instagram additionally rejects documents and audio — those pickers
+  // are hidden so files aren't uploaded and orphaned in the bucket.
+  const isWhatsApp = platform === "whatsapp";
+  const isInstagram = platform === "instagram";
 
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
@@ -694,19 +706,26 @@ export function MessageComposer({
                 <Video className="mr-2 h-4 w-4" />
                 {t("video")}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => documentInputRef.current?.click()}>
-                <FileText className="mr-2 h-4 w-4" />
-                {t("document")}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => void startRecording()}>
-                <Mic className="mr-2 h-4 w-4" />
-                {t("voiceNote")}
-              </DropdownMenuItem>
+              {!isInstagram && (
+                <DropdownMenuItem onClick={() => documentInputRef.current?.click()}>
+                  <FileText className="mr-2 h-4 w-4" />
+                  {t("document")}
+                </DropdownMenuItem>
+              )}
+              {!isInstagram && (
+                <DropdownMenuItem onClick={() => void startRecording()}>
+                  <Mic className="mr-2 h-4 w-4" />
+                  {t("voiceNote")}
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* + menu — interactive messages + quick replies. Gated on the
-              24h window like free-form text (interactive requires it). */}
+          {/* + menu — interactive messages + quick replies (WhatsApp only:
+              interactive requires the 24h window AND the WhatsApp send
+              route; Messenger/Instagram have neither). Also gated on the
+              24h window like free-form text. */}
+          {isWhatsApp && (
           <DropdownMenu>
             <DropdownMenuTrigger
               disabled={inputsDisabled}
@@ -732,7 +751,9 @@ export function MessageComposer({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          )}
 
+          {isWhatsApp && (
           <GatedButton
             variant="ghost"
             size="sm"
@@ -744,6 +765,7 @@ export function MessageComposer({
           >
             <LayoutTemplate className="h-4 w-4" />
           </GatedButton>
+          )}
 
           <GatedButton
             variant="ghost"

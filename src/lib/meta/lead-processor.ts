@@ -331,9 +331,11 @@ async function ensureLeadTags(
  * Meta lead forms sometimes omit a phone number entirely. The CRM's
  * contacts.phone is NOT NULL, so generate a unique, invalid-looking
  * placeholder so the lead is never dropped. It's clearly not a real
- * number and can be corrected later.
+ * number and can be corrected later. Exported for the Messenger/IG
+ * messaging processor, whose channel-originated contacts also have no
+ * phone.
  */
-function generateFallbackPhone(): string {
+export function generateFallbackPhone(): string {
   const suffix = Math.random().toString().slice(2, 11);
   return `00000${suffix}`;
 }

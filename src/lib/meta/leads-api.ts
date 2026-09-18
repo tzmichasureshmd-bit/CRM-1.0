@@ -290,6 +290,50 @@ export async function subscribePageToLeadgen(
   await throwMetaLeadsError(res, `Subscription failed (HTTP ${res.status})`, 'subscribe_page')
 }
 
+/**
+ * Install the app onto a Page for the `messages` webhook field — this is
+ * what delivers Facebook Messenger + Instagram DM events to the same
+ * webhook URL the leadgen subscription uses. Uses the Page access token.
+ * Best-effort: a Messenger-less setup (e.g. no messaging permission yet)
+ * should not break the lead-ads connect flow.
+ */
+export async function subscribePageToMessaging(
+  pageId: string,
+  pageAccessToken: string,
+): Promise<void> {
+  try {
+    const params = new URLSearchParams({
+      subscribed_fields: 'messages',
+      access_token: pageAccessToken,
+    })
+    const res = await fetch(
+      `${META_LEADS_API_BASE}/${pageId}/subscribed_apps?${params.toString()}`,
+      { method: 'POST' },
+    )
+    // Treat 200 + benign "already subscribed / no permission" (code 100)
+    // as success — the connection is still recorded either way.
+    if (!res.ok) {
+      const errData = (await res.json().catch(() => ({}))) as {
+        error?: { code?: number }
+      }
+      if (errData.error?.code !== 100) {
+        throw new MetaLeadsApiError({
+          status: res.status,
+          message: 'Could not subscribe page to messages webhook',
+          operation: 'subscribe_page',
+        })
+      }
+    }
+  } catch (err) {
+    // Best-effort: lead-ads connect must succeed even when messaging
+    // permission isn't granted yet.
+    console.warn(
+      `[meta] messages subscription skipped for page ${pageId}:`,
+      err instanceof Error ? err.message : String(err),
+    )
+  }
+}
+
 // ------------------------------------------------------------
 // Lead retrieval
 // ------------------------------------------------------------

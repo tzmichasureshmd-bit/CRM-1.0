@@ -44,6 +44,7 @@ import {
 } from '@/lib/whatsapp/phone-utils';
 import type { MessageTemplate } from '@/types';
 import { isMessageTemplate } from '@/lib/whatsapp/template-row-guard';
+import { sendMessagingToConversation } from '@/lib/meta/messaging-send';
 
 export const MEDIA_KINDS = ['image', 'video', 'document', 'audio'] as const;
 export const VALID_MESSAGE_TYPES = [
@@ -230,6 +231,32 @@ export async function sendMessageToConversation(
   }
 
   const contact = conversation.contact;
+
+  // ---- Unified multi-channel core (migration 070) --------------
+  // Messenger / Instagram conversations route through the Meta Graph
+  // API (Page access token + the channel ids stored on the
+  // conversation) instead of the WhatsApp Cloud API. Everything below
+  // this branch is WhatsApp-only: phone validation, whatsapp_config,
+  // Cloud API send with phone-variant retry.
+  const platform =
+    (conversation.platform as 'whatsapp' | 'facebook' | 'instagram' | null) ??
+    'whatsapp';
+  if (platform !== 'whatsapp') {
+    const { messageId, metaMessageId } = await sendMessagingToConversation(
+      db,
+      accountId,
+      conversation,
+      {
+        messageType,
+        contentText,
+        mediaUrl,
+        filename,
+        replyToMessageId,
+      }
+    );
+    return { messageId, whatsappMessageId: metaMessageId };
+  }
+
   if (!contact?.phone) {
     throw new SendMessageError(
       'bad_request',
@@ -443,28 +470,81 @@ export async function sendMessageToConversation(
       .eq('id', contact.id);
   }
 
-  // Persist the sent message. Field names MUST match the messages
-  // schema (see 001_initial_schema.sql).
+  // Persist the sent message (shared with the Messenger/Instagram path
+  // so every channel persists identically), then return.
+  const { messageId } = await persistOutboundMessage(
+    db,
+    accountId,
+    conversationId,
+    contact.id,
+    {
+      contentType: messageType,
+      contentText: contentText ?? null,
+      mediaUrl: mediaUrl ?? null,
+      templateName: templateName || null,
+      interactivePayload:
+        messageType === 'interactive' ? interactivePayload : null,
+      replyToMessageId: replyToMessageId || null,
+      metaMessageId: waMessageId,
+    }
+  );
+
+  return { messageId, whatsappMessageId: waMessageId };
+}
+
+export interface PersistOutboundOptions {
+  /** messages.content_type value (also drives the preview text). */
+  contentType: string;
+  contentText?: string | null;
+  mediaUrl?: string | null;
+  templateName?: string | null;
+  interactivePayload?: InteractiveMessagePayload | null;
+  replyToMessageId?: string | null;
+  /** Meta message id (wamid for WhatsApp, mid for Messenger/IG). */
+  metaMessageId: string;
+  /** Marks the persisted row `ai_generated = true` (AI auto-reply only). */
+  aiGenerated?: boolean;
+}
+
+/**
+ * Persist an outbound message + update the conversation + pause any
+ * active Flow run (agent stepped in). Shared by the WhatsApp core and
+ * the Messenger/Instagram send path so all channels write identical
+ * rows. Throws `SendMessageError` on a DB failure (the message already
+ * reached Meta by this point).
+ */
+export async function persistOutboundMessage(
+  db: SupabaseClient,
+  accountId: string,
+  conversationId: string,
+  contactId: string,
+  opts: PersistOutboundOptions
+): Promise<{ messageId: string }> {
   // Interactive messages persist the body as content_text (so the
   // conversation-list preview reads sensibly) plus the full structured
   // payload so the thread can re-render the buttons / rows.
   const interactiveBody =
-    messageType === 'interactive' ? interactivePayload!.body : null;
+    opts.contentType === 'interactive'
+      ? opts.interactivePayload?.body ?? null
+      : null;
 
   const { data: messageRecord, error: msgError } = await db
     .from('messages')
     .insert({
       conversation_id: conversationId,
       sender_type: 'agent',
-      content_type: messageType,
-      content_text: interactiveBody ?? contentText ?? null,
-      media_url: mediaUrl || null,
-      template_name: templateName || null,
+      content_type: opts.contentType,
+      content_text: interactiveBody ?? opts.contentText ?? null,
+      media_url: opts.mediaUrl ?? null,
+      template_name: opts.templateName ?? null,
       interactive_payload:
-        messageType === 'interactive' ? interactivePayload : null,
-      message_id: waMessageId,
+        opts.contentType === 'interactive'
+          ? opts.interactivePayload
+          : null,
+      message_id: opts.metaMessageId,
       status: 'sent',
-      reply_to_message_id: replyToMessageId || null,
+      reply_to_message_id: opts.replyToMessageId ?? null,
+      ai_generated: opts.aiGenerated ?? false,
     })
     .select()
     .single();
@@ -479,9 +559,9 @@ export async function sendMessageToConversation(
   }
 
   const lastMessageText =
-    messageType === 'interactive'
-      ? interactivePayloadPreviewText(interactivePayload!)
-      : contentText || `[${messageType}]`;
+    opts.contentType === 'interactive' && opts.interactivePayload
+      ? interactivePayloadPreviewText(opts.interactivePayload)
+      : opts.contentText || `[${opts.contentType}]`;
 
   await db
     .from('conversations')
@@ -503,7 +583,7 @@ export async function sendMessageToConversation(
         end_reason: 'agent_replied',
       })
       .eq('account_id', accountId)
-      .eq('contact_id', contact.id)
+      .eq('contact_id', contactId)
       .eq('status', 'active');
     if (pauseErr) {
       console.error('[flows] pause-on-agent-send failed:', pauseErr.message);
@@ -515,5 +595,5 @@ export async function sendMessageToConversation(
     );
   }
 
-  return { messageId: messageRecord.id, whatsappMessageId: waMessageId };
+  return { messageId: messageRecord.id };
 }

@@ -12,6 +12,7 @@ import type {
   Message,
   MessageReaction,
   Contact,
+  ConversationPlatform,
   ConversationStatus,
   MessageTemplate,
   Profile,
@@ -150,6 +151,12 @@ const STATUS_OPTIONS: { label: string; value: ConversationStatus; color: string 
   { label: "Closed", value: "closed", color: "text-muted-foreground" },
 ];
 
+const PLATFORM_BADGE_CLASS: Record<ConversationPlatform, string> = {
+  whatsapp: "bg-[#25D366]/15 text-[#0f9d58]",
+  facebook: "bg-[#1877F2]/15 text-[#1877F2]",
+  instagram: "bg-[#E1306C]/15 text-[#E1306C]",
+};
+
 /**
  * WhatsApp-style doodle background applied to the chat area (both the
  * active thread and the empty state). The SVG tile lives at
@@ -181,6 +188,7 @@ export function MessageThread({
   const t = useTranslations("Inbox.messageThread");
   const tTimer = useTranslations("Inbox.sessionTimer");
   const tQuote = useTranslations("Inbox.replyQuote");
+  const tChannels = useTranslations("Inbox.conversationList");
 
   const { user, accountId } = useAuth();
   const { getPresence, getRow, now } = usePresence();
@@ -238,8 +246,14 @@ export function MessageThread({
     };
   }, []);
 
-  // 24-hour session timer
+  // 24-hour session timer — WhatsApp only. Messenger/Instagram DMs don't
+  // gate on a 24h service window in this CRM (the inbox doesn't synthesize
+  // an expiry for them), so the badge and composer block stay off.
+  const platform: ConversationPlatform = conversation?.platform ?? "whatsapp";
+  const isWhatsApp = platform === "whatsapp";
+
   const sessionInfo = useMemo(() => {
+    if (!isWhatsApp) return { expired: false, remaining: "" };
     if (!messages.length) return { expired: false, remaining: "" };
 
     // Find last customer message
@@ -263,7 +277,7 @@ export function MessageThread({
         : tTimer("xmRemaining", { minutes: Math.floor(hoursLeft * 60) });
 
     return { expired, remaining };
-  }, [messages, tTimer]);
+  }, [messages, tTimer, isWhatsApp]);
 
   // Store latest callback in a ref so fetchMessages doesn't need to
   // depend on `onMessagesLoaded` — otherwise parent re-renders cause
@@ -1028,21 +1042,42 @@ export function MessageThread({
             )}
           </div>
           <div className="min-w-0">
-            <h2 className="truncate text-sm font-semibold text-foreground">{displayName}</h2>
-            <p className="truncate text-xs text-muted-foreground">{contact.phone}</p>
+            <h2 className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+              <span className="truncate">{displayName}</span>
+              {!isWhatsApp && (
+                <span
+                  className={cn(
+                    "shrink-0 rounded px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide",
+                    PLATFORM_BADGE_CLASS[platform]
+                  )}
+                >
+                  {platform === "facebook"
+                    ? tChannels("platformMessenger")
+                    : tChannels("platformInstagram")}
+                </span>
+              )}
+            </h2>
+            <p className="truncate text-xs text-muted-foreground">
+              {isWhatsApp
+                ? contact.phone
+                : conversation.channel_username ?? ""}
+            </p>
           </div>
           {/* Session timer badge — hidden on the narrowest phones so
-              the name + back arrow keep their room. */}
-          <Badge
-            variant="outline"
-            className={cn(
-              "ml-1 hidden gap-1 border-border text-[10px] sm:inline-flex sm:ml-2",
-              sessionInfo.expired ? "text-red-400" : "text-primary"
-            )}
-          >
-            <Clock className="h-3 w-3" />
-            {sessionInfo.remaining}
-          </Badge>
+              the name + back arrow keep their room; hidden entirely for
+              Messenger / Instagram DMs which have no 24h gate here. */}
+          {isWhatsApp && (
+            <Badge
+              variant="outline"
+              className={cn(
+                "ml-1 hidden gap-1 border-border text-[10px] sm:inline-flex sm:ml-2",
+                sessionInfo.expired ? "text-red-400" : "text-primary"
+              )}
+            >
+              <Clock className="h-3 w-3" />
+              {sessionInfo.remaining}
+            </Badge>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -1110,8 +1145,10 @@ export function MessageThread({
             </button>
           )}
 
-          {/* Call button */}
-          {contact?.phone && (
+          {/* Call button — WhatsApp only. Messenger/Instagram contacts
+              carry a generated fallback phone (see messaging processor),
+              so a tel: link would dial junk. */}
+          {isWhatsApp && contact?.phone && (
             <a
               href={`tel:${contact.phone}`}
               className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -1351,6 +1388,7 @@ export function MessageThread({
       {/* Composer */}
       <MessageComposer
         conversationId={conversation.id}
+        platform={platform}
         sessionExpired={sessionInfo.expired}
         onSend={handleSend}
         onSendMedia={handleSendMedia}

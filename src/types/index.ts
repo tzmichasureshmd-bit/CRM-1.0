@@ -156,6 +156,11 @@ export interface Contact {
   /** When this contact was last messaged (individual or broadcast).
     *  Maintained by the send paths; enables "already contacted" filtering. */
   last_contacted_at?: string | null;
+  /** Messenger PSID (facebook channel identity, migration 070). Used to
+    *  dedupe return-messaging users across webhook deliveries. */
+  messenger_psid?: string | null;
+  /** Instagram IG-scoped user id (migration 070). Dedupe key for DMs. */
+  instagram_user_id?: string | null;
   /** WhatsApp profile display name (migration 068). Synced on every
     *  inbound message's profile payload, independent of the CRM `name`. */
   whatsapp_name?: string | null;
@@ -230,6 +235,7 @@ export interface FollowUp {
 }
 
 export type ConversationStatus = 'open' | 'pending' | 'closed';
+export type ConversationPlatform = 'whatsapp' | 'facebook' | 'instagram';
 export type LeadStatus = 'new' | 'contacted' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost';
 
 export interface Conversation {
@@ -241,6 +247,15 @@ export interface Conversation {
   last_message_text?: string;
   last_message_at?: string;
   unread_count: number;
+  /** Channel this conversation lives on (migration 070). Defaults to
+   *  "whatsapp"; facebook/instagram conversations carry channel_* ids. */
+  platform: ConversationPlatform;
+  /** Sender's channel-scoped id: Messenger PSID or IG-scoped user id. */
+  channel_recipient_id?: string | null;
+  /** Facebook Page id (facebook) or Instagram account id (instagram). */
+  channel_page_id?: string | null;
+  /** Display name on the channel (e.g. the Page name for partner ease). */
+  channel_username?: string | null;
   created_at: string;
   updated_at: string;
   contact?: Contact;

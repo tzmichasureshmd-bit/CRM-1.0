@@ -5,6 +5,10 @@ import { supabaseAdmin } from "@/lib/automations/admin-client";
 import { getLeadDetails, MetaLeadsApiError } from "@/lib/meta/leads-api";
 import { processMetaLead } from "@/lib/meta/lead-processor";
 import { createNotification } from "@/lib/notifications";
+import {
+  processMessagingEvents,
+  type MessengerWebhookMessagingEvent,
+} from "@/lib/meta/messaging-processor";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -24,6 +28,8 @@ interface LeadgenEntry {
     field?: string;
     value?: LeadgenChangeValue;
   }>;
+  /** Messenger / Instagram DM events (`object: "page"`, field messages). */
+  messaging?: MessengerWebhookMessagingEvent[];
 }
 
 interface LeadgenBody {
@@ -115,9 +121,47 @@ export async function POST(request: Request) {
     } catch (error) {
       console.error("[meta/webhook] error processing leadgen:", error);
     }
+    try {
+      await processMessaging(body);
+    } catch (error) {
+      console.error("[meta/webhook] error processing messaging:", error);
+    }
   });
 
   return NextResponse.json({ status: "ok" });
+}
+
+/**
+ * Ingest Messenger / Instagram DM events (the standard `page` object
+ * `entry[].messaging[]` shape) after acking Meta.
+ */
+async function processMessaging(body: LeadgenBody): Promise<void> {
+  const entries = body.entry ?? [];
+  const events: MessengerWebhookMessagingEvent[] = [];
+  for (const entry of entries) {
+    if (entry.messaging && entry.messaging.length > 0) {
+      events.push(...entry.messaging);
+    }
+  }
+  if (events.length === 0) return;
+  await processMessagingEvents(sanitizeMessagingEvents(events));
+}
+
+/**
+ * Drop events that clearly aren't DM messages (no message / missing ids)
+ * before handing off — the processor double-checks, but cheap defensive
+ * filtering keeps the log clean for reaction/postback flushes.
+ */
+function sanitizeMessagingEvents(
+  events: MessengerWebhookMessagingEvent[],
+): MessengerWebhookMessagingEvent[] {
+  return events.filter(
+    (ev) =>
+      ev &&
+      !!ev.sender?.id &&
+      !!ev.recipient?.id &&
+      !!ev.message?.mid,
+  );
 }
 
 /**
