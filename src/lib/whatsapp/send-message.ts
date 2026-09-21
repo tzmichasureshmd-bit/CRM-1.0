@@ -45,6 +45,7 @@ import {
 import type { MessageTemplate } from '@/types';
 import { isMessageTemplate } from '@/lib/whatsapp/template-row-guard';
 import { sendMessagingToConversation } from '@/lib/meta/messaging-send';
+import { sendTelegramMessage } from '@/lib/telegram/telegram-send';
 
 export const MEDIA_KINDS = ['image', 'video', 'document', 'audio'] as const;
 export const VALID_MESSAGE_TYPES = [
@@ -239,9 +240,22 @@ export async function sendMessageToConversation(
   // this branch is WhatsApp-only: phone validation, whatsapp_config,
   // Cloud API send with phone-variant retry.
   const platform =
-    (conversation.platform as 'whatsapp' | 'facebook' | 'instagram' | null) ??
+    (conversation.platform as 'whatsapp' | 'facebook' | 'instagram' | 'telegram' | null) ??
     'whatsapp';
-  if (platform !== 'whatsapp') {
+
+  // Telegram: route through Telegram Bot API
+  if (platform === 'telegram') {
+    const { messageId, telegramMessageId } = await sendTelegramMessage(
+      db,
+      accountId,
+      conversation,
+      { messageType, contentText, mediaUrl, filename, replyToMessageId },
+    );
+    return { messageId, whatsappMessageId: telegramMessageId };
+  }
+
+  // Messenger / Instagram: route through Meta Graph API
+  if (platform === 'facebook' || platform === 'instagram') {
     const { messageId, metaMessageId } = await sendMessagingToConversation(
       db,
       accountId,

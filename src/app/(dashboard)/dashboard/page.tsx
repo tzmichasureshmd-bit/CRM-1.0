@@ -88,13 +88,6 @@ export default function DashboardPage() {
   const [recentLeads, setRecentLeads] = useState<RecentLead[]>([])
   const [recentLeadsLoading, setRecentLeadsLoading] = useState(true)
 
-  const [loadError, setLoadError] = useState(false)
-
-  const markLoadError = useCallback((err: unknown, label: string) => {
-    console.error(`[dashboard] ${label} failed:`, err)
-    setLoadError(true)
-  }, [])
-
   const loadLeads = useCallback(() => {
     fetch('/api/social-media/overview', { cache: 'no-store' })
       .then((r) => r.json())
@@ -102,12 +95,12 @@ export default function DashboardPage() {
         setLeadStats(d.stats ?? null)
         setRecentLeads(d.recentLeads ?? [])
       })
-      .catch((err) => markLoadError(err, 'social overview'))
+      .catch((err) => console.error('[dashboard] social overview failed:', err))
       .finally(() => {
         setLeadStatsLoading(false)
         setRecentLeadsLoading(false)
       })
-  }, [markLoadError])
+  }, [])
 
   const [whatsappConnected, setWhatsappConnected] = useState<boolean | null>(null)
 
@@ -121,32 +114,32 @@ export default function DashboardPage() {
 
     void loadMetrics(db)
       .then((m) => setMetrics(m))
-      .catch((err) => markLoadError(err, 'metrics'))
+      .catch((err) => console.error('[dashboard] metrics failed:', err))
       .finally(() => setMetricsLoading(false))
 
     void loadConversationsSeries(db, 30)
       .then((s) => setSeries((prev) => ({ ...prev, 30: s })))
-      .catch((err) => markLoadError(err, 'series'))
+      .catch((err) => console.error('[dashboard] series failed:', err))
       .finally(() => setSeriesLoading(false))
 
     void loadPipelineDonut(db)
       .then((p) => setPipeline(p))
-      .catch((err) => markLoadError(err, 'pipeline'))
+      .catch((err) => console.error('[dashboard] pipeline failed:', err))
       .finally(() => setPipelineLoading(false))
 
     void loadResponseTime(db)
       .then((r) => setResponseTime(r))
-      .catch((err) => markLoadError(err, 'response time'))
+      .catch((err) => console.error('[dashboard] response time failed:', err))
       .finally(() => setResponseTimeLoading(false))
 
      void loadActivity(db, 50)
       .then((a) => setActivity(a))
-      .catch((err) => markLoadError(err, 'activity'))
+      .catch((err) => console.error('[dashboard] activity failed:', err))
       .finally(() => setActivityLoading(false))
 
     void loadRecentConversations(db, 6)
       .then((r) => setRecentConversations(r))
-      .catch((err) => markLoadError(err, 'recent convs'))
+      .catch((err) => console.error('[dashboard] recent convs failed:', err))
       .finally(() => setRecentLoading(false))
 
     void (async () => {
@@ -155,9 +148,8 @@ export default function DashboardPage() {
           .from('contacts')
           .select('id', { count: 'exact', head: true })
         setTotalContacts(count ?? 0)
-      } catch (err) {
+      } catch {
         setTotalContacts(0)
-        markLoadError(err, 'contacts count')
       }
     })()
 
@@ -167,9 +159,8 @@ export default function DashboardPage() {
           .from('conversations')
           .select('id', { count: 'exact', head: true })
         setTotalConversations(count ?? 0)
-      } catch (err) {
+      } catch {
         setTotalConversations(0)
-        markLoadError(err, 'conversations count')
       }
     })()
 
@@ -181,9 +172,8 @@ export default function DashboardPage() {
           .is('assigned_agent_id', null)
           .neq('status', 'closed')
         setUnassignedCount(count ?? 0)
-      } catch (err) {
+      } catch {
         setUnassignedCount(0)
-        markLoadError(err, 'unassigned count')
       }
     })()
 
@@ -196,12 +186,11 @@ export default function DashboardPage() {
           .eq('status', 'pending')
           .lt('due_date', now)
         setOverdueFollowUpsCount(count ?? 0)
-      } catch (err) {
+      } catch {
         setOverdueFollowUpsCount(0)
-        markLoadError(err, 'overdue follow-ups count')
       }
     })()
-  }, [markLoadError])
+  }, [])
 
   useEffect(() => {
     loadAll()
@@ -238,19 +227,13 @@ export default function DashboardPage() {
       const db = createClient()
       loadConversationsSeries(db, r)
         .then((s) => setSeries((prev) => ({ ...prev, [r]: s })))
-        .catch((err) => markLoadError(err, 'series'))
+        .catch((err) => console.error('[dashboard] series failed:', err))
         .finally(() => setSeriesLoading(false))
     },
-    [series, markLoadError],
+    [series],
   )
 
   const firstName = profile?.full_name?.split(' ')[0] ?? t('there')
-
-  const handleRetry = useCallback(() => {
-    setLoadError(false)
-    loadAll()
-    loadLeads()
-  }, [loadAll, loadLeads])
 
   return (
     <div className="space-y-6">
@@ -311,27 +294,6 @@ export default function DashboardPage() {
               {t('connectNow')}
             </Link>
           </div>
-        </div>
-      )}
-
-      {loadError && (
-        <div className="flex flex-col gap-3 rounded-xl border border-destructive/20 bg-destructive/5 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-destructive/10">
-              <WifiOff className="h-4 w-4 text-destructive" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-foreground">{t('loadFailedTitle')}</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">{t('loadFailedHint')}</p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={handleRetry}
-            className="shrink-0 rounded-lg bg-destructive/10 px-4 py-2 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/20"
-          >
-            {t('retry')}
-          </button>
         </div>
       )}
 

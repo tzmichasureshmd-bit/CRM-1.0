@@ -19,6 +19,13 @@ export const THEME_IDS = [
   "cobalt",
   "amber",
   "rose",
+  "teal",
+  "indigo",
+  "orange",
+  "pink",
+  "cyan",
+  "lime",
+  "red",
 ] as const;
 
 export type ThemeId = (typeof THEME_IDS)[number];
@@ -39,7 +46,7 @@ export const STORAGE_KEY = "wacrm.theme";
  * Persisted under its own localStorage key so it composes freely
  * with the accent choice (you can run Violet-light or Violet-dark).
  */
-export const MODES = ["light", "dark"] as const;
+export const MODES = ["light", "dark", "auto"] as const;
 
 export type Mode = (typeof MODES)[number];
 
@@ -96,6 +103,48 @@ export const THEMES: ReadonlyArray<ThemeMeta> = [
     name: "Rose",
     tagline: "Bold and modern — D2C, creator-economy, lifestyle.",
     swatch: "oklch(0.645 0.22 16)",
+  },
+  {
+    id: "teal",
+    name: "Teal",
+    tagline: "Fresh and professional.",
+    swatch: "oklch(0.62 0.14 195)",
+  },
+  {
+    id: "indigo",
+    name: "Indigo",
+    tagline: "Deep and focused.",
+    swatch: "oklch(0.55 0.22 270)",
+  },
+  {
+    id: "orange",
+    name: "Orange",
+    tagline: "Energetic and bold.",
+    swatch: "oklch(0.72 0.19 45)",
+  },
+  {
+    id: "pink",
+    name: "Pink",
+    tagline: "Vibrant and friendly.",
+    swatch: "oklch(0.68 0.22 340)",
+  },
+  {
+    id: "cyan",
+    name: "Cyan",
+    tagline: "Cool and modern.",
+    swatch: "oklch(0.72 0.14 210)",
+  },
+  {
+    id: "lime",
+    name: "Lime",
+    tagline: "Fresh and lively.",
+    swatch: "oklch(0.78 0.18 130)",
+  },
+  {
+    id: "red",
+    name: "Red",
+    tagline: "Powerful and urgent.",
+    swatch: "oklch(0.62 0.24 25)",
   },
 ];
 

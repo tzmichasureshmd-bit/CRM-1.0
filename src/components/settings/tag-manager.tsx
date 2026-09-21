@@ -112,7 +112,7 @@ export function TagManager() {
       toast.success(t('tagCreated'));
       setNewTagName('');
       setSelectedColor(PRESET_COLORS[3].value);
-      await fetchTags(accountId);
+      await fetchTags(user.id);
     } catch (err) {
       console.error('Create error:', err);
       toast.error(t('failedToCreateTag'));

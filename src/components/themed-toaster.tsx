@@ -37,7 +37,7 @@ export function ThemedToaster() {
   const isClient = useIsClient();
   return (
     <Toaster
-      theme={isClient ? mode : DEFAULT_MODE}
+      theme={(isClient ? (mode === 'auto' ? 'system' : mode) : DEFAULT_MODE) as 'light' | 'dark' | 'system'}
       position="top-right"
       toastOptions={{
         style: {

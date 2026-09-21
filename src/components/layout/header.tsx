@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
-import { LogOut, Menu, Settings as SettingsIcon, User } from "lucide-react";
+import { LogOut, Menu, Settings as SettingsIcon, User, Palette } from "lucide-react";
+import { useState } from "react";
 import {
   Avatar,
   AvatarFallback,
@@ -17,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ModeToggle } from "@/components/layout/mode-toggle";
+import { ThemePanel } from "@/components/layout/theme-panel";
 
 const pageTitles: Record<string, string> = {
   "/dashboard": "dashboard",
@@ -69,6 +71,7 @@ export function Header({ onOpenSidebar }: HeaderProps) {
   const pathname = usePathname();
   const { profile, signOut } = useAuth();
   const titleKey = getPageTitleKey(pathname);
+  const [themePanelOpen, setThemePanelOpen] = useState(false);
 
   const initial =
     profile?.full_name?.charAt(0)?.toUpperCase() ??
@@ -94,6 +97,20 @@ export function Header({ onOpenSidebar }: HeaderProps) {
 
       <div className="flex items-center gap-1 sm:gap-2">
         <ModeToggle />
+
+        {/* Zoho-style theme/appearance panel trigger */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setThemePanelOpen((v) => !v)}
+            aria-label="Appearance settings"
+            title="Appearance"
+            className="flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <Palette className="h-5 w-5" />
+          </button>
+          <ThemePanel open={themePanelOpen} onClose={() => setThemePanelOpen(false)} />
+        </div>
 
         <DropdownMenu>
         <DropdownMenuTrigger

@@ -25,6 +25,7 @@ import { QuickRepliesManager } from '@/components/settings/quick-replies-manager
 import { FieldsAndTagsPanel } from '@/components/settings/fields-and-tags-panel';
 import { DealsSettings } from '@/components/settings/deals-settings';
 import { ApiKeysSettings } from '@/components/settings/api-keys-settings';
+import { TelegramSettings } from '@/components/settings/telegram-settings';
 import {
   resolveSection,
   type SettingsSection,
@@ -95,6 +96,7 @@ function SettingsPageInner() {
     fields: <FieldsAndTagsPanel />,
     deals: <DealsSettings />,
     api: <ApiKeysSettings />,
+    telegram: <TelegramSettings />,
   };
 
   return (

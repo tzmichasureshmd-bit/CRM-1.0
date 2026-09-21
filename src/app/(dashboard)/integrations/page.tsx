@@ -17,15 +17,10 @@ import {
   Webhook,
   Power,
   HelpCircle,
+  Camera,
+  MessageSquare,
+  Send,
 } from "lucide-react";
-
-/**
- * Integrations hub. Every card is driven by the live
- * `/api/integrations/overview` payload — nothing here is hardcoded
- * connection state. A card links to the real management surface for
- * that integration (Settings tabs, Social Media center, API developer
- * page) and never points at a non-existent flow.
- */
 
 interface OverviewPayload {
   whatsapp: {
@@ -69,9 +64,14 @@ interface OverviewPayload {
     whatsapp: number;
     google_form: number;
   };
+  telegram: {
+    connected: boolean;
+    botName: string | null;
+    botUsername: string | null;
+    lastInboundAt: string | null;
+  };
 }
 
-/** Live Graph-API health from /api/integrations/health. */
 interface HealthPayload {
   checkedAt: string;
   config: {
@@ -141,16 +141,7 @@ const CATEGORIES: { id: Category; label: string }[] = [
   { id: "communication", label: "Communication" },
   { id: "social-media", label: "Social Media" },
   { id: "forms", label: "Forms" },
-  { id: "marketing", label: "Marketing" },
-  { id: "ecommerce", label: "E-commerce" },
-  { id: "crm", label: "CRM" },
-  { id: "payments", label: "Payments" },
-  { id: "analytics", label: "Analytics" },
   { id: "developer", label: "Developer" },
-  { id: "automation", label: "Automation" },
-  { id: "ai", label: "AI" },
-  { id: "leads", label: "Leads" },
-  { id: "other", label: "Other" },
 ];
 
 function fmtDate(iso: string | null | undefined): string {
@@ -167,16 +158,17 @@ interface ConnectionBadgeProps {
 
 function ConnectionBadge({ state, label }: ConnectionBadgeProps) {
   const styles: Record<ConnectionBadgeProps["state"], string> = {
-    connected:
-      "border-emerald-500/30 bg-emerald-500/10 text-emerald-400",
-    notConnected:
-      "border-border bg-muted text-muted-foreground",
-    attention:
-      "border-amber-500/30 bg-amber-500/10 text-amber-300",
-    available:
-      "border-primary/30 bg-primary/10 text-primary",
+    connected: "border-emerald-500/30 bg-emerald-500/10 text-emerald-400",
+    notConnected: "border-border bg-muted text-muted-foreground",
+    attention: "border-amber-500/30 bg-amber-500/10 text-amber-300",
+    available: "border-primary/30 bg-primary/10 text-primary",
   };
-  const Icon = state === "connected" ? CheckCircle2 : state === "attention" ? AlertTriangle : Power;
+  const Icon =
+    state === "connected"
+      ? CheckCircle2
+      : state === "attention"
+        ? AlertTriangle
+        : Power;
   return (
     <span
       className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${styles[state]}`}
@@ -224,8 +216,6 @@ interface IntegrationCard {
   description: string;
   sections: (payload: OverviewPayload) => { label: string; value: string }[];
   state: (payload: OverviewPayload) => ConnectionBadgeProps;
-  /** Optional live Graph-API health rows (checked when the user runs a
-   *  health check). Rendered as tone chips under the detail list. */
   health?: (payload: HealthPayload) => { label: string; value: string; tone: HealthTone }[];
   action:
     | { href: string; label: string; primary?: boolean }[]
@@ -242,12 +232,9 @@ function buildCards(): IntegrationCard[] {
       icon: MessageCircle,
       iconClass: "bg-emerald-500/10 text-emerald-500",
       description:
-        "Send and receive WhatsApp messages on one or more numbers through the official WhatsApp Cloud API. Set a default number for outbound and register numbers for inbound inbox delivery.",
+        "Send and receive WhatsApp messages on one or more numbers through the official WhatsApp Cloud API.",
       sections: (p) => [
-        {
-          label: "Connected numbers",
-          value: p.whatsapp.accountCount.toString(),
-        },
+        { label: "Connected numbers", value: p.whatsapp.accountCount.toString() },
         {
           label: "Default number",
           value:
@@ -281,32 +268,142 @@ function buildCards(): IntegrationCard[] {
           },
         ];
       },
-      action: [
+      action: [{ href: "/settings?tab=whatsapp", label: "Manage", primary: true }],
+    },
+    {
+      id: "instagram-dm",
+      category: "communication",
+      name: "Instagram DMs",
+      tagline: "Instagram Messaging API",
+      icon: Camera,
+      iconClass: "bg-[#E1306C]/10 text-[#E1306C]",
+      description:
+        "Receive and reply to Instagram Direct Messages in the shared inbox. Requires a Facebook Page with a linked Instagram Professional account connected via Meta OAuth.",
+      sections: (p) => [
+        { label: "Instagram accounts", value: p.meta.instagramAccounts.toString() },
+        { label: "DMs in inbox", value: p.meta.connected ? "Active" : "—" },
+      ],
+      state: (p) =>
+        !p.meta.configured
+          ? { state: "attention", label: "Setup required" }
+          : p.meta.instagramAccounts > 0
+            ? { state: "connected", label: "Connected" }
+            : { state: "notConnected", label: "Not connected" },
+      health: (h) => {
+        if (h.instagram.accounts.length === 0) return [];
+        const apiOk = h.instagram.accounts.every((a) => a.api === "ok");
+        const apiError = h.instagram.accounts.some((a) => a.api === "error");
+        const msgOk = h.facebook.pages.some((pg) => pg.messagesWebhook === "ok");
+        const msgError = h.facebook.pages.some((pg) => pg.messagesWebhook === "error");
+        return [
+          {
+            label: "IG API",
+            value: apiOk ? "Reachable" : apiError ? "Unreachable" : "Not verified",
+            tone: apiError ? "error" : apiOk ? "ok" : "warn",
+          },
+          {
+            label: "Webhook",
+            value: msgOk ? "Subscribed" : msgError ? "Error" : "Not verified",
+            tone: msgError ? "error" : msgOk ? "ok" : "warn",
+          },
+        ];
+      },
+      action: (p) => [
         {
-          href: "/settings?tab=whatsapp",
-          label: "Manage",
+          href:
+            p.meta.instagramAccounts > 0
+              ? "/inbox?channel=instagram"
+              : "/social-media/connect?platform=instagram",
+          label: p.meta.instagramAccounts > 0 ? "Open Inbox" : "Connect Instagram",
           primary: true,
         },
+        ...(p.meta.instagramAccounts > 0
+          ? [{ href: "/settings?tab=meta-leads", label: "Settings" }]
+          : []),
       ],
     },
     {
-      id: "email",
+      id: "facebook-messenger",
       category: "communication",
-      name: "Email (SMTP)",
-      tagline: "Transactional email",
-      icon: Mail,
-      iconClass: "bg-blue-500/10 text-blue-500",
+      name: "Facebook Messenger",
+      tagline: "Messenger Platform API",
+      icon: MessageSquare,
+      iconClass: "bg-[#1877F2]/10 text-[#1877F2]",
       description:
-        "Configure an SMTP provider for sending email from your account (notifications and outbound mail). Credentials are stored encrypted and scoped to this account.",
+        "Receive and reply to Facebook Messenger messages in the shared inbox. Requires a Facebook Page connected via Meta OAuth with the pages_messaging permission.",
       sections: (p) => [
-        { label: "From address", value: p.email.fromEmail ?? "—" },
-        { label: "Provider", value: p.email.provider ?? "—" },
+        { label: "Pages connected", value: p.meta.facebookPages.toString() },
+        { label: "Messenger in inbox", value: p.meta.connected ? "Active" : "—" },
       ],
       state: (p) =>
-        p.email.connected
+        !p.meta.configured
+          ? { state: "attention", label: "Setup required" }
+          : p.meta.facebookPages > 0
+            ? { state: "connected", label: "Connected" }
+            : { state: "notConnected", label: "Not connected" },
+      health: (h) => {
+        if (h.facebook.pages.length === 0) return [];
+        const apiOk = h.facebook.pages.every((pg) => pg.api === "ok");
+        const apiError = h.facebook.pages.some((pg) => pg.api === "error");
+        const msgOk = h.facebook.pages.some((pg) => pg.messagesWebhook === "ok");
+        const msgError = h.facebook.pages.some((pg) => pg.messagesWebhook === "error");
+        return [
+          {
+            label: "Pages API",
+            value: apiOk ? "Reachable" : apiError ? "Unreachable" : "Not verified",
+            tone: apiError ? "error" : apiOk ? "ok" : "warn",
+          },
+          {
+            label: "Webhook",
+            value: msgOk ? "Subscribed" : msgError ? "Error" : "Not verified",
+            tone: msgError ? "error" : msgOk ? "ok" : "warn",
+          },
+        ];
+      },
+      action: (p) => [
+        {
+          href:
+            p.meta.facebookPages > 0
+              ? "/inbox?channel=facebook"
+              : "/social-media/connect?platform=facebook",
+          label: p.meta.facebookPages > 0 ? "Open Inbox" : "Connect Facebook",
+          primary: true,
+        },
+        ...(p.meta.facebookPages > 0
+          ? [{ href: "/settings?tab=meta-leads", label: "Settings" }]
+          : []),
+      ],
+    },
+    {
+      id: "telegram",
+      category: "communication",
+      name: "Telegram",
+      tagline: "Telegram Bot API",
+      icon: Send,
+      iconClass: "bg-[#2AABEE]/10 text-[#2AABEE]",
+      description:
+        "Receive and reply to Telegram DMs in the shared inbox via the official Telegram Bot API. Connect a bot created with @BotFather.",
+      sections: (p) => [
+        {
+          label: "Bot",
+          value: p.telegram.connected
+            ? (p.telegram.botUsername ? `@${p.telegram.botUsername}` : p.telegram.botName ?? "Connected")
+            : "Not connected",
+        },
+        { label: "Last message", value: fmtDate(p.telegram.lastInboundAt) },
+      ],
+      state: (p) =>
+        p.telegram.connected
           ? { state: "connected", label: "Connected" }
           : { state: "notConnected", label: "Not connected" },
-      action: (p) => [{ href: "/settings?tab=email", label: "Configure", primary: p.email.connected }],
+      action: (p) => [
+        {
+          href: p.telegram.connected ? "/inbox?channel=telegram" : "/settings?tab=telegram",
+          label: p.telegram.connected ? "Open Inbox" : "Connect Bot",
+          primary: true,
+        },
+        ...(p.telegram.connected ? [{ href: "/settings?tab=telegram", label: "Settings" }] : []),
+      ],
     },
     {
       id: "meta-leads",
@@ -325,10 +422,7 @@ function buildCards(): IntegrationCard[] {
       ],
       state: (p) =>
         !p.meta.configured
-          ? {
-              state: "attention",
-              label: "Server setup required",
-            }
+          ? { state: "attention", label: "Server setup required" }
           : p.meta.connected
             ? { state: "connected", label: "Connected" }
             : { state: "notConnected", label: "Not connected" },
@@ -364,6 +458,25 @@ function buildCards(): IntegrationCard[] {
       ],
     },
     {
+      id: "email",
+      category: "communication",
+      name: "Email (SMTP)",
+      tagline: "Transactional email",
+      icon: Mail,
+      iconClass: "bg-blue-500/10 text-blue-500",
+      description:
+        "Configure an SMTP provider for sending email from your account. Credentials are stored encrypted and scoped to this account.",
+      sections: (p) => [
+        { label: "From address", value: p.email.fromEmail ?? "—" },
+        { label: "Provider", value: p.email.provider ?? "—" },
+      ],
+      state: (p) =>
+        p.email.connected
+          ? { state: "connected", label: "Connected" }
+          : { state: "notConnected", label: "Not connected" },
+      action: (p) => [{ href: "/settings?tab=email", label: "Configure", primary: p.email.connected }],
+    },
+    {
       id: "google-forms",
       category: "forms",
       name: "Google Forms",
@@ -371,7 +484,7 @@ function buildCards(): IntegrationCard[] {
       icon: FileSpreadsheet,
       iconClass: "bg-amber-500/10 text-amber-500",
       description:
-        "Every Google Form submission is delivered into the CRM as an ordinary contact (source: Google Form) via a public API key with the contacts:write scope. De-duplicated by submission id.",
+        "Every Google Form submission is delivered into the CRM as an ordinary contact via a public API key with the contacts:write scope.",
       sections: (p) => [
         { label: "Contacts synced", value: p.googleForms.contactCount.toString() },
         { label: "Last submission", value: fmtDate(p.googleForms.lastSubmissionAt) },
@@ -397,10 +510,8 @@ function buildCards(): IntegrationCard[] {
       icon: Webhook,
       iconClass: "bg-violet-500/10 text-violet-500",
       description:
-        "Receive CRM events (new message, lead created, conversation opened) at your own endpoints. Register endpoints with a webhooks:manage API key; delivery is signed and SSRF-protected.",
-      sections: (p) => [
-        { label: "Endpoints", value: p.webhooks.endpointCount.toString() },
-      ],
+        "Receive CRM events at your own endpoints. Register endpoints with a webhooks:manage API key; delivery is signed and SSRF-protected.",
+      sections: (p) => [{ label: "Endpoints", value: p.webhooks.endpointCount.toString() }],
       state: (p) =>
         p.webhooks.endpointCount > 0
           ? { state: "connected", label: "Active" }
@@ -415,7 +526,7 @@ function buildCards(): IntegrationCard[] {
       icon: Code,
       iconClass: "bg-slate-500/10 text-slate-300",
       description:
-        "Create scoped API keys (contacts:write, webhooks:manage, broadcasts:send, …) to integrate other tools. Every key is account-scoped, revocable, and never shown in plaintext after creation.",
+        "Create scoped API keys to integrate other tools. Every key is account-scoped, revocable, and never shown in plaintext after creation.",
       sections: (p) => [
         { label: "Active keys", value: p.apiKeys.activeCount.toString() },
         { label: "Google Form endpoint", value: "/api/v1/integrations/google-forms" },
@@ -432,22 +543,35 @@ export default function IntegrationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [category, setCategory] = useState<Category>("all");
-  // True while a manual health check is running (the checks hit the Meta
-  // Graph API and can take a moment).
   const [checkingHealth, setCheckingHealth] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [ovRes, hRes] = await Promise.all([
+      const [ovRes, hRes, tgRes] = await Promise.all([
         fetch("/api/integrations/overview", { cache: "no-store" }),
         fetch("/api/integrations/health", { cache: "no-store" }),
+        fetch("/api/telegram/connect", { cache: "no-store" }),
       ]);
       if (!ovRes.ok || !hRes.ok) {
         setError("Could not load integration status. Please try again.");
         return;
       }
-      setPayload(await ovRes.json());
+      const ovData = await ovRes.json();
+      // Merge Telegram bot status into the overview payload
+      if (tgRes.ok) {
+        const tgData = await tgRes.json();
+        const bot = tgData.bot;
+        ovData.telegram = {
+          connected: bot?.status === "connected",
+          botName: bot?.bot_name ?? null,
+          botUsername: bot?.bot_username ?? null,
+          lastInboundAt: bot?.last_inbound_at ?? null,
+        };
+      } else {
+        ovData.telegram = { connected: false, botName: null, botUsername: null, lastInboundAt: null };
+      }
+      setPayload(ovData);
       setHealth((await hRes.json()) as HealthPayload);
     } catch (err) {
       console.error("Integrations overview load failed:", err);
@@ -487,8 +611,7 @@ export default function IntegrationsPage() {
             Integrations
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Connect the tools your business already uses and they show up here with
-            live status. Only real connections are listed — every card reflects an
+            Connect the tools your business already uses. Every card reflects an
             actual, verified integration in your account.
           </p>
         </div>
@@ -504,16 +627,13 @@ export default function IntegrationsPage() {
         </button>
       </div>
 
-      {/* Last checked timestamp */}
       {health && !loading && (
         <p className="-mt-3 text-[11px] text-muted-foreground">
-          Health verified{" "}
-          {new Date(health.checkedAt).toLocaleTimeString()} · checks hit the live Meta
-          Graph API; credentials are never exposed.
+          Health verified {new Date(health.checkedAt).toLocaleTimeString()} · checks
+          hit the live Meta Graph API; credentials are never exposed.
         </p>
       )}
 
-      {/* Category tabs */}
       <div className="flex flex-wrap gap-1.5">
         {CATEGORIES.map((cat) => (
           <button
@@ -553,10 +673,6 @@ export default function IntegrationsPage() {
           <HelpCircle className="h-10 w-10 text-muted-foreground/50" />
           <p className="text-sm font-medium text-foreground">
             No integrations in this category yet
-          </p>
-          <p className="max-w-sm text-xs text-muted-foreground">
-            Integrations live in the catalog only once they are real and
-            connectable in this deployment — nothing is listed just for show.
           </p>
         </div>
       ) : (

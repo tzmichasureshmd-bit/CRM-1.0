@@ -93,17 +93,34 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const setMode = useCallback((next: Mode) => {
-    setModeState(next);
-    if (typeof document !== "undefined") {
+  const applyMode = useCallback((next: Mode) => {
+    if (typeof document === "undefined") return;
+    if (next === "auto") {
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      document.documentElement.dataset.mode = prefersDark ? "dark" : "light";
+    } else {
       document.documentElement.dataset.mode = next;
     }
+  }, []);
+
+  const setMode = useCallback((next: Mode) => {
+    setModeState(next);
+    applyMode(next);
     try {
       localStorage.setItem(MODE_STORAGE_KEY, next);
     } catch {
       // Same private-browsing edge case as above.
     }
-  }, []);
+  }, [applyMode]);
+
+  // Keep auto mode in sync with system preference changes
+  useEffect(() => {
+    if (mode !== "auto") return;
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const handler = () => applyMode("auto");
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, [mode, applyMode]);
 
   const toggleMode = useCallback(() => {
     setMode(mode === "dark" ? "light" : "dark");

@@ -159,8 +159,8 @@ export interface Contact {
   /** Messenger PSID (facebook channel identity, migration 070). Used to
     *  dedupe return-messaging users across webhook deliveries. */
   messenger_psid?: string | null;
-  /** Instagram IG-scoped user id (migration 070). Dedupe key for DMs. */
-  instagram_user_id?: string | null;
+  /** Telegram chat id (migration 072). Dedupe key for Telegram DMs. */
+  telegram_chat_id?: string | null;
   /** WhatsApp profile display name (migration 068). Synced on every
     *  inbound message's profile payload, independent of the CRM `name`. */
   whatsapp_name?: string | null;
@@ -235,7 +235,7 @@ export interface FollowUp {
 }
 
 export type ConversationStatus = 'open' | 'pending' | 'closed';
-export type ConversationPlatform = 'whatsapp' | 'facebook' | 'instagram';
+export type ConversationPlatform = 'whatsapp' | 'facebook' | 'instagram' | 'telegram';
 export type LeadStatus = 'new' | 'contacted' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost';
 
 export interface Conversation {

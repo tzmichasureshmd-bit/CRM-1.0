@@ -106,8 +106,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  if (body.object !== "page") {
-    // Different object type — acknowledge but ignore.
+  // Instagram DMs arrive with object="instagram"; Facebook Messenger + Lead
+  // Ads arrive with object="page". Both use the same entry[].messaging[] shape.
+  // Anything else (whatsapp, user, etc.) is acknowledged but not processed.
+  const isPage = body.object === "page";
+  const isInstagram = body.object === "instagram";
+  if (!isPage && !isInstagram) {
     return NextResponse.json({ status: "ignored" });
   }
 
@@ -116,11 +120,15 @@ export async function POST(request: Request) {
   //    completion after we return — same pattern/guarantee as the WhatsApp
   //    webhook (see issue #301 there).
   after(async () => {
-    try {
-      await processLeadgen(body);
-    } catch (error) {
-      console.error("[meta/webhook] error processing leadgen:", error);
+    // Lead Ads only come through page object
+    if (isPage) {
+      try {
+        await processLeadgen(body);
+      } catch (error) {
+        console.error("[meta/webhook] error processing leadgen:", error);
+      }
     }
+    // Messaging events come through both page (Messenger) and instagram (IG DMs)
     try {
       await processMessaging(body);
     } catch (error) {

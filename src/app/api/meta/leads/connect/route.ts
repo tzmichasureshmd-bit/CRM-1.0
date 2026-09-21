@@ -9,6 +9,12 @@ const PERMISSIONS = [
   "pages_manage_metadata",
   "leads_retrieval",
   "ads_management",
+  // Messenger DMs (Facebook Messenger Platform)
+  "pages_messaging",
+  // Instagram DMs (Instagram Messaging API)
+  "instagram_manage_messages",
+  // Required to read Instagram account info linked to a Page
+  "instagram_basic",
 ].join(",");
 
 /**

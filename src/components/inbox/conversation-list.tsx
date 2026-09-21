@@ -45,13 +45,9 @@ interface ConversationListProps {
   onSelect: (conversation: Conversation) => void;
   conversations: Conversation[];
   onConversationsLoaded: (conversations: Conversation[]) => void;
-  /**
-   * Increment to force the fetch effect below to refire. The parent
-   * bumps this on realtime reconnect / tab visibility → visible so the
-   * list catches up on any events sent while the WS was disconnected
-   * or the tab was throttled. Optional so existing callers keep working.
-   */
   resyncToken?: number;
+  /** Pre-select a platform filter from the URL (?channel=instagram etc.) */
+  initialPlatformFilter?: PlatformFilter;
 }
 
 const STATUS_COLORS: Record<ConversationStatus, string> = {
@@ -64,6 +60,7 @@ const PLATFORM_BADGE: Record<ConversationPlatform, string> = {
   whatsapp: "bg-[#25D366]/15 text-[#0f9d58]",
   facebook: "bg-[#1877F2]/15 text-[#1877F2]",
   instagram: "bg-[#E1306C]/15 text-[#E1306C]",
+  telegram: "bg-[#2AABEE]/15 text-[#2AABEE]",
 };
 
 
@@ -83,6 +80,7 @@ export function ConversationList({
   conversations,
   onConversationsLoaded,
   resyncToken = 0,
+  initialPlatformFilter = "all",
 }: ConversationListProps) {
   const t = useTranslations("Inbox.conversationList");
   
@@ -107,7 +105,7 @@ export function ConversationList({
   // Multi-channel: filter to one platform. The chip row stays hidden until
   // a non-WhatsApp conversation actually exists, so WhatsApp-only inboxes
   // look exactly as before.
-  const [platformFilter, setPlatformFilter] = useState<PlatformFilter>("all");
+  const [platformFilter, setPlatformFilter] = useState<PlatformFilter>(initialPlatformFilter);
 
   // Drag-and-drop status organization. Track only the id being dragged;
   // the payload is derived from `conversations` so the overlay stays in
@@ -288,6 +286,7 @@ export function ConversationList({
       { value: "whatsapp", label: t("platformWhatsapp") },
       { value: "facebook", label: t("platformMessenger") },
       { value: "instagram", label: t("platformInstagram") },
+      { value: "telegram", label: t("platformTelegram") },
     ],
     [t]
   );
@@ -678,9 +677,7 @@ function ConversationItem({
                   PLATFORM_BADGE[conversation.platform!]
                 )}
               >
-                {conversation.platform === "facebook"
-                  ? t("platformMessenger")
-                  : t("platformInstagram")}
+                {conversation.platform === "facebook" ? t("platformMessenger") : conversation.platform === "telegram" ? t("platformTelegram") : t("platformInstagram")}
               </span>
             )}
           </div>
@@ -776,9 +773,7 @@ function DragOverlayCard({
             PLATFORM_BADGE[conversation.platform]
           )}
         >
-          {conversation.platform === "facebook"
-            ? t("platformMessenger")
-            : t("platformInstagram")}
+          {conversation.platform === "facebook" ? t("platformMessenger") : conversation.platform === "telegram" ? t("platformTelegram") : t("platformInstagram")}
         </span>
       )}
     </div>

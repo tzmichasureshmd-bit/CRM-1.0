@@ -258,10 +258,7 @@
       "overdueFollowUps": "Overdue Follow-ups",
       "there": "there",
       "salesOverviewTitle": "Sales Overview",
-      "salesOverviewLink": "Open pipeline",
-      "loadFailedTitle": "Some dashboard data failed to load",
-      "loadFailedHint": "Your account may be offline or still syncing. You can retry now.",
-      "retry": "Retry"
+      "salesOverviewLink": "Open pipeline"
     },
     "salesOverview": {
       "totalLeads": "Total Leads",
@@ -383,6 +380,7 @@
       "platformWhatsapp": "WhatsApp",
       "platformMessenger": "Messenger",
       "platformInstagram": "Instagram",
+      "platformTelegram": "Telegram",
       "dropStatusHint": "Drop to change status",
       "dropOpen": "Open",
       "dropPending": "Pending",
@@ -417,6 +415,7 @@
        "noSearchResultsDesc": "No messages contain \"{query}\". Try a different keyword.",
       "selectConversation": "Select a conversation",
       "selectConversationHint": "Choose a conversation from the left to start messaging",
+      "sendTemplateHint": "Send a template to start a new conversation.",
       "today": "Today",
       "yesterday": "Yesterday",
       "aiAssistant": "AI Assistant"

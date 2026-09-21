@@ -19,17 +19,11 @@ const REST_ENDPOINTS = [
   { method: "GET", path: "/api/v1/me", desc: "Authenticated account + profile" },
   { method: "GET", path: "/api/v1/contacts", desc: "List / search contacts" },
   { method: "POST", path: "/api/v1/contacts", desc: "Create a contact" },
-  { method: "PATCH", path: "/api/v1/contacts/{id}", desc: "Update a contact" },
   { method: "GET", path: "/api/v1/conversations", desc: "List conversations" },
-  { method: "GET", path: "/api/v1/conversations/{id}", desc: "Get a conversation" },
-  { method: "GET", path: "/api/v1/conversations/{id}/messages", desc: "List a conversation's messages" },
+  { method: "GET", path: "/api/v1/messages", desc: "List messages (filtered)" },
   { method: "POST", path: "/api/v1/messages", desc: "Send a WhatsApp message" },
-  { method: "POST", path: "/api/v1/broadcasts", desc: "Create a broadcast campaign" },
-  { method: "GET", path: "/api/v1/broadcasts/{id}", desc: "Get a broadcast campaign" },
-  { method: "GET", path: "/api/v1/webhooks", desc: "List webhook endpoints" },
+  { method: "GET", path: "/api/v1/broadcasts", desc: "List broadcast campaigns" },
   { method: "POST", path: "/api/v1/webhooks", desc: "Register a webhook endpoint" },
-  { method: "PATCH", path: "/api/v1/webhooks/{id}", desc: "Update a webhook endpoint" },
-  { method: "DELETE", path: "/api/v1/webhooks/{id}", desc: "Delete a webhook endpoint" },
 ] as const;
 
 export default function ApiDeveloperPage() {
@@ -122,11 +116,7 @@ export default function ApiDeveloperPage() {
           <code className="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
             POST /api/v1/webhooks
           </code>{" "}
-          with an API key that has the{" "}
-          <code className="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
-            webhooks:manage
-          </code>{" "}
-          scope.
+          with any scoped API key.
         </CardContent>
       </Card>
     </div>

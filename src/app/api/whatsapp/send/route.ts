@@ -229,6 +229,7 @@ async function findOrCreateConversation(
     .select('id')
     .eq('account_id', accountId)
     .eq('contact_id', contactId)
+    .eq('platform', 'whatsapp')
     .maybeSingle()
 
   if (existing) return existing.id
@@ -239,6 +240,7 @@ async function findOrCreateConversation(
       account_id: accountId,
       user_id: userId,
       contact_id: contactId,
+      platform: 'whatsapp',
     })
     .select('id')
     .single()

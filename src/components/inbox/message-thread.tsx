@@ -155,6 +155,7 @@ const PLATFORM_BADGE_CLASS: Record<ConversationPlatform, string> = {
   whatsapp: "bg-[#25D366]/15 text-[#0f9d58]",
   facebook: "bg-[#1877F2]/15 text-[#1877F2]",
   instagram: "bg-[#E1306C]/15 text-[#E1306C]",
+  telegram: "bg-[#2AABEE]/15 text-[#2AABEE]",
 };
 
 /**
@@ -1052,8 +1053,7 @@ export function MessageThread({
                   )}
                 >
                   {platform === "facebook"
-                    ? tChannels("platformMessenger")
-                    : tChannels("platformInstagram")}
+                    ? tChannels("platformMessenger") : platform === "telegram" ? tChannels("platformTelegram") : tChannels("platformInstagram")}
                 </span>
               )}
             </h2>
