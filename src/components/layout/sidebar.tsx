@@ -260,6 +260,27 @@ export function Sidebar({ open = false, onClose, collapsed = false, onToggleColl
   const unreadNotifications = useUnreadNotifications();
   const showAccountStrip = !profileLoading && !!account?.name && account.name !== profile?.full_name;
 
+  const [channelStatus, setChannelStatus] = useState<{
+    whatsapp: boolean; instagram: boolean; facebook: boolean; telegram: boolean;
+  }>({ whatsapp: false, instagram: false, facebook: false, telegram: false });
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      fetch("/api/integrations/overview", { cache: "no-store" }).then((r) => r.ok ? r.json() : null).catch(() => null),
+      fetch("/api/telegram/connect", { cache: "no-store" }).then((r) => r.ok ? r.json() : null).catch(() => null),
+    ]).then(([overview, tg]) => {
+      if (cancelled) return;
+      setChannelStatus({
+        whatsapp: overview?.whatsapp?.connected === true,
+        instagram: (overview?.meta?.instagramAccounts ?? 0) > 0,
+        facebook: (overview?.meta?.facebookPages ?? 0) > 0,
+        telegram: tg?.bot?.status === "connected",
+      });
+    });
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const [sectionsOpen, setSectionsOpen] = useState<Record<string, boolean>>(() => {
     const saved = loadSectionState();
     const initial: Record<string, boolean> = {};
@@ -505,12 +526,12 @@ export function Sidebar({ open = false, onClose, collapsed = false, onToggleColl
                           <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">Channels</p>
                           <ul className="flex flex-col gap-0.5">
                             {[
-                              { label: "WhatsApp", icon: WhatsAppIcon, color: "text-[#25D366]", href: "/inbox?channel=whatsapp", connected: true },
-                              { label: "Instagram", icon: InstagramIcon, color: "text-[#E1306C]", href: "/inbox?channel=instagram", connected: false },
-                              { label: "Facebook", icon: FacebookIcon, color: "text-[#1877F2]", href: "/inbox?channel=facebook", connected: false },
-                              { label: "Telegram", icon: TelegramIcon, color: "text-[#26A5E4]", href: "/inbox?channel=telegram", connected: false },
-                              { label: "Twitter / X", icon: TwitterXIcon, color: "text-foreground", href: "/inbox?channel=twitter", connected: false },
-                              { label: "Threads", icon: ThreadsIcon, color: "text-foreground", href: "/inbox?channel=threads", connected: false },
+                              { label: "WhatsApp", icon: WhatsAppIcon, color: "text-[#25D366]", href: "/inbox?channel=whatsapp", connected: channelStatus.whatsapp, available: true },
+                              { label: "Instagram", icon: InstagramIcon, color: "text-[#E1306C]", href: channelStatus.instagram ? "/inbox?channel=instagram" : "/settings?tab=meta-leads", connected: channelStatus.instagram, available: true },
+                              { label: "Facebook", icon: FacebookIcon, color: "text-[#1877F2]", href: channelStatus.facebook ? "/inbox?channel=facebook" : "/settings?tab=meta-leads", connected: channelStatus.facebook, available: true },
+                              { label: "Telegram", icon: TelegramIcon, color: "text-[#26A5E4]", href: channelStatus.telegram ? "/inbox?channel=telegram" : "/settings?tab=telegram", connected: channelStatus.telegram, available: true },
+                              { label: "Twitter / X", icon: TwitterXIcon, color: "text-foreground", href: "/inbox?channel=twitter", connected: false, available: false },
+                              { label: "Threads", icon: ThreadsIcon, color: "text-foreground", href: "/inbox?channel=threads", connected: false, available: false },
                             ].map((ch) => (
                               <li key={ch.label}>
                                 <Link
@@ -521,8 +542,10 @@ export function Sidebar({ open = false, onClose, collapsed = false, onToggleColl
                                   <span className="flex-1">{ch.label}</span>
                                   {ch.connected ? (
                                     <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                  ) : ch.available ? (
+                                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-semibold text-muted-foreground/60">Connect</span>
                                   ) : (
-                                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-semibold text-muted-foreground/60">Soon</span>
+                                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-semibold text-muted-foreground/40">Soon</span>
                                   )}
                                 </Link>
                               </li>
