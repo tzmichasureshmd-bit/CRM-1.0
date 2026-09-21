@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { Loader2, Send, CheckCircle2, AlertTriangle, Unlink } from "lucide-react";
 
@@ -137,12 +138,12 @@ export function TelegramSettings() {
           </div>
 
           <div className="flex gap-2">
-            <a
+            <Link
               href="/inbox?channel=telegram"
               className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
             >
               <Send className="size-3.5" /> Open Inbox
-            </a>
+            </Link>
             <button
               type="button"
               onClick={() => void disconnect()}
