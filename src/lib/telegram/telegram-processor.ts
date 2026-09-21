@@ -228,7 +228,8 @@ async function findOrCreateTelegramContact(
   userId: string,
   chatId: string,
   contactName: string,
-  username: string | null,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _username: string | null,
 ): Promise<{ id: string; wasCreated: boolean } | null> {
   const { data: existing } = await admin
     .from('contacts')

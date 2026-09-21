@@ -215,8 +215,6 @@ export function validateMappedRow(
   requiredPhone = true
 ): string[] {
   const problems: string[] = [];
-  const targetByHeader = new Map(mapping.map((m) => [m.header, m.target]));
-
   const get = (field: ContactColumnKey): string => {
     for (const m of mapping) if (m.target === field) return (row[m.header] ?? '').trim();
     return '';
@@ -293,7 +291,6 @@ export function buildContactRow(
   tagNames: string[];
   custom: Record<string, string>;
 } {
-  const targetByHeader = new Map(mapping.map((m) => [m.header, m.target]));
   const get = (field: ContactColumnKey): string => {
     for (const m of mapping) if (m.target === field) return (row[m.header] ?? '').trim();
     return '';

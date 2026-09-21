@@ -8,20 +8,14 @@ import { useAuth } from "@/hooks/use-auth";
 import { useTotalUnread } from "@/hooks/use-total-unread";
 import { useUnreadNotifications } from "@/hooks/use-unread-notifications";
 import {
-  Bell,
-  Bot,
-  Calendar,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   Crown,
-  CreditCard,
-  Code,
   LogOut,
   Settings,
   User,
   UserCog,
-  Users,
   UsersRound,
   Shield,
   X,
@@ -279,7 +273,7 @@ export function Sidebar({ open = false, onClose, collapsed = false, onToggleColl
       });
     });
     return () => { cancelled = true; };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   const [sectionsOpen, setSectionsOpen] = useState<Record<string, boolean>>(() => {
     const saved = loadSectionState();
