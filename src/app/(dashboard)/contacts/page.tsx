@@ -612,12 +612,13 @@ function ContactsPageInner() {
   }, [search, page, selectedTagIds, buildGroups, sort, sortAsc, activeTab, t]);
 
   const fetchTags = useCallback(async () => {
-    const { data } = await fetch('/api/tags', { cache: 'no-store' }).then((r) =>
-      r.json().catch(() => ({ data: undefined }))
+    const body = await fetch('/api/tags', { cache: 'no-store' }).then((r) =>
+      r.json().catch(() => undefined)
     );
-    if (Array.isArray(data)) {
+    const tags: Tag[] = Array.isArray(body?.tags) ? body.tags : [];
+    if (tags.length > 0 || body?.tags) {
       const map: Record<string, Tag> = {};
-      data.forEach((tag: Tag) => (map[tag.id] = tag));
+      tags.forEach((tag: Tag) => (map[tag.id] = tag));
       setTagsMap(map);
       setSelectedTagIds((prev) => prev.filter((id) => map[id]));
     }

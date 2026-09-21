@@ -258,7 +258,10 @@
       "overdueFollowUps": "Overdue Follow-ups",
       "there": "there",
       "salesOverviewTitle": "Sales Overview",
-      "salesOverviewLink": "Open pipeline"
+      "salesOverviewLink": "Open pipeline",
+      "loadFailedTitle": "Some dashboard data failed to load",
+      "loadFailedHint": "Your account may be offline or still syncing. You can retry now.",
+      "retry": "Retry"
     },
     "salesOverview": {
       "totalLeads": "Total Leads",
