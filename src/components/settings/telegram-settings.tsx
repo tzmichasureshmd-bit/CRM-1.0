@@ -4,6 +4,14 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Loader2, Send, CheckCircle2, AlertTriangle, Unlink } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 interface BotStatus {
   id: string;
@@ -24,6 +32,7 @@ export function TelegramSettings() {
   const [token, setToken] = useState("");
   const [connecting, setConnecting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -73,6 +82,7 @@ export function TelegramSettings() {
 
   const disconnect = async () => {
     setDisconnecting(true);
+    setConfirmDisconnect(false);
     try {
       const res = await fetch("/api/telegram/connect", { method: "DELETE" });
       if (res.ok) {
@@ -146,7 +156,7 @@ export function TelegramSettings() {
             </Link>
             <button
               type="button"
-              onClick={() => void disconnect()}
+              onClick={() => setConfirmDisconnect(true)}
               disabled={disconnecting}
               className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-red-400 disabled:opacity-50"
             >
@@ -158,6 +168,31 @@ export function TelegramSettings() {
               Disconnect
             </button>
           </div>
+
+          {/* Disconnect confirmation dialog */}
+          <Dialog open={confirmDisconnect} onOpenChange={setConfirmDisconnect}>
+            <DialogContent className="sm:max-w-sm">
+              <DialogHeader>
+                <DialogTitle>Disconnect Telegram?</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-muted-foreground">
+                This will stop new messages and sending from this channel. Existing CRM contacts, conversations, and message history will be preserved.
+              </p>
+              <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={() => setConfirmDisconnect(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => void disconnect()}
+                  disabled={disconnecting}
+                >
+                  {disconnecting ? <Loader2 className="mr-1 size-3.5 animate-spin" /> : null}
+                  Disconnect
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       ) : (
         <div className="space-y-4">

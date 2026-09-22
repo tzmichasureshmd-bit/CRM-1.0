@@ -160,6 +160,10 @@ export function MessageComposer({
   // are hidden so files aren't uploaded and orphaned in the bucket.
   const isWhatsApp = platform === "whatsapp";
   const isInstagram = platform === "instagram";
+  const isTelegram = platform === "telegram";
+  // Telegram supports text + media but not WhatsApp templates or interactive messages
+  const supportsTemplates = isWhatsApp;
+  const supportsInteractive = isWhatsApp;
 
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
@@ -594,7 +598,7 @@ export function MessageComposer({
           />
         </div>
       )}
-      {sessionExpired && (
+      {sessionExpired && !isTelegram && (
         <div className="mb-2 flex items-center justify-between rounded-lg bg-amber-500/10 px-3 py-2">
           <p className="text-xs text-amber-400">
             {t("sessionExpiredHint")}
@@ -721,11 +725,8 @@ export function MessageComposer({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* + menu — interactive messages + quick replies (WhatsApp only:
-              interactive requires the 24h window AND the WhatsApp send
-              route; Messenger/Instagram have neither). Also gated on the
-              24h window like free-form text. */}
-          {isWhatsApp && (
+          {/* + menu — interactive messages + quick replies (WhatsApp only) */}
+          {supportsInteractive && (
           <DropdownMenu>
             <DropdownMenuTrigger
               disabled={inputsDisabled}
@@ -753,7 +754,7 @@ export function MessageComposer({
           </DropdownMenu>
           )}
 
-          {isWhatsApp && (
+          {supportsTemplates && (
           <GatedButton
             variant="ghost"
             size="sm"

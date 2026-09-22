@@ -78,6 +78,7 @@ export async function processTelegramUpdate(
   const conversation = await findOrCreateTelegramConversation(
     admin, accountId, userId, contact.id, chatId,
     contactName,
+    message.from?.username ?? null,
   )
   if (!conversation) return
 
@@ -228,8 +229,7 @@ async function findOrCreateTelegramContact(
   userId: string,
   chatId: string,
   contactName: string,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _username: string | null,
+  username: string | null,
 ): Promise<{ id: string; wasCreated: boolean } | null> {
   const { data: existing } = await admin
     .from('contacts')
@@ -237,7 +237,15 @@ async function findOrCreateTelegramContact(
     .eq('account_id', accountId)
     .eq('telegram_chat_id', chatId)
     .maybeSingle()
-  if (existing) return { id: existing.id as string, wasCreated: false }
+  if (existing) {
+    // Update name/username if they changed
+    void admin
+      .from('contacts')
+      .update({ name: contactName, updated_at: new Date().toISOString() })
+      .eq('id', existing.id as string)
+      .then(() => {})
+    return { id: existing.id as string, wasCreated: false }
+  }
 
   const { data: created, error: createErr } = await admin
     .from('contacts')
@@ -281,6 +289,7 @@ async function findOrCreateTelegramConversation(
   contactId: string,
   chatId: string,
   contactName: string,
+  username: string | null,
 ): Promise<{ id: string; unread_count: number; created: boolean } | null> {
   const { data: existingRows, error: findError } = await admin
     .from('conversations')
@@ -296,6 +305,14 @@ async function findOrCreateTelegramConversation(
     return null
   }
   if (existingRows && existingRows.length > 0) {
+    // Update channel_username if username changed
+    if (username) {
+      void admin
+        .from('conversations')
+        .update({ channel_username: username })
+        .eq('id', existingRows[0].id as string)
+        .then(() => {})
+    }
     return {
       id: existingRows[0].id as string,
       unread_count: (existingRows[0].unread_count as number) ?? 0,
@@ -311,7 +328,8 @@ async function findOrCreateTelegramConversation(
       contact_id: contactId,
       platform: 'telegram',
       channel_recipient_id: chatId,
-      channel_username: contactName,
+      // Store @username if available, otherwise contact name
+      channel_username: username ?? contactName,
     })
     .select()
     .single()

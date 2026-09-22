@@ -14,12 +14,19 @@ import {
   ImageOff,
   CornerDownLeft,
   Sparkles,
+  Info,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ReplyQuote } from "./reply-quote";
 import { MessageReactions } from "./message-reactions";
 import { InteractivePreview } from "@/components/interactive/interactive-preview";
 import { useTranslations } from "next-intl";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface MessageBubbleProps {
   message: Message;
@@ -28,23 +35,51 @@ interface MessageBubbleProps {
   reactions?: MessageReaction[];
   currentUserId?: string;
   onToggleReaction?: (emoji: string) => void;
+  /** The conversation platform — used to cap Telegram status correctly. */
+  platform?: string;
 }
 
-function StatusIcon({ status }: { status: Message["status"] }) {
-  switch (status) {
-    case "sending":
-      return <Clock className="h-3 w-3 text-muted-foreground" />;
-    case "sent":
-      return <Check className="h-3 w-3 text-muted-foreground" />;
-    case "delivered":
-      return <CheckCheck className="h-3 w-3 text-muted-foreground" />;
-    case "read":
-      return <CheckCheck className="h-3 w-3 text-blue-400" />;
-    case "failed":
-      return <XCircle className="h-3 w-3 text-red-400" />;
-    default:
-      return null;
-  }
+/**
+ * Telegram Bot API only confirms the message was accepted by Telegram's
+ * servers — it does NOT provide delivery or read receipts for bot messages.
+ * Cap Telegram status at "sent" so we never show a false double-tick.
+ */
+function StatusIcon({
+  status,
+  platform,
+  onClick,
+}: {
+  status: Message["status"];
+  platform?: string;
+  onClick?: () => void;
+}) {
+  const isTelegram = platform === "telegram";
+  // For Telegram: treat delivered/read as sent — Bot API doesn't confirm these
+  const effectiveStatus = isTelegram && (status === "delivered" || status === "read") ? "sent" : status;
+
+  const icon = (() => {
+    switch (effectiveStatus) {
+      case "sending": return <Clock className="h-3 w-3 text-muted-foreground" />;
+      case "sent":    return <Check className="h-3 w-3 text-muted-foreground" />;
+      case "delivered": return <CheckCheck className="h-3 w-3 text-muted-foreground" />;
+      case "read":    return <CheckCheck className="h-3 w-3 text-blue-400" />;
+      case "failed":  return <XCircle className="h-3 w-3 text-red-400" />;
+      default:        return null;
+    }
+  })();
+
+  if (!icon) return null;
+  if (!onClick) return icon;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center opacity-80 hover:opacity-100"
+      aria-label="Message info"
+    >
+      {icon}
+    </button>
+  );
 }
 
 function MediaUnavailable({ label, t }: { label: string, t: ReturnType<typeof useTranslations> }) {
@@ -274,78 +309,130 @@ export function MessageBubble({
   reactions,
   currentUserId,
   onToggleReaction,
+  platform,
 }: MessageBubbleProps) {
   const t = useTranslations("Inbox.bubble");
+  const [infoOpen, setInfoOpen] = useState(false);
 
   const isAgent = message.sender_type === "agent" || message.sender_type === "bot";
   const time = format(new Date(message.created_at), "HH:mm");
+  const isTelegram = platform === "telegram";
 
-  // Row alignment + width cap are owned by <MessageActions> so its hover
-  // group matches the bubble's content area, not the full row.
   return (
-    <div
-      className={cn(
-        "flex flex-col",
-        isAgent ? "items-end" : "items-start",
-      )}
-    >
+    <>
       <div
         className={cn(
-          "relative rounded-2xl px-3 py-2",
-          isAgent
-            ? "rounded-br-md bg-primary text-primary-foreground"
-            : "rounded-bl-md bg-muted text-foreground",
+          "flex flex-col",
+          isAgent ? "items-end" : "items-start",
         )}
       >
-        {reply && (
-          <ReplyQuote
-            authorLabel={reply.authorLabel}
-            preview={reply.preview}
-            onPrimary={isAgent}
-          />
-        )}
-        <MessageContent message={message} t={t} />
         <div
           className={cn(
-            "mt-1 flex items-center gap-1",
-            isAgent ? "justify-end" : "justify-start",
+            "relative rounded-2xl px-3 py-2",
+            isAgent
+              ? "rounded-br-md bg-primary text-primary-foreground"
+              : "rounded-bl-md bg-muted text-foreground",
           )}
         >
-          {/* AI badge — only on replies the auto-reply bot generated
-              (always outbound, so it sits on the primary fill). Lets
-              agents tell an AI reply from their own / a Flow's at a
-              glance. */}
-          {message.ai_generated && (
-            <span
-              className="inline-flex items-center gap-0.5 rounded-full bg-primary-foreground/20 px-1.5 py-px text-[9px] font-semibold uppercase leading-none tracking-wide text-primary-foreground"
-              title={t("aiBadgeTitle")}
-            >
-              <Sparkles className="h-2.5 w-2.5" />
-              {t("aiBadge")}
-            </span>
+          {reply && (
+            <ReplyQuote
+              authorLabel={reply.authorLabel}
+              preview={reply.preview}
+              onPrimary={isAgent}
+            />
           )}
-          <span
+          <MessageContent message={message} t={t} />
+          <div
             className={cn(
-              "text-[10px]",
-              // Outbound bubbles sit on the primary fill, so the
-              // timestamp must read against that (not the neutral
-              // foreground) — otherwise it goes low-contrast in light
-              // mode. Inbound bubbles use the muted surface.
-              isAgent ? "text-primary-foreground/70" : "text-muted-foreground",
+              "mt-1 flex items-center gap-1",
+              isAgent ? "justify-end" : "justify-start",
             )}
           >
-            {time}
-          </span>
-          {isAgent && <StatusIcon status={message.status} />}
+            {message.ai_generated && (
+              <span
+                className="inline-flex items-center gap-0.5 rounded-full bg-primary-foreground/20 px-1.5 py-px text-[9px] font-semibold uppercase leading-none tracking-wide text-primary-foreground"
+                title={t("aiBadgeTitle")}
+              >
+                <Sparkles className="h-2.5 w-2.5" />
+                {t("aiBadge")}
+              </span>
+            )}
+            <span
+              className={cn(
+                "text-[10px]",
+                isAgent ? "text-primary-foreground/70" : "text-muted-foreground",
+              )}
+            >
+              {time}
+            </span>
+            {isAgent && (
+              <StatusIcon
+                status={message.status}
+                platform={platform}
+                onClick={isTelegram ? () => setInfoOpen(true) : undefined}
+              />
+            )}
+            {/* Info button for non-Telegram outbound messages */}
+            {isAgent && !isTelegram && (
+              <button
+                type="button"
+                onClick={() => setInfoOpen(true)}
+                className="flex items-center opacity-0 hover:opacity-80 group-hover/bubble:opacity-60"
+                aria-label="Message info"
+              >
+                <Info className="h-2.5 w-2.5 text-primary-foreground/50" />
+              </button>
+            )}
+          </div>
         </div>
+        {reactions && reactions.length > 0 && onToggleReaction && (
+          <MessageReactions
+            reactions={reactions}
+            currentUserId={currentUserId}
+            onToggle={onToggleReaction}
+          />
+        )}
       </div>
-      {reactions && reactions.length > 0 && onToggleReaction && (
-        <MessageReactions
-          reactions={reactions}
-          currentUserId={currentUserId}
-          onToggle={onToggleReaction}
-        />
-      )}
+
+      {/* Message Info Dialog */}
+      <Dialog open={infoOpen} onOpenChange={setInfoOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-sm">
+              {isTelegram ? (
+                <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-[#2AABEE]/15 text-[#2AABEE]">TELEGRAM</span>
+              ) : null}
+              Message Info
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 text-sm">
+            <InfoRow label="Direction" value={isAgent ? "Outgoing" : "Incoming"} />
+            <InfoRow label="Type" value={isTelegram ? "Telegram message" : `${message.content_type} message`} />
+            <InfoRow label="Sent" value={format(new Date(message.created_at), "MMM d, yyyy HH:mm:ss")} />
+            <InfoRow label="Status" value={message.status} />
+            {message.message_id && (
+              <InfoRow label={isTelegram ? "Telegram Message ID" : "Message ID"} value={message.message_id} mono />
+            )}
+            {isTelegram && message.message_id && (
+              <p className="rounded-md bg-muted/60 px-3 py-2 text-[11px] text-muted-foreground">
+                Telegram Bot API confirms message was accepted by Telegram’s servers. Delivery and read receipts are not available for bot messages.
+              </p>
+            )}
+            {message.status === "failed" && (
+              <InfoRow label="Failure reason" value="Message failed to send. Use Retry." />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function InfoRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <span className="shrink-0 text-muted-foreground">{label}</span>
+      <span className={cn("text-right text-foreground", mono && "font-mono text-xs break-all")}>{value}</span>
     </div>
   );
 }

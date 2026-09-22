@@ -43,7 +43,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { MessageBubble } from "./message-bubble";
 import { MessageActions } from "./message-actions";
 import {
@@ -478,7 +477,6 @@ export function MessageThread({
 
       const tempId = `temp-${Date.now()}`;
 
-      // Optimistic update — shows the message immediately with "sending" status
       const optimisticMsg: Message = {
         id: tempId,
         conversation_id: conversation.id,
@@ -492,8 +490,11 @@ export function MessageThread({
       onNewMessage(optimisticMsg);
       setReplyTo(null);
 
+      // Route to the correct send endpoint based on platform
+      const sendEndpoint = platform === "telegram" ? "/api/telegram/send" : "/api/whatsapp/send";
+
       try {
-        const res = await fetch("/api/whatsapp/send", {
+        const res = await fetch(sendEndpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -510,14 +511,10 @@ export function MessageThread({
           const reason = payload?.error || `HTTP ${res.status}`;
           console.error("Failed to send message:", reason);
           toast.error(`Failed to send: ${reason}`);
-          // Mark the optimistic bubble as failed so the user sees what happened
           onUpdateMessage(tempId, { status: "failed" });
           return;
         }
 
-        // Success — the realtime INSERT event will replace the temp bubble
-        // with the real DB row. If realtime hasn't arrived yet, at least
-        // flip status to 'sent' so the UI stops showing "sending".
         onUpdateMessage(tempId, { status: "sent" });
       } catch (err) {
         console.error("Failed to send message:", err);
@@ -526,16 +523,13 @@ export function MessageThread({
         onUpdateMessage(tempId, { status: "failed" });
       }
     },
-    [conversation, onNewMessage, onUpdateMessage]
+    [conversation, platform, onNewMessage, onUpdateMessage]
   );
 
   const handleSendMedia = useCallback(
     async (payload: SendMediaPayload) => {
       if (!conversation) return;
 
-      // Documents show their filename in our own bubble (and to the
-      // recipient as the Meta caption when no caption was typed); other
-      // kinds use the caption as-is. Audio carries no caption.
       const contentText =
         payload.kind === "document"
           ? payload.caption || payload.filename || "Document"
@@ -556,8 +550,10 @@ export function MessageThread({
       onNewMessage(optimisticMsg);
       setReplyTo(null);
 
+      const sendEndpoint = platform === "telegram" ? "/api/telegram/send" : "/api/whatsapp/send";
+
       try {
-        const res = await fetch("/api/whatsapp/send", {
+        const res = await fetch(sendEndpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -577,8 +573,6 @@ export function MessageThread({
           console.error("Failed to send media:", reason);
           toast.error(`Failed to send: ${reason}`);
           onUpdateMessage(tempId, { status: "failed" });
-          // The upload never reached the recipient — GC the orphaned
-          // object rather than leaving it in the public bucket forever.
           void deleteAccountMedia(CHAT_MEDIA_BUCKET, payload.path).catch(() => {});
           return;
         }
@@ -592,7 +586,7 @@ export function MessageThread({
         void deleteAccountMedia(CHAT_MEDIA_BUCKET, payload.path).catch(() => {});
       }
     },
-    [conversation, onNewMessage, onUpdateMessage],
+    [conversation, platform, onNewMessage, onUpdateMessage],
   );
 
   const handleSendInteractive = useCallback(
@@ -961,9 +955,6 @@ export function MessageThread({
     [tAct],
   );
 
-  // Empty state — same WhatsApp-style doodle background as the active
-  // thread below, so swapping between empty/selected doesn't change the
-  // pattern under the user's eye.
   if (!conversation || !contact) {
     return (
       <div className={cn("flex flex-1 flex-col items-center justify-center", DOODLE_BG_CLASSES)}>
@@ -1058,9 +1049,11 @@ export function MessageThread({
               )}
             </h2>
             <p className="truncate text-xs text-muted-foreground">
-              {isWhatsApp
-                ? contact.phone
-                : conversation.channel_username ?? ""}
+              {platform === "telegram"
+                ? (conversation.channel_username ? `@${conversation.channel_username.replace(/^@/, "")}` : conversation.channel_recipient_id ?? "")
+                : isWhatsApp
+                  ? contact.phone
+                  : conversation.channel_username ?? ""}
             </p>
           </div>
           {/* Session timer badge — hidden on the narrowest phones so
@@ -1352,12 +1345,13 @@ export function MessageThread({
                         onDelete={handleDeleteMessage}
                         onForward={handleForwardMessage}
                       >
-                        <MessageBubble
+                      <MessageBubble
                           message={msg}
                           reply={reply}
                           reactions={msgReactions}
                           currentUserId={user?.id}
                           onToggleReaction={handlePillToggle}
+                          platform={platform}
                         />
                       </MessageActions>
                     );
