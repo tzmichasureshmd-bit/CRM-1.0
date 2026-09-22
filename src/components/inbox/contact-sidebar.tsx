@@ -534,6 +534,31 @@ export function ContactSidebar({ contact, conversation, onContactUpdated }: Cont
                 )}
               </div>
             )}
+            {/* Instagram profile section */}
+            {conversation?.platform === "instagram" && (
+              <div className="mb-3 rounded-lg border border-[#E1306C]/20 bg-[#E1306C]/5 px-3 py-2">
+                <div className="mb-1.5 flex items-center gap-1.5">
+                  <span className="rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide bg-[#E1306C]/15 text-[#E1306C]">INSTAGRAM</span>
+                </div>
+                {conversation.channel_username && (
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="font-medium text-foreground">{conversation.channel_username}</span>
+                  </div>
+                )}
+                {contact.instagram_user_id && (
+                  <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground">
+                    <span>Instagram ID</span>
+                    <span className="font-mono text-foreground">{contact.instagram_user_id}</span>
+                  </div>
+                )}
+                {conversation.channel_page_id && (
+                  <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground">
+                    <span>Account ID</span>
+                    <span className="font-mono text-foreground">{conversation.channel_page_id}</span>
+                  </div>
+                )}
+              </div>
+            )}
             <button
               onClick={handleCopyPhone}
               className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted"

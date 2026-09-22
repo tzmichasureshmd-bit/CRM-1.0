@@ -6,6 +6,13 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, ThumbsUp, Camera, Link2, Unlink, RefreshCw, Download } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 interface PageConnection {
   id: string;
@@ -93,6 +100,7 @@ export function MetaLeadsConnect() {
   };
 
   const disconnect = async (platform: "facebook" | "instagram", pageId: string) => {
+    setConfirmDisconnect(null);
     const res = await fetch("/api/meta/leads/config", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
@@ -107,6 +115,7 @@ export function MetaLeadsConnect() {
   };
 
   const [syncing, setSyncing] = useState(false);
+  const [confirmDisconnect, setConfirmDisconnect] = useState<{ platform: "facebook" | "instagram"; pageId: string } | null>(null);
 
   // Re-pull recent leads from the connected Pages through the official
   // Graph API, reusing the same idempotent pipeline the webhook uses.
@@ -226,7 +235,7 @@ export function MetaLeadsConnect() {
                 <ThumbsUp className="size-4 text-[#1877F2]" /> Connected Pages
               </h3>
               {facebookPages.map((p) => (
-                <PageRow key={p.id} conn={p} onDisconnect={() => disconnect("facebook", p.page_id)} />
+                <PageRow key={p.id} conn={p} onDisconnect={() => setConfirmDisconnect({ platform: "facebook", pageId: p.page_id })} />
               ))}
             </div>
           )}
@@ -250,12 +259,15 @@ export function MetaLeadsConnect() {
                       <p className="text-xs text-muted-foreground">
                         {p.page_name ?? "Instagram Professional account"}
                       </p>
+                      {p.instagram_account_id && (
+                        <p className="text-[10px] font-mono text-muted-foreground">ID: {p.instagram_account_id}</p>
+                      )}
                     </div>
                   </div>
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => disconnect("instagram", p.page_id)}
+                    onClick={() => setConfirmDisconnect({ platform: "instagram", pageId: p.page_id })}
                     className="text-muted-foreground hover:text-red-400"
                   >
                     <Unlink className="size-4" /> Disconnect
@@ -273,6 +285,29 @@ export function MetaLeadsConnect() {
           )}
         </>
       )}
+
+      {/* Disconnect confirmation dialog */}
+      <Dialog open={!!confirmDisconnect} onOpenChange={(open) => { if (!open) setConfirmDisconnect(null); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              Disconnect {confirmDisconnect?.platform === "instagram" ? "Instagram" : "Facebook"}?
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            This will stop new messages and leads from this channel. Existing CRM contacts, conversations, and message history will be preserved.
+          </p>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setConfirmDisconnect(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={() => confirmDisconnect && void disconnect(confirmDisconnect.platform, confirmDisconnect.pageId)}
+            >
+              Disconnect
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

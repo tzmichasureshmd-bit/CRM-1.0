@@ -146,6 +146,7 @@ async function processMessagingEvent(event: MessengerWebhookMessagingEvent) {
 
   // ---- Sender profile (best-effort, never fatal) -----------------
   let profileName: string | null = null;
+  let profilePic: string | null = null;
   try {
     if (platform === 'facebook' && conn.page_id) {
       const profile = await fetchMessengerProfile(
@@ -154,9 +155,11 @@ async function processMessagingEvent(event: MessengerWebhookMessagingEvent) {
         accessToken,
       );
       profileName = profile.name ?? null;
+      profilePic = profile.profile_pic ?? null;
     } else {
       const profile = await fetchInstagramProfile(senderId, accessToken);
       profileName = profile.name ?? profile.username ?? null;
+      profilePic = profile.profile_pic ?? null;
     }
   } catch (err) {
     console.warn('[messaging] profile fetch skipped:', String(err));
@@ -175,6 +178,7 @@ async function processMessagingEvent(event: MessengerWebhookMessagingEvent) {
     senderId,
     contactName,
     dedupeColumn,
+    profilePic,
   );
   if (!contact) return;
   if (contact.wasCreated) {
@@ -355,6 +359,7 @@ async function findOrCreateMessagingContact(
   senderId: string,
   contactName: string,
   dedupeColumn: 'messenger_psid' | 'instagram_user_id',
+  profilePic: string | null = null,
 ): Promise<{ id: string; wasCreated: boolean } | null> {
   const { data: existing } = await admin
     .from('contacts')
@@ -362,7 +367,19 @@ async function findOrCreateMessagingContact(
     .eq('account_id', accountId)
     .eq(dedupeColumn, senderId)
     .maybeSingle();
-  if (existing) return { id: existing.id as string, wasCreated: false };
+  if (existing) {
+    // Update name and avatar on repeat messages (best-effort)
+    void admin
+      .from('contacts')
+      .update({
+        name: contactName,
+        ...(profilePic ? { avatar_url: profilePic } : {}),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', existing.id as string)
+      .then(() => {})
+    return { id: existing.id as string, wasCreated: false };
+  }
 
   const pageId = String(conn.page_id ?? '');
   const { data: created, error: createErr } = await admin
@@ -377,6 +394,7 @@ async function findOrCreateMessagingContact(
       source_page_id: pageId,
       source_page_name: conn.page_name ?? null,
       [dedupeColumn]: senderId,
+      ...(profilePic ? { avatar_url: profilePic } : {}),
       lead_status: 'new',
     })
     .select('id')
