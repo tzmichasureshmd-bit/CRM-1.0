@@ -7,8 +7,6 @@ export const dynamic = "force-dynamic";
 const PERMISSIONS = [
   "pages_show_list",
   "pages_manage_metadata",
-  "leads_retrieval",
-  "ads_management",
   // Messenger DMs (Facebook Messenger Platform)
   "pages_messaging",
   // Instagram DMs (Instagram Messaging API)
