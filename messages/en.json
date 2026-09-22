@@ -2479,7 +2479,10 @@
       "quick-replies": "Quick replies",
       "fields": "Fields & tags",
       "deals": "Deals & currency",
-      "api": "API keys"
+      "api": "API keys",
+      "meta-leads": "Meta Leads",
+      "google-forms": "Google Forms",
+      "telegram": "Telegram"
     },
     "groups": {
       "account": "Account",
