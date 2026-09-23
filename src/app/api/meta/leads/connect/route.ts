@@ -92,6 +92,11 @@ export async function GET(request: Request) {
     response_type: "code",
     scope: PERMISSIONS,
     state,
+    // Force Meta to re-show the permissions dialog instead of silently
+    // reusing a previous authorization. Without this, a reconnect after
+    // a broken/partial grant returns the old token with the old (missing)
+    // scopes and the user never sees the permission screen again.
+    auth_type: "rerequest",
   });
 
   const facebookUrl = `https://www.facebook.com/v21.0/dialog/oauth?${params.toString()}`;

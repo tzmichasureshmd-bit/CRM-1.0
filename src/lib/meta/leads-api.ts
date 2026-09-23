@@ -94,6 +94,26 @@ async function throwIfNotOk(response: Response, operation: string): Promise<void
 // OAuth
 // ------------------------------------------------------------
 
+export interface GrantedPermission {
+  permission: string
+  status: 'granted' | 'declined'
+}
+
+/**
+ * Inspect the permissions actually granted by the user for a given token.
+ * Used after code exchange to verify required scopes before saving.
+ */
+export async function getGrantedPermissions(
+  userAccessToken: string,
+): Promise<GrantedPermission[]> {
+  const res = await fetch(`${META_LEADS_API_BASE}/me/permissions`, {
+    headers: { Authorization: `Bearer ${userAccessToken}` },
+  })
+  await throwIfNotOk(res, 'get_permissions')
+  const data = (await res.json()) as { data?: GrantedPermission[] }
+  return data.data ?? []
+}
+
 export interface ExchangeCodeResult {
   access_token?: string
   token_type?: string
@@ -294,13 +314,14 @@ export async function subscribePageToLeadgen(
  * Install the app onto a Page for the `messages` webhook field — this is
  * what delivers Facebook Messenger + Instagram DM events to the same
  * webhook URL the leadgen subscription uses. Uses the Page access token.
- * Best-effort: a Messenger-less setup (e.g. no messaging permission yet)
- * should not break the lead-ads connect flow.
+ *
+ * Returns `true` on success, `false` on failure (never throws).
+ * The caller decides how to record webhook_status.
  */
 export async function subscribePageToMessaging(
   pageId: string,
   pageAccessToken: string,
-): Promise<void> {
+): Promise<boolean> {
   try {
     const params = new URLSearchParams({
       subscribed_fields: 'messages',
@@ -310,27 +331,26 @@ export async function subscribePageToMessaging(
       `${META_LEADS_API_BASE}/${pageId}/subscribed_apps?${params.toString()}`,
       { method: 'POST' },
     )
-    // Treat 200 + benign "already subscribed / no permission" (code 100)
-    // as success — the connection is still recorded either way.
     if (!res.ok) {
       const errData = (await res.json().catch(() => ({}))) as {
-        error?: { code?: number }
+        error?: { code?: number; message?: string }
       }
-      if (errData.error?.code !== 100) {
-        throw new MetaLeadsApiError({
-          status: res.status,
-          message: 'Could not subscribe page to messages webhook',
-          operation: 'subscribe_page',
-        })
-      }
+      // code 100 = already subscribed / benign
+      if (errData.error?.code === 100) return true
+      console.error(
+        `[meta/oauth] facebook messaging subscription: failure page=${pageId}`,
+        `code=${errData.error?.code ?? 'n/a'} message=${errData.error?.message ?? 'n/a'}`,
+      )
+      return false
     }
+    console.log(`[meta/oauth] facebook messaging subscription: success page=${pageId}`)
+    return true
   } catch (err) {
-    // Best-effort: lead-ads connect must succeed even when messaging
-    // permission isn't granted yet.
-    console.warn(
-      `[meta] messages subscription skipped for page ${pageId}:`,
+    console.error(
+      `[meta/oauth] facebook messaging subscription: failure page=${pageId}`,
       err instanceof Error ? err.message : String(err),
     )
+    return false
   }
 }
 

@@ -106,11 +106,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
+  console.log("[meta/webhook] received object=", body.object);
+
   // Instagram DMs arrive with object="instagram"; Facebook Messenger + Lead
   // Ads arrive with object="page". Both use the same entry[].messaging[] shape.
   // Anything else (whatsapp, user, etc.) is acknowledged but not processed.
   const isPage = body.object === "page";
   const isInstagram = body.object === "instagram";
+
+  if (isInstagram) {
+    console.log("[meta/webhook] object=instagram");
+  } else if (isPage) {
+    console.log("[meta/webhook] object=page");
+  }
+
   if (!isPage && !isInstagram) {
     return NextResponse.json({ status: "ignored" });
   }
@@ -148,11 +157,19 @@ async function processMessaging(body: LeadgenBody): Promise<void> {
   const events: MessengerWebhookMessagingEvent[] = [];
   for (const entry of entries) {
     if (entry.messaging && entry.messaging.length > 0) {
+      for (const ev of entry.messaging) {
+        if (ev.message) {
+          console.log("[meta/webhook] event field=messages");
+        }
+      }
       events.push(...entry.messaging);
     }
   }
   if (events.length === 0) return;
-  await processMessagingEvents(sanitizeMessagingEvents(events));
+  const sanitized = sanitizeMessagingEvents(events);
+  console.log("[meta/webhook] event count", sanitized.length);
+  console.log("[meta/webhook] processing started");
+  await processMessagingEvents(sanitized);
 }
 
 /**
