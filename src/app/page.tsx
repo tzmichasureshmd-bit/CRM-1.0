@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { Metadata } from "next";
+import { Fragment } from "react";
 import {
   MessageSquare,
   ArrowRight,
@@ -24,6 +25,12 @@ import {
   UserPlus,
   ArrowDown,
   Sparkles,
+  ThumbsUp,
+  Camera,
+  LayoutDashboard,
+  UserCheck,
+  Repeat,
+  type LucideIcon,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -65,15 +72,42 @@ const leadSources = [
   { name: "Website Leads", icon: Globe, count: "42", color: "bg-violet-500/10 text-violet-500 border-violet-500/20" },
 ];
 
-const leadFlow = [
-  "Facebook Lead",
-  "Instagram Lead",
-  "WhatsApp Conversation",
-  "CRM",
-  "Assigned Agent",
-  "Follow-up",
-  "Converted Customer",
+type LeadFlowStep = {
+  label: string;
+  icon: LucideIcon;
+  tint: string;
+  ring: string;
+  central?: boolean;
+  final?: boolean;
+};
+
+const leadFlow: LeadFlowStep[] = [
+  { label: "Facebook Lead", icon: ThumbsUp, tint: "bg-blue-500/10 text-blue-500", ring: "border-blue-500/20" },
+  { label: "Instagram Lead", icon: Camera, tint: "bg-pink-500/10 text-pink-500", ring: "border-pink-500/20" },
+  { label: "WhatsApp Conversation", icon: MessageSquare, tint: "bg-emerald-500/10 text-emerald-500", ring: "border-emerald-500/20" },
+  { label: "CRM Central Hub", icon: LayoutDashboard, central: true, tint: "", ring: "" },
+  { label: "Assigned Agent", icon: UserCheck, tint: "bg-amber-500/10 text-amber-500", ring: "border-amber-500/20" },
+  { label: "Follow-up", icon: Repeat, tint: "bg-violet-500/10 text-violet-500", ring: "border-violet-500/20" },
+  { label: "Converted Customer", icon: CheckCircle2, final: true, tint: "", ring: "" },
 ];
+
+function flowCardClass(step: LeadFlowStep) {
+  if (step.central) return "border-primary/40 bg-primary/10 shadow-md shadow-primary/5";
+  if (step.final) return "border-emerald-500/40 bg-emerald-500/10 shadow-md shadow-emerald-500/5";
+  return `border-border/60 bg-card/60 backdrop-blur-sm ${step.ring}`;
+}
+
+function flowIconClass(step: LeadFlowStep) {
+  if (step.central) return "bg-primary text-primary-foreground shadow-sm shadow-primary/30";
+  if (step.final) return "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400";
+  return step.tint;
+}
+
+function flowLabelClass(step: LeadFlowStep) {
+  if (step.central) return "text-primary";
+  if (step.final) return "text-emerald-600 dark:text-emerald-400";
+  return "text-foreground";
+}
 
 const plans = [
   {
@@ -244,7 +278,7 @@ export default function LandingPage() {
                   LEADS
                 </div>
                 <div
-                  className="pointer-events-none absolute right-[-6px] top-[58%] text-sm font-bold uppercase tracking-[0.2em] text-emerald-500/50 landing-float-word"
+                  className="pointer-events-none absolute right-[-6px] top-[58%] text-sm font-bold uppercase tracking-[0.2em] text-foreground/40 landing-float-word"
                   style={{ animationDelay: "1.2s", transform: "rotate(6deg)" }}
                 >
                   AUTOMATION
@@ -427,48 +461,158 @@ export default function LandingPage() {
 
           {/* Lead flow visualization */}
           <LandingReveal delay={200}>
-            <div className="mx-auto max-w-3xl">
-              <div className="flex flex-col items-center gap-2">
+            <div className="mx-auto max-w-5xl">
+              {/* Desktop horizontal flow */}
+              <div className="hidden items-stretch md:flex">
                 {leadFlow.map((step, i) => (
-                  <div key={step} className="flex items-center gap-3">
-                    <div className="flex h-10 items-center rounded-lg border border-border/60 bg-card px-4 text-sm font-medium shadow-sm">
-                      {step === "CRM" ? (
-                        <span className="flex items-center gap-2">
-                          <MessageSquare className="size-4 text-primary" />
-                          {step}
-                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">Central Hub</span>
-                        </span>
-                      ) : step === "Converted Customer" ? (
-                        <span className="flex items-center gap-2">
-                          <CheckCircle2 className="size-4 text-emerald-500" />
-                          {step}
-                        </span>
-                      ) : (
-                        step
-                      )}
+                  <Fragment key={step.label}>
+                    <div
+                      className={`flex flex-1 flex-col items-center justify-center gap-2 rounded-xl border p-3 text-center transition-all duration-300 landing-card-hover ${flowCardClass(step)}`}
+                    >
+                      <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${flowIconClass(step)}`}>
+                        <step.icon className="h-4 w-4" />
+                      </div>
+                      <div className="text-center">
+                        <p className={`text-[11px] font-semibold leading-tight ${flowLabelClass(step)}`}>{step.label}</p>
+                        {step.central && (
+                          <span className="mt-1 inline-block rounded-full bg-primary/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-primary">
+                            Hub
+                          </span>
+                        )}
+                        {step.final && (
+                          <span className="mt-1 inline-block rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
+                            Goal
+                          </span>
+                        )}
+                      </div>
                     </div>
                     {i < leadFlow.length - 1 && (
-                      <ArrowDown className="size-4 text-muted-foreground/40" />
+                      <div className="flex w-5 shrink-0 items-center justify-center">
+                        <ArrowRight className="size-3.5 text-muted-foreground/60" />
+                      </div>
                     )}
-                  </div>
+                  </Fragment>
+                ))}
+              </div>
+
+              {/* Mobile vertical flow */}
+              <div className="mx-auto flex w-full max-w-sm flex-col items-center gap-2 md:hidden">
+                {leadFlow.map((step, i) => (
+                  <Fragment key={step.label}>
+                    <div className={`flex w-full items-center gap-3 rounded-xl border p-3 ${flowCardClass(step)}`}>
+                      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${flowIconClass(step)}`}>
+                        <step.icon className="h-4.5 w-4.5" />
+                      </div>
+                      <div>
+                        <p className={`text-sm font-semibold ${flowLabelClass(step)}`}>{step.label}</p>
+                        {(step.central || step.final) && (
+                          <span
+                            className={`mt-0.5 inline-block rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide ${
+                              step.central ? "bg-primary/15 text-primary" : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                            }`}
+                          >
+                            {step.central ? "Central Hub" : "Goal"}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {i < leadFlow.length - 1 && <ArrowDown className="size-4 text-muted-foreground/50" />}
+                  </Fragment>
                 ))}
               </div>
             </div>
           </LandingReveal>
 
-          {/* CRM screenshot for leads */}
+          {/* Compact product visuals */}
           <LandingReveal delay={300}>
-            <div className="landing-perspective mx-auto mt-16 max-w-4xl">
-              <div className="relative">
-                <div className="absolute -inset-4 rounded-2xl bg-primary/5 blur-2xl landing-glow" />
-                <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card shadow-2xl shadow-black/10 landing-3d-tilt">
-                  <Image
-                    src="/crm/crm3.jpeg"
-                    alt="WhatsApp CRM Lead Pipeline"
-                    width={1200}
-                    height={750}
-                    className="h-auto w-full"
-                  />
+            <div className="mx-auto mt-16 grid max-w-5xl gap-5 lg:grid-cols-3">
+              {/* Unified inbox mock */}
+              <div className="rounded-2xl border border-border/60 bg-card/60 p-5 backdrop-blur-sm landing-card-hover">
+                <div className="mb-5 flex items-center gap-2.5">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <Inbox className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold">Unified Inbox</p>
+                    <p className="text-xs text-muted-foreground">One place for every channel</p>
+                  </div>
+                </div>
+                <div className="space-y-2.5">
+                  {[
+                    { icon: Globe, tint: "bg-blue-500/10 text-blue-500" },
+                    { icon: Images, tint: "bg-pink-500/10 text-pink-500" },
+                    { icon: MessageSquare, tint: "bg-emerald-500/10 text-emerald-500" },
+                  ].map((c, i) => (
+                    <div key={i} className="flex items-center gap-3 rounded-xl border border-border/50 bg-muted/20 p-2.5">
+                      <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${c.tint}`}>
+                        <c.icon className="h-3.5 w-3.5" />
+                      </div>
+                      <div className="h-2 flex-1 rounded-full bg-muted-foreground/15" />
+                      <div className="h-2 w-10 rounded-full bg-muted-foreground/10" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Agent assignment mock */}
+              <div className="rounded-2xl border border-border/60 bg-card/60 p-5 backdrop-blur-sm landing-card-hover">
+                <div className="mb-5 flex items-center gap-2.5">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <Users className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold">Agent Assignment</p>
+                    <p className="text-xs text-muted-foreground">Every lead routed instantly</p>
+                  </div>
+                </div>
+                <div className="space-y-2.5">
+                  {[0, 1, 2].map((i) => (
+                    <div key={i} className="flex items-center gap-3 rounded-xl border border-border/50 bg-muted/20 p-2.5">
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border/60 bg-background">
+                        <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                      </div>
+                      <div className="h-2 flex-1 rounded-full bg-muted-foreground/15" />
+                      <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-[10px] font-semibold text-primary">
+                        <UserCheck className="size-3" />
+                        Assigned
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Conversion mock */}
+              <div className="rounded-2xl border border-border/60 bg-card/60 p-5 backdrop-blur-sm landing-card-hover">
+                <div className="mb-5 flex items-center gap-2.5">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <Zap className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold">Customer Conversion</p>
+                    <p className="text-xs text-muted-foreground">From first message to closed deal</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {["Message", "Reply", "Qualify", "Close"].map((s, i) => (
+                    <Fragment key={s}>
+                      <div className="flex-1">
+                        <div
+                          className={`flex h-8 items-center justify-center rounded-lg border text-[10px] font-semibold ${
+                            i === 3
+                              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                              : "border-border/50 bg-muted/20 text-muted-foreground"
+                          }`}
+                        >
+                          {i === 3 && <CheckCircle2 className="mr-1 size-3" />}
+                          {s}
+                        </div>
+                      </div>
+                      {i < 3 && <ArrowRight className="size-3 shrink-0 text-muted-foreground/50" />}
+                    </Fragment>
+                  ))}
+                </div>
+                <div className="mt-4 flex h-2 overflow-hidden rounded-full bg-muted">
+                  <div className="h-full w-3/4 rounded-full bg-gradient-to-r from-primary to-emerald-500" />
                 </div>
               </div>
             </div>
@@ -508,10 +652,19 @@ export default function LandingPage() {
           </LandingReveal>
 
           <LandingReveal delay={200}>
-            <div className="landing-perspective mx-auto max-w-4xl">
+            <div className="landing-perspective mx-auto max-w-5xl">
               <div className="relative">
                 <div className="absolute -inset-6 rounded-3xl bg-primary/5 blur-3xl landing-glow" />
                 <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card shadow-2xl shadow-black/10 landing-3d-tilt">
+                  <div className="flex items-center gap-2 border-b border-border/60 bg-muted/30 px-4 py-2.5">
+                    <span className="h-2.5 w-2.5 rounded-full bg-red-400/70" />
+                    <span className="h-2.5 w-2.5 rounded-full bg-amber-400/70" />
+                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/70" />
+                    <span className="ml-3 h-5 w-32 rounded-md bg-muted/70 sm:w-48" />
+                    <span className="ml-auto hidden rounded-md px-2 py-1 text-[10px] font-medium text-muted-foreground sm:block">
+                      TZMICHA &middot; Analytics
+                    </span>
+                  </div>
                   <Image
                     src="/crm/crm1.jpeg"
                     alt="WhatsApp CRM Dashboard Analytics"

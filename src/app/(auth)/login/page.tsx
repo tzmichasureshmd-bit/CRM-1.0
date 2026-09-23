@@ -5,18 +5,21 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { PasswordInput } from "@/components/ui/password-input";
-import { Label } from "@/components/ui/label";
+import { ShieldCheck } from "lucide-react";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { MessageSquare, UsersRound } from "lucide-react";
+  LoginBrand,
+  LoginCard,
+  LoginDivider,
+  LoginEmailInput,
+  LoginError,
+  LoginField,
+  LoginFooter,
+  LoginHeading,
+  LoginPasswordInput,
+  LoginSecondary,
+  LoginShell,
+  LoginSubmit,
+} from "@/components/auth/login-shell";
 
 // `useSearchParams` opts the component out of static prerendering
 // unless it sits under a Suspense boundary. We split the form into
@@ -25,9 +28,15 @@ import { MessageSquare, UsersRound } from "lucide-react";
 // string on the client.
 export default function LoginPage() {
   return (
-    <Suspense fallback={null}>
-      <LoginPageInner />
-    </Suspense>
+    // The premium chrome (CRM4 image pane, glass frame) is served in
+    // the static HTML outside the Suspense boundary so the visual
+    // paints immediately, while the form itself (which needs
+    // useSearchParams for the invite token) hydrates on the client.
+    <LoginShell>
+      <Suspense fallback={null}>
+        <LoginPageInner />
+      </Suspense>
+    </LoginShell>
   );
 }
 
@@ -43,20 +52,34 @@ function LoginPageInner() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const supabase = createClient();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const supabase = createClient();
 
-    if (error) {
-      setError(error.message);
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+        return;
+      }
+    } catch (err) {
+      console.error("[LOGIN] Unexpected error:", err);
+      const isMisconfigured =
+        err instanceof Error && err.message.includes("Supabase is not configured");
+      setError(
+        isMisconfigured
+          ? "Login is temporarily unavailable. Supabase is not configured. Please contact the administrator."
+          : "Unable to sign in. Please try again later.",
+      );
       setLoading(false);
       return;
     }
@@ -82,112 +105,82 @@ function LoginPageInner() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <Card className="w-full max-w-md border-border bg-card">
-        <CardHeader className="items-center text-center">
-          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-            {inviteToken ? (
-              <UsersRound className="h-6 w-6 text-primary" />
-            ) : (
-              <MessageSquare className="h-6 w-6 text-primary" />
-            )}
-          </div>
-          <CardTitle className="text-xl text-foreground">
-            {inviteToken ? t('titleAccept') : t('titleWelcome')}
-          </CardTitle>
-          <CardDescription className="text-muted-foreground">
-            {inviteToken
-              ? t('descAccept')
-              : t('descWelcome')}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLogin} className="flex flex-col gap-4">
-            {error && (
-              <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
-                {error}
-              </div>
-            )}
+    <>
+      <LoginCard>
+        <LoginBrand />
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="email" className="text-muted-foreground">
-                {t('emailLabel')}
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder={t('emailPlaceholder')}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="border-border bg-muted text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/20"
-              />
-            </div>
+        <LoginHeading title={inviteToken ? t("titleAccept") : t("titleWelcome")}>
+          {inviteToken
+            ? t("descAccept")
+            : "Sign in to manage your conversations, leads, contacts and business communication."}
+        </LoginHeading>
 
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password" className="text-muted-foreground">
-                  {t('passwordLabel')}
-                </Label>
-                <Link
-                  href="/forgot-password"
-                  className="text-sm text-primary hover:text-primary/80"
-                >
-                  {t('forgotPassword')}
-                </Link>
-              </div>
-              <PasswordInput
-                id="password"
-                placeholder={t('passwordPlaceholder')}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoComplete="current-password"
-                toggleLabels={{ show: t('showPassword'), hide: t('hidePassword') }}
-                className="border-border bg-muted text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/20"
-              />
-            </div>
+        <form onSubmit={handleLogin} className="mt-2 flex flex-col gap-4">
+          <LoginError>{error}</LoginError>
 
-            <Button
-              type="submit"
-              disabled={loading}
-              className="mt-2 h-10 w-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-            >
-              {loading ? t('signingIn') : t('signIn')}
-            </Button>
-          </form>
+          <LoginField label={t("emailLabel")} htmlFor="email">
+            <LoginEmailInput
+              id="email"
+              placeholder={t("emailPlaceholder")}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </LoginField>
 
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-border" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-card px-2 text-muted-foreground">{t('or')}</span>
-            </div>
-          </div>
-
-          <Link
-            href="/super-admin/login"
-            className="flex h-10 w-full items-center justify-center rounded-lg border border-border bg-background text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          <LoginField
+            label={t("passwordLabel")}
+            htmlFor="password"
+            action={
+              <Link href="/forgot-password" className="login-link-accent">
+                {t("forgotPassword")}
+              </Link>
+            }
           >
-            {t('superAdmin')}
-          </Link>
+            <LoginPasswordInput
+              id="password"
+              placeholder={t("passwordPlaceholder")}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              showLabel={t("showPassword")}
+              hideLabel={t("hidePassword")}
+            />
+          </LoginField>
 
-          <p className="mt-6 text-center text-sm text-muted-foreground">
-            {t('noAccount')}{" "}
-            <Link
-              href={
-                inviteToken
-                  ? `/signup?invite=${encodeURIComponent(inviteToken)}`
-                  : "/signup"
-              }
-              className="text-primary hover:text-primary/80"
-            >
-              {t('createAccount')}
-            </Link>
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+          <LoginSubmit loading={loading} loadingText={t("signingIn")}>
+            {t("signIn")}
+          </LoginSubmit>
+        </form>
+
+        <LoginDivider>{t("or")}</LoginDivider>
+
+        <LoginSecondary
+          href="/super-admin/login"
+          icon={<ShieldCheck className="h-4 w-4" aria-hidden="true" />}
+        >
+          {t("superAdmin")}
+        </LoginSecondary>
+
+        <p className="login-muted mt-6 text-center">
+          {t("noAccount")}{" "}
+          <Link
+            href={
+              inviteToken
+                ? `/signup?invite=${encodeURIComponent(inviteToken)}`
+                : "/signup"
+            }
+            className="login-link-accent"
+          >
+            {t("createAccount")}
+          </Link>
+        </p>
+      </LoginCard>
+
+      <LoginFooter>
+        &copy; {new Date().getFullYear()} TZmicha IT Solutions &middot; WhatsApp
+        CRM
+      </LoginFooter>
+    </>
   );
 }

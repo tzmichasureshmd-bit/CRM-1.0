@@ -576,12 +576,20 @@ html[data-theme="red"] {
 .landing-stagger > *:nth-child(7) { animation-delay: 0.35s; }
 .landing-stagger > *:nth-child(8) { animation-delay: 0.4s; }
 
-/* ---- Gradient text ---- */
+/* ---- Gradient text (high-contrast, no green cast) ---- */
 .landing-gradient-text {
-  background: linear-gradient(135deg, var(--foreground) 0%, oklch(0.55 0.2 162) 100%);
+  background: linear-gradient(135deg, var(--foreground) 0%, var(--primary) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+/* Fallback so the word is never invisible if text-clip is unsupported */
+@supports not ((background-clip: text) or (-webkit-background-clip: text)) {
+  .landing-gradient-text {
+    background: none;
+    -webkit-text-fill-color: var(--primary);
+    color: var(--primary);
+  }
 }
 
 /* ---- Soft grid dots background ---- */
@@ -616,5 +624,482 @@ html[data-mode="dark"] .landing-dots-bg {
   }
   .landing-3d-tilt {
     transform: none !important;
+  }
+}
+
+/* ============================================================
+   PREMIUM LOGIN — full-screen CRM4 image + floating glass card
+   ------------------------------------------------------------
+   Scoped, unlayered styles for the /login, /admin/login and
+   /super-admin/login screens. Kept outside @layer so they win
+   over Tailwind utility conflicts, and paired with a
+   prefers-reduced-motion block at the end.
+   The CRM4 image IS the page background — there is no split
+   screen, side panel or video. A single glass card floats above.
+   ============================================================ */
+
+/* ---- Cinematic full-screen shell: card pinned to the LEFT ---- */
+.login-shell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
+  overflow-x: hidden; /* no horizontal scroll on mobile */
+  color: #0f172a;
+  background: #10131c; /* dark backdrop while the image streams */
+  padding-left: clamp(3rem, 7vw, 6rem);
+}
+.login-shell__content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  width: 100%;
+  max-width: 21rem; /* compact 336px card */
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 2.5rem 0;
+}
+
+/* ---- Full-page background: CRM4 image covering the viewport ---- */
+.login-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+}
+.login-bg__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+/* Subtle neutral scrim so the glass card + text stay readable.
+   The image must remain clearly visible — keep it light. */
+.login-bg__overlay {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(125% 95% at 50% 22%, rgba(2, 6, 23, 0.1) 0%, rgba(2, 6, 23, 0.24) 55%, rgba(2, 6, 23, 0.46) 100%),
+    linear-gradient(180deg, rgba(2, 6, 23, 0.2) 0%, rgba(2, 6, 23, 0.12) 45%, rgba(2, 6, 23, 0.34) 100%);
+}
+/* Absolute full-viewport fill for the next/image element inside. */
+.login-bg__img,
+.login-bg__overlay {
+  pointer-events: none;
+}
+
+/* ---- Highly transparent premium glass card (dark translucent layer) ---- */
+.login-glass {
+  position: relative;
+  width: 100%;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: linear-gradient(160deg, rgba(15, 23, 42, 0.52) 0%, rgba(15, 23, 42, 0.4) 50%, rgba(15, 23, 42, 0.46) 100%);
+  -webkit-backdrop-filter: blur(36px) saturate(150%) brightness(1.05);
+  backdrop-filter: blur(36px) saturate(150%) brightness(1.05);
+  box-shadow:
+    0 30px 70px -28px rgba(2, 6, 23, 0.7),
+    0 14px 34px -16px rgba(2, 6, 23, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+}
+/* Very subtle top sheen — pure decoration, never blocks interaction */
+.login-glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(120% 62% at 50% -12%, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0) 52%);
+}
+.login-glass > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ---- Brand ---- */
+.login-brand-mark {
+  display: flex;
+  height: 2.5rem;
+  width: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  background: linear-gradient(150deg, color-mix(in oklab, var(--primary) 88%, white 12%), var(--primary));
+  color: var(--primary-foreground);
+  box-shadow:
+    0 12px 30px -10px color-mix(in oklab, var(--primary) 55%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+.login-brand-eyebrow {
+  margin-top: 0.625rem;
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.72);
+  text-indent: 0.32em; /* optically center the tracked text */
+  text-shadow: 0 1px 2px rgba(2, 6, 23, 0.6);
+}
+.login-brand-name {
+  margin-top: 0.125rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+  text-shadow: 0 1px 3px rgba(2, 6, 23, 0.55);
+}
+
+/* ---- Card heading ---- */
+.login-heading-title {
+  margin-top: 0.875rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(2, 6, 23, 0.5);
+}
+.login-heading-text {
+  margin-top: 0.375rem;
+  font-size: 0.78125rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.84);
+  text-shadow: 0 1px 2px rgba(2, 6, 23, 0.45);
+}
+
+/* ---- Compact field spacing inside the glass card ---- */
+.login-glass form {
+  gap: 0.6875rem;
+}
+
+/* ---- Fields ---- */
+.login-field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.3125rem;
+}
+.login-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 1px 2px rgba(2, 6, 23, 0.5);
+}
+.login-field {
+  position: relative;
+}
+.login-input {
+  height: 2.75rem;
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.1);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  backdrop-filter: blur(14px) saturate(160%);
+  padding: 0 0.75rem;
+  font-size: 0.9375rem;
+  color: #ffffff;
+  caret-color: #ffffff;
+  box-shadow: inset 0 1px 2px rgba(2, 6, 23, 0.18);
+  transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+.login-input::placeholder {
+  color: rgba(255, 255, 255, 0.55);
+}
+.login-input:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.42);
+}
+.login-input:focus-visible {
+  outline: none;
+  border-color: color-mix(in oklab, var(--ring) 70%, white 30%);
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 45%, transparent);
+}
+.login-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.login-input--icon {
+  padding-left: 2.5rem;
+}
+.login-input--icon-end {
+  padding-right: 2.75rem;
+}
+.login-input-icon {
+  position: absolute;
+  top: 50%;
+  left: 0.75rem;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.6);
+  pointer-events: none;
+  transition: color 0.2s ease;
+}
+.login-field:focus-within .login-input-icon {
+  color: #ffffff;
+}
+/* Keep browser-autofill readable on the dark frosted fields */
+.login-input:-webkit-autofill,
+.login-input:-webkit-autofill:hover,
+.login-input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #ffffff;
+  caret-color: #ffffff;
+  -webkit-box-shadow: 0 0 0 40px rgba(15, 23, 42, 0.95) inset;
+  box-shadow: 0 0 0 40px rgba(15, 23, 42, 0.95) inset;
+  border-radius: 12px;
+}
+
+/* ---- Password show/hide toggle ---- */
+.login-toggle {
+  position: absolute;
+  top: 50%;
+  right: 0.3125rem;
+  transform: translateY(-50%);
+  display: flex;
+  height: 2rem;
+  width: 2rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  color: rgba(255, 255, 255, 0.78);
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+.login-toggle:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+}
+.login-toggle:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--ring) 40%, transparent);
+}
+
+/* ---- Error banner ---- */
+.login-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  border-radius: 10px;
+  border: 1px solid rgba(254, 202, 202, 0.4);
+  background: rgba(127, 29, 29, 0.6);
+  padding: 0.625rem 0.75rem;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: #fecaca;
+}
+
+/* ---- Primary CTA ---- */
+.login-submit {
+  display: inline-flex;
+  width: 100%;
+  height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 12px;
+  border: 1px solid color-mix(in oklab, var(--primary) 55%, white 45%);
+  background: linear-gradient(180deg, color-mix(in oklab, var(--primary) 92%, white 8%), var(--primary));
+  color: var(--primary-foreground);
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  box-shadow:
+    0 12px 28px -12px color-mix(in oklab, var(--primary) 60%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  transition: filter 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+}
+.login-submit:hover:not(:disabled) {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+  box-shadow:
+    0 16px 34px -12px color-mix(in oklab, var(--primary) 75%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+.login-submit:active:not(:disabled) {
+  transform: translateY(1px) scale(0.995);
+  box-shadow: 0 8px 20px -10px color-mix(in oklab, var(--primary) 50%, transparent);
+}
+.login-submit:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 35%, transparent);
+}
+.login-submit:disabled {
+  cursor: not-allowed;
+  filter: saturate(0.7) brightness(0.92);
+  opacity: 0.7;
+}
+
+/* ---- Secondary (Super Admin / back) ---- */
+.login-secondary {
+  display: inline-flex;
+  width: 100%;
+  height: 2.375rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.12);
+  -webkit-backdrop-filter: blur(10px) saturate(150%);
+  backdrop-filter: blur(10px) saturate(150%);
+  color: #ffffff;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+.login-secondary:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.45);
+  color: #ffffff;
+}
+.login-secondary:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 30%, transparent);
+}
+
+/* ---- Divider ---- */
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin: 0.875rem 0;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.login-divider::before,
+.login-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.26), transparent);
+}
+
+/* ---- Links ---- */
+.login-link {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.78);
+  transition: color 0.2s ease;
+}
+.login-link:hover {
+  color: #ffffff;
+}
+.login-link:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--ring) 40%, transparent);
+  border-radius: 4px;
+}
+.login-link-accent {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: color-mix(in oklab, var(--ring) 62%, #ffffff 38%);
+  text-shadow: 0 1px 2px rgba(2, 6, 23, 0.6);
+  transition: color 0.2s ease;
+}
+.login-link-accent:hover {
+  color: color-mix(in oklab, var(--ring) 45%, #ffffff 55%);
+}
+.login-link-accent:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--ring) 40%, transparent);
+  border-radius: 4px;
+}
+
+/* ---- Footer / muted text ---- */
+.login-muted {
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.8);
+  text-shadow: 0 1px 2px rgba(2, 6, 23, 0.55);
+}
+/* Footer sits directly on the image (outside the glass card), so it
+   needs light-on-dark treatment to stay readable everywhere. */
+.login-shell__content > .login-muted {
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 1px 2px rgba(2, 6, 23, 0.55), 0 2px 12px rgba(2, 6, 23, 0.35);
+}
+
+/* ---- Micro-interactions ---- */
+@keyframes login-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes login-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes login-error-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.login-fade-in {
+  animation: login-fade-in 0.7s ease-out both;
+}
+.login-card-enter {
+  animation: login-card-enter 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.login-error-enter {
+  animation: login-error-in 0.25s ease-out both;
+}
+
+/* ---- Reduced motion: keep the login fully functional, drop motion ---- */
+@media (prefers-reduced-motion: reduce) {
+  .login-fade-in,
+  .login-card-enter,
+  .login-error-enter {
+    animation: none !important;
+  }
+  .login-input,
+  .login-submit,
+  .login-secondary,
+  .login-toggle {
+    transition: none !important;
+  }
+}
+
+/* ---- Responsive: image STAYS a full background, the glass card
+        just narrows / recenters for small phones. No split layout. ---- */
+@media (max-width: 900px) {
+  .login-glass {
+    border-radius: 18px;
+  }
+}
+@media (max-width: 640px) {
+  .login-shell {
+    justify-content: center;
+    padding-left: 0;
+  }
+  .login-shell__content {
+    width: calc(100% - 2rem); /* card ≈ viewport − 32px */
+    max-width: 21rem;
+    padding: 2rem 0 2.5rem;
   }
 }
