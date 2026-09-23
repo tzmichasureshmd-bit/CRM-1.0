@@ -1,28 +1,36 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { CheckCircle, User } from "lucide-react";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { MessageSquare, CheckCircle, UsersRound } from "lucide-react";
+  LoginBrand,
+  LoginCard,
+  LoginEmailInput,
+  LoginError,
+  LoginField,
+  LoginFooter,
+  LoginHeading,
+  LoginPasswordInput,
+  LoginSecondary,
+  LoginShell,
+  LoginSubmit,
+} from "@/components/auth/login-shell";
 
 // `useSearchParams` opts the component out of static prerendering
-// unless wrapped in Suspense — same pattern as /login.
+// unless it sits under a Suspense boundary — same pattern as /login.
 export default function SignupPage() {
   return (
-    <Suspense fallback={null}>
-      <SignupPageInner />
-    </Suspense>
+    // The premium chrome (CRM4 image pane, glass frame) is served in
+    // the static HTML outside the Suspense boundary so the visual
+    // paints immediately, while the form hydrates on the client.
+    <LoginShell>
+      <Suspense fallback={null}>
+        <SignupPageInner />
+      </Suspense>
+    </LoginShell>
   );
 }
 
@@ -89,156 +97,126 @@ function SignupPageInner() {
     setLoading(false);
   };
 
+  const loginHref = inviteToken
+    ? `/login?invite=${encodeURIComponent(inviteToken)}`
+    : "/login";
+
   if (success) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background px-4">
-        <Card className="w-full max-w-md border-border bg-card">
-          <CardHeader className="items-center text-center">
-            <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-              <CheckCircle className="h-6 w-6 text-primary" />
-            </div>
-            <CardTitle className="text-xl text-foreground">
-              Check your email
-            </CardTitle>
-            <CardDescription className="text-muted-foreground">
-              We&apos;ve sent a confirmation link to{" "}
-              <span className="text-foreground">{email}</span>. Please check your
-              inbox and click the link to verify your account.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link
-              href={
-                inviteToken
-                  ? `/login?invite=${encodeURIComponent(inviteToken)}`
-                  : "/login"
-              }
-            >
-              <Button
-                variant="outline"
-                className="w-full border-border text-muted-foreground hover:bg-muted hover:text-foreground"
-              >
-                Back to sign in
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
+      <>
+        <LoginCard>
+        <LoginBrand />
+
+        <LoginHeading title="Check your email">
+          We&apos;ve sent a confirmation link to{" "}
+          <span className="text-white">{email}</span>. Please check your
+          inbox and click the link to verify your account.
+        </LoginHeading>
+
+        <div className="mt-2 flex justify-center">
+          <div className="login-brand-mark">
+            <CheckCircle className="h-5 w-5" aria-hidden="true" />
+          </div>
+        </div>
+
+        <LoginSecondary href={loginHref}>Back to sign in</LoginSecondary>
+        </LoginCard>
+
+        <LoginFooter>
+          &copy; {new Date().getFullYear()} TZmicha IT Solutions &middot;
+          WhatsApp CRM
+        </LoginFooter>
+      </>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <Card className="w-full max-w-md border-border bg-card">
-        <CardHeader className="items-center text-center">
-          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-            {inviteToken ? (
-              <UsersRound className="h-6 w-6 text-primary" />
-            ) : (
-              <MessageSquare className="h-6 w-6 text-primary" />
-            )}
-          </div>
-          <CardTitle className="text-xl text-foreground">
-            {inviteToken ? "Create account & join" : "Create account"}
-          </CardTitle>
-          <CardDescription className="text-muted-foreground">
-            {inviteToken
-              ? "Verify your email, then accept the invitation to join your team."
-              : "Get started with WhatsApp CRM TZmicha"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSignup} className="flex flex-col gap-4">
-            {error && (
-              <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
-                {error}
-              </div>
-            )}
+    <>
+      <LoginCard>
+        <LoginBrand />
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="fullName" className="text-muted-foreground">
-                Full name
-              </Label>
-              <Input
+        <LoginHeading
+          title={inviteToken ? "Create account & join" : "Create account"}
+        >
+          {inviteToken
+            ? "Verify your email, then accept the invitation to join your team."
+            : "Get started with WhatsApp CRM TZmicha"}
+        </LoginHeading>
+
+        <form onSubmit={handleSignup} className="mt-2 flex flex-col">
+          <LoginError>{error}</LoginError>
+
+          <LoginField label="Full name" htmlFor="fullName">
+            <div className="login-field">
+              <User className="login-input-icon" aria-hidden="true" />
+              <input
                 id="fullName"
                 type="text"
+                autoComplete="name"
+                spellCheck={false}
                 placeholder="John Doe"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 required
-                className="border-border bg-muted text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/20"
+                className="login-input login-input--icon"
               />
             </div>
+          </LoginField>
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="email" className="text-muted-foreground">
-                Email
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="border-border bg-muted text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/20"
-              />
-            </div>
+          <LoginField label="Email" htmlFor="email">
+            <LoginEmailInput
+              id="email"
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </LoginField>
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="password" className="text-muted-foreground">
-                Password
-              </Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="At least 6 characters"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="border-border bg-muted text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/20"
-              />
-            </div>
+          <LoginField label="Password" htmlFor="password">
+            <LoginPasswordInput
+              id="password"
+              placeholder="At least 6 characters"
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              showLabel="Show password"
+              hideLabel="Hide password"
+            />
+          </LoginField>
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="confirmPassword" className="text-muted-foreground">
-                Confirm password
-              </Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                placeholder="Repeat your password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                className="border-border bg-muted text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/20"
-              />
-            </div>
+          <LoginField label="Confirm password" htmlFor="confirmPassword">
+            <LoginPasswordInput
+              id="confirmPassword"
+              placeholder="Repeat your password"
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+              showLabel="Show password"
+              hideLabel="Hide password"
+            />
+          </LoginField>
 
-            <Button
-              type="submit"
-              disabled={loading}
-              className="mt-2 h-10 w-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-            >
-              {loading ? "Creating account..." : "Create account"}
-            </Button>
-          </form>
+          <LoginSubmit loading={loading} loadingText="Creating account...">
+            Create account
+          </LoginSubmit>
+        </form>
 
-          <p className="mt-6 text-center text-sm text-muted-foreground">
-            Already have an account?{" "}
-            <Link
-              href={
-                inviteToken
-                  ? `/login?invite=${encodeURIComponent(inviteToken)}`
-                  : "/login"
-              }
-              className="text-primary hover:text-primary/80"
-            >
-              Sign in
-            </Link>
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+        <p className="login-muted mt-6 text-center">
+          Already have an account?{" "}
+          <Link href={loginHref} className="login-link-accent">
+            Sign in
+          </Link>
+        </p>
+      </LoginCard>
+
+      <LoginFooter>
+        &copy; {new Date().getFullYear()} TZmicha IT Solutions &middot; WhatsApp
+        CRM
+      </LoginFooter>
+    </>
   );
 }
