@@ -96,7 +96,8 @@
     "defaultAvatar": "아바타",
     "menuProfile": "프로필",
     "menuSettings": "설정",
-    "menuSignOut": "로그아웃"
+    "menuSignOut": "로그아웃",
+    "menuInstallApp": "앱 설치"
   },
   "Crm": {
     "page": {
@@ -2279,6 +2280,7 @@
       "profile": "내 프로필",
       "security": "로그인 & 보안",
       "appearance": "화면 설정",
+      "app": "앱 및 설치",
       "whatsapp": "WhatsApp",
       "activity": "활동 로그",
       "templates": "템플릿",
@@ -2293,6 +2295,24 @@
     "groups": {
       "account": "계정",
       "workspace": "워크스페이스"
+    },
+    "app": {
+      "title": "앱 및 설치",
+      "description": "Tzmicha CRM을 이 기기에 설치해 네이티브 앱처럼 실행하고, 현재 앱 동작을 확인하세요.",
+      "installCardDesc": "팀을 위한 WhatsApp 및 소셜 미디어 CRM입니다. 설치된 앱은 별도 창에서 열리며 자동으로 업데이트됩니다.",
+      "installButton": "Tzmicha CRM 설치",
+      "installing": "설치 중…",
+      "installed": "설치됨",
+      "iosTitle": "iPhone 또는 iPad에 설치",
+      "iosHint": "브라우저에서 공유(Share) 버튼을 누른 뒤 '홈 화면에 추가(Add to Home Screen)'를 선택하세요. Tzmicha CRM이 별도 창으로 열립니다.",
+      "notInstallable": "이 브라우저에서는 아직 설치 기능을 사용할 수 없습니다. 브라우저 메뉴에서 설치(Chrome 또는 Edge: 메뉴 → 앱 설치)를 할 수 있습니다.",
+      "offlineTitle": "오프라인 동작",
+      "offlineDesc": "Tzmicha CRM은 온라인 우선으로 동작합니다. 연결이 끊기면 명확한 오프라인 화면이 표시되고, 다시 연결되면 데이터가 유실되지 않습니다. 앱은 메시지를 오프라인으로 저장하거나 대기시키지 않습니다.",
+      "privacyTitle": "개인정보 보호 및 데이터",
+      "privacyDesc": "앱은 개인 데이터를 캐시하지 않습니다. 메시지, 연락처, 인증 세션, API 응답은 네트워크에서만 처리되므로 회사별 데이터가 안전하게 분리됩니다.",
+      "updateTitle": "새 버전 사용 가능",
+      "updateDesc": "Tzmicha CRM이 업데이트되었습니다.",
+      "updateAction": "새로고침"
     },
     "profile": {
       "title": "내 프로필",

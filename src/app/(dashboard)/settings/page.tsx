@@ -26,6 +26,7 @@ import { FieldsAndTagsPanel } from '@/components/settings/fields-and-tags-panel'
 import { DealsSettings } from '@/components/settings/deals-settings';
 import { ApiKeysSettings } from '@/components/settings/api-keys-settings';
 import { TelegramSettings } from '@/components/settings/telegram-settings';
+import { AppSettings } from '@/components/settings/app-settings';
 import {
   resolveSection,
   type SettingsSection,
@@ -82,6 +83,7 @@ function SettingsPageInner() {
     profile: <ProfileForm />,
     security: <SecurityPanel />,
     appearance: <AppearancePanel />,
+    app: <AppSettings />,
     company: <CompanySettings />,
     members: <MembersTab />,
     roles: <RolesSettings />,

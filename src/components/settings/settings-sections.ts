@@ -18,6 +18,7 @@ import {
   Megaphone,
   FileSpreadsheet,
   Send,
+  Smartphone,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -34,6 +35,7 @@ export const SETTINGS_SECTIONS = [
   'profile',
   'security',
   'appearance',
+  'app',
   'company',
   'members',
   'roles',
@@ -68,6 +70,7 @@ export const SECTION_META: Record<SettingsSection, SectionMeta> = {
   profile: { id: 'profile', label: 'Your profile', icon: User, group: 'account' },
   security: { id: 'security', label: 'Login & security', icon: Shield, group: 'account' },
   appearance: { id: 'appearance', label: 'Appearance', icon: Palette, group: 'account' },
+  app: { id: 'app', label: 'App & install', icon: Smartphone, group: 'account' },
   company: { id: 'company', label: 'Company', icon: Building2, group: 'account' },
   members: { id: 'members', label: 'Team members', icon: UsersRound, group: 'workspace' },
   roles: { id: 'roles', label: 'Roles & permissions', icon: UserCog, group: 'workspace' },

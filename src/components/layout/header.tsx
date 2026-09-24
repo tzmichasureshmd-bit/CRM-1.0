@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
-import { LogOut, Menu, Settings as SettingsIcon, User, Palette } from "lucide-react";
+import { LogOut, Menu, Settings as SettingsIcon, User, Palette, Download } from "lucide-react";
 import { useState } from "react";
 import {
   Avatar,
@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ModeToggle } from "@/components/layout/mode-toggle";
 import { ThemePanel } from "@/components/layout/theme-panel";
+import { usePwaInstall } from "@/hooks/use-pwa-install";
 
 const pageTitles: Record<string, string> = {
   "/dashboard": "dashboard",
@@ -70,6 +71,7 @@ export function Header({ onOpenSidebar }: HeaderProps) {
   const t = useTranslations("Header");
   const pathname = usePathname();
   const { profile, signOut } = useAuth();
+  const { canInstall, isStandalone, install } = usePwaInstall();
   const titleKey = getPageTitleKey(pathname);
   const [themePanelOpen, setThemePanelOpen] = useState(false);
 
@@ -168,6 +170,17 @@ export function Header({ onOpenSidebar }: HeaderProps) {
             <SettingsIcon className="size-4" />
             {t("menuSettings")}
           </DropdownMenuItem>
+          {canInstall && !isStandalone ? (
+            <DropdownMenuItem
+              onClick={() => {
+                void install();
+              }}
+              className="text-popover-foreground focus:bg-accent focus:text-accent-foreground"
+            >
+              <Download className="size-4" />
+              {t("menuInstallApp")}
+            </DropdownMenuItem>
+          ) : null}
           <DropdownMenuSeparator className="bg-border" />
           <DropdownMenuItem
             onClick={signOut}

@@ -6,6 +6,7 @@ import Script from "next/script";
 import "./globals.css";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { ThemedToaster } from "@/components/themed-toaster";
+import { PwaBoot } from "@/components/pwa/pwa-boot";
 import {
   DEFAULT_MODE,
   DEFAULT_THEME,
@@ -21,6 +22,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
+  applicationName: "Tzmicha CRM",
   title: {
     default: "WhatsApp CRM | Manage Leads, Conversations & Sales | TZMICHA IT SOLUTIONS",
     template: "%s | TZMICHA IT SOLUTIONS",
@@ -57,7 +59,17 @@ export const metadata: Metadata = {
     follow: false,
   },
   icons: {
-    icon: [{ url: "/icon" }],
+    icon: [
+      { url: "/icon" },
+      { url: "/icons/icon-192x192.png", type: "image/png", sizes: "192x192" },
+      { url: "/icons/icon-512x512.png", type: "image/png", sizes: "512x512" },
+    ],
+    apple: [{ url: "/icons/apple-touch-icon.png", type: "image/png", sizes: "180x180" }],
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Tzmicha CRM",
   },
   formatDetection: {
     email: false,
@@ -138,6 +150,7 @@ export default async function RootLayout({
           <ThemeProvider>
             {children}
             <ThemedToaster />
+            <PwaBoot />
           </ThemeProvider>
         </NextIntlClientProvider>
       </body>

@@ -106,7 +106,8 @@
     "defaultAvatar": "Avatar",
     "menuProfile": "Profile",
     "menuSettings": "Settings",
-    "menuSignOut": "Sign out"
+    "menuSignOut": "Sign out",
+    "menuInstallApp": "Install app"
   },
   "Crm": {
     "page": {
@@ -2468,6 +2469,7 @@
       "profile": "Your profile",
       "security": "Login & security",
       "appearance": "Appearance",
+      "app": "App & install",
       "company": "Company",
       "members": "Team members",
       "roles": "Roles & permissions",
@@ -2487,6 +2489,24 @@
     "groups": {
       "account": "Account",
       "workspace": "Workspace"
+    },
+    "app": {
+      "title": "App & install",
+      "description": "Install Tzmicha CRM on this device so it launches like a native app, and review how the app behaves today.",
+      "installCardDesc": "WhatsApp and Social Media CRM for your team. Installed apps open in their own window and get automatic updates.",
+      "installButton": "Install Tzmicha CRM",
+      "installing": "Installing…",
+      "installed": "Installed",
+      "iosTitle": "Install on iPhone or iPad",
+      "iosHint": "Tap the Share button in your browser, then choose Add to Home Screen. Tzmicha CRM will open in its own window.",
+      "notInstallable": "Installing isn't available in this browser just yet. You can usually install the app from your browser's menu (Chrome or Edge: menu → Install app).",
+      "offlineTitle": "Offline behavior",
+      "offlineDesc": "Tzmicha CRM is online-first. If your connection drops you'll see a clear offline screen, and back online nothing is lost — the app never stores or queues your messages offline.",
+      "privacyTitle": "Privacy & data",
+      "privacyDesc": "The app never caches private data. Messages, contacts, authentication sessions and API responses stay network-only, so each company's data stays isolated.",
+      "updateTitle": "New version available",
+      "updateDesc": "Tzmicha CRM has been updated.",
+      "updateAction": "Reload"
     },
     "profile": {
       "title": "Your profile",
