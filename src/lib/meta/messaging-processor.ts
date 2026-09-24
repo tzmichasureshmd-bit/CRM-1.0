@@ -103,6 +103,8 @@ async function processMessagingEvent(event: MessengerWebhookMessagingEvent) {
     return;
   }
 
+  console.log('[messaging] recipient id', recipientId);
+
   const admin = supabaseAdmin();
 
   // ---- Resolve the connection (tenant) by recipient.id ----------
@@ -112,27 +114,39 @@ async function processMessagingEvent(event: MessengerWebhookMessagingEvent) {
     .eq('status', 'active');
 
   if (connError || !conns || conns.length === 0) {
-    console.error(`[messaging] no connections stored for recipient ${recipientId}`);
+    console.error(`[messaging] CONNECTION_NOT_FOUND platform=unknown recipientId=${recipientId}`);
     return;
   }
-  const conn: ChannelConnection | null =
-    (conns as ChannelConnection[]).find(
-      (c) => c.platform === 'facebook' && c.page_id === recipientId,
-    ) ??
-    ((conns as ChannelConnection[]).find(
-      (c) => c.platform === 'instagram' && c.instagram_account_id === recipientId,
-    ) ??
-      null);
+
+  // Instagram: require instagram_account_id to be non-null and match.
+  // Facebook: match by page_id.
+  const fbConn = (conns as ChannelConnection[]).find(
+    (c) => c.platform === 'facebook' && c.page_id === recipientId,
+  );
+  const igConn = (conns as ChannelConnection[]).find(
+    (c) =>
+      c.platform === 'instagram' &&
+      c.instagram_account_id != null &&
+      c.instagram_account_id === recipientId,
+  );
+  const conn: ChannelConnection | null = fbConn ?? igConn ?? null;
 
   if (!conn) {
-    console.warn(
-      `[messaging] recipient ${recipientId} does not match any connection; skipping`,
+    console.error(
+      `[messaging] CONNECTION_NOT_FOUND platform=unknown recipientId=${recipientId}`,
     );
     return;
   }
 
   const platform: 'facebook' | 'instagram' =
     conn.platform === 'instagram' ? 'instagram' : 'facebook';
+
+  console.log('[messaging] platform detected', platform);
+  console.log('[messaging] connection matched id=', conn.id);
+  console.log('[messaging] connection platform', conn.platform);
+  if (platform === 'instagram') {
+    console.log('[messaging] instagram_account_id', conn.instagram_account_id);
+  }
   const accountId = conn.account_id;
   const userId = conn.user_id;
 
@@ -211,6 +225,8 @@ async function processMessagingEvent(event: MessengerWebhookMessagingEvent) {
     return;
   }
 
+  console.log('[messaging] message id', mid);
+
   // ---- Parse content ----------------------------------------------
   const { contentText, mediaUrl } = await resolveInboundContent(
     message,
@@ -262,6 +278,8 @@ async function processMessagingEvent(event: MessengerWebhookMessagingEvent) {
     console.error('[messaging] error inserting message:', msgError);
     return;
   }
+
+  console.log('[messaging] message persisted mid=', mid);
 
   // Contact recency + conversation state (lifted from broadcast/lead
   // scoring signals — same updates the WhatsApp webhook makes).

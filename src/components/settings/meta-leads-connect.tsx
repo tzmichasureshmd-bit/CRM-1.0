@@ -151,9 +151,15 @@ export function MetaLeadsConnect() {
     }
   };
 
-  const facebookPages = connections.filter((c) => c.platform === "facebook");
+  const facebookPages = connections.filter(
+    (c) => c.platform === "facebook" && !!c.page_id && c.status === "active",
+  );
   const instagramAccounts = connections.filter(
-    (c) => c.platform === "instagram" && c.instagram_username,
+    (c) =>
+      c.platform === "instagram" &&
+      c.status === "active" &&
+      !!c.instagram_account_id &&
+      !!c.instagram_username,
   );
 
   return (
@@ -174,24 +180,24 @@ export function MetaLeadsConnect() {
         <Badge
           variant="outline"
           className={
-            connections.length > 0
+            facebookPages.length > 0 || instagramAccounts.length > 0
               ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
               : "border-border text-muted-foreground"
           }
         >
-          {connections.length > 0 ? "Connected" : "Not connected"}
+          {facebookPages.length > 0 || instagramAccounts.length > 0 ? "Connected" : "Not connected"}
         </Badge>
-        {connections.length > 0 && (
+        {(facebookPages.length > 0 || instagramAccounts.length > 0) && (
           <Badge
             variant="outline"
             className={
-              connections.some((c) => c.webhook_status === "active")
+              [...facebookPages, ...instagramAccounts].some((c) => c.webhook_status === "active")
                 ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
                 : "border-amber-500/40 bg-amber-500/10 text-amber-400"
             }
           >
             Webhook:
-            {connections.some((c) => c.webhook_status === "active")
+            {[...facebookPages, ...instagramAccounts].some((c) => c.webhook_status === "active")
               ? " Active"
               : " Pending"}
           </Badge>
@@ -214,7 +220,7 @@ export function MetaLeadsConnect() {
         <Button
           variant="outline"
           onClick={() => void syncNow()}
-          disabled={syncing || connections.length === 0}
+          disabled={syncing || (facebookPages.length === 0 && instagramAccounts.length === 0)}
           className="border-border text-muted-foreground hover:bg-muted"
           title="Pull recent leads from Meta manually (idempotent — already-synced leads are skipped)"
         >
@@ -277,7 +283,7 @@ export function MetaLeadsConnect() {
             </div>
           )}
 
-          {connections.length === 0 && !loading && (
+          {facebookPages.length === 0 && instagramAccounts.length === 0 && !loading && (
             <p className="text-sm text-muted-foreground">
               No Meta pages connected yet. Click “Connect Facebook Account”
               to get started.
