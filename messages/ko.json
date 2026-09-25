@@ -97,7 +97,24 @@
     "menuProfile": "프로필",
     "menuSettings": "설정",
     "menuSignOut": "로그아웃",
-    "menuInstallApp": "앱 설치"
+    "menuInstallApp": "앱 설치",
+    "headerInstallApp": "앱 설치"
+  },
+  "InstallApp": {
+    "title": "Tzmicha CRM 설치",
+    "description": "Tzmicha CRM을 기기에서 전용 애플리케이션으로 사용하세요.",
+    "androidTitle": "Android 앱",
+    "androidDescription": "Android 휴대폰에 Tzmicha CRM을 설치하세요.",
+    "androidAction": "APK 다운로드",
+    "windowsTitle": "Windows 앱",
+    "windowsDescription": "Windows PC에 Tzmicha CRM을 설치하세요.",
+    "windowsAction": "Windows용 다운로드",
+    "checking": "다운로드 확인 중…",
+    "ready": "다운로드 가능",
+    "unavailable": "준비 중",
+    "unavailableHint": "릴리스가 게시되면 설치 프로그램이 여기에 표시됩니다.",
+    "webFallback": "브라우저가 더 편하신가요?",
+    "webFallbackLink": "웹 앱 설정"
   },
   "Crm": {
     "page": {

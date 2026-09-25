@@ -17,8 +17,16 @@
 /.next/
 /out/
 
-# production
+# production (Next.js static output)
 /build
+# keep the electron-builder buildResources icon
+!/build/icon.png
+
+# native apps
+/dist/native/
+# real installable artifacts live in public/downloads (see NATIVE_APPS.md)
+/public/downloads/*.apk
+/public/downloads/*.exe
 
 # misc
 .DS_Store

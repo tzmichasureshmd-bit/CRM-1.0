@@ -107,7 +107,24 @@
     "menuProfile": "Profile",
     "menuSettings": "Settings",
     "menuSignOut": "Sign out",
-    "menuInstallApp": "Install app"
+    "menuInstallApp": "Install app",
+    "headerInstallApp": "Install App"
+  },
+  "InstallApp": {
+    "title": "Install Tzmicha CRM",
+    "description": "Use Tzmicha CRM as a dedicated application on your device.",
+    "androidTitle": "Android App",
+    "androidDescription": "Install Tzmicha CRM on your Android phone.",
+    "androidAction": "Download APK",
+    "windowsTitle": "Windows App",
+    "windowsDescription": "Install Tzmicha CRM on your Windows PC.",
+    "windowsAction": "Download for Windows",
+    "checking": "Checking downloads…",
+    "ready": "Ready",
+    "unavailable": "Coming soon",
+    "unavailableHint": "The installer appears here once the release is published.",
+    "webFallback": "Prefer the browser?",
+    "webFallbackLink": "Web app settings"
   },
   "Crm": {
     "page": {
@@ -410,10 +427,10 @@
       "unassign": "Unassign",
       "noTeammates": "No teammates available",
       "me": " (me)",
-       "noMessagesYet": "No messages yet",
-       "searchMessages": "Search messages",
-       "noSearchResults": "No matching messages found",
-       "noSearchResultsDesc": "No messages contain \"{query}\". Try a different keyword.",
+      "noMessagesYet": "No messages yet",
+      "searchMessages": "Search messages",
+      "noSearchResults": "No matching messages found",
+      "noSearchResultsDesc": "No messages contain \"{query}\". Try a different keyword.",
       "selectConversation": "Select a conversation",
       "selectConversationHint": "Choose a conversation from the left to start messaging",
       "sendTemplateHint": "Send a template to start a new conversation.",
@@ -530,39 +547,39 @@
       "cancel": "Cancel",
       "send": "Send template"
     },
-     "sidebar": {
-       "contactInfo": "Contact info",
-       "tags": "Tags",
-       "notes": "Notes",
-       "deals": "Deals",
-       "noTags": "No tags",
-       "noDeals": "No deals",
-       "documents": "Documents",
-       "noDocuments": "No documents shared",
-       "assignedTo": "Assigned to",
-       "addNotePlaceholder": "Add a note...",
-       "leadStatus": "Lead status",
-       "followUps": "Follow-ups",
-       "noFollowUps": "No follow-ups scheduled",
-        "addFollowUpPlaceholder": "Add a follow-up...",
-        "dueDate": "Due date",
-        "markComplete": "Mark complete",
-       "markPending": "Mark pending",
-       "deleteFollowUp": "Delete follow-up",
-       "createDeal": "Create Deal",
-       "dealTitlePlaceholder": "Deal title",
-       "dealValuePlaceholder": "Value",
-       "cancel": "Cancel",
-       "toastDealCreated": "Deal created",
-        "toastDealFailed": "Failed to create deal",
-         "addTag": "Add tag",
-         "removeTag": "Remove tag",
-         "noAvailableTags": "No tags available",
-         "editContact": "Edit contact",
-         "saveChanges": "Save",
-         "toastContactUpdated": "Contact updated",
-         "toastContactUpdateFailed": "Failed to update contact"
-       },
+    "sidebar": {
+      "contactInfo": "Contact info",
+      "tags": "Tags",
+      "notes": "Notes",
+      "deals": "Deals",
+      "noTags": "No tags",
+      "noDeals": "No deals",
+      "documents": "Documents",
+      "noDocuments": "No documents shared",
+      "assignedTo": "Assigned to",
+      "addNotePlaceholder": "Add a note...",
+      "leadStatus": "Lead status",
+      "followUps": "Follow-ups",
+      "noFollowUps": "No follow-ups scheduled",
+      "addFollowUpPlaceholder": "Add a follow-up...",
+      "dueDate": "Due date",
+      "markComplete": "Mark complete",
+      "markPending": "Mark pending",
+      "deleteFollowUp": "Delete follow-up",
+      "createDeal": "Create Deal",
+      "dealTitlePlaceholder": "Deal title",
+      "dealValuePlaceholder": "Value",
+      "cancel": "Cancel",
+      "toastDealCreated": "Deal created",
+      "toastDealFailed": "Failed to create deal",
+      "addTag": "Add tag",
+      "removeTag": "Remove tag",
+      "noAvailableTags": "No tags available",
+      "editContact": "Edit contact",
+      "saveChanges": "Save",
+      "toastContactUpdated": "Contact updated",
+      "toastContactUpdateFailed": "Failed to update contact"
+    },
     "aiBanner": {
       "pausedTitle": "AI assistant is paused here",
       "activeText": "AI assistant is replying automatically",
@@ -664,9 +681,9 @@
         "tags": "Tags",
         "followups": "Follow-ups",
         "overview": "360",
-      "noTags": "No tags",
-      "noDeals": "No deals",
-      "addNotePlaceholder": "Add a note..."
+        "noTags": "No tags",
+        "noDeals": "No deals",
+        "addNotePlaceholder": "Add a note..."
       },
       "leadScore": {
         "title": "AI Lead Score",
@@ -2200,13 +2217,13 @@
       "deleteLocallyAria": "Delete template locally",
       "deleteMetaLocallyTitle": "Delete from Meta and locally",
       "deleteLocallyTitle": "Delete locally",
-      
+
       "dialogEditTitle": "Edit Message Template",
       "dialogNewTitle": "New Message Template",
       "dialogEditDesc": "Save your changes to re-submit to Meta. Status will flip back to PENDING during review.",
       "dialogNewDesc": "Build a template and submit it to Meta for approval. Once approved, you can use it in broadcasts and the inbox.",
       "authWarning": "AUTHENTICATION templates have a fixed body + OTP button shape that needs a different builder. Create them in Meta WhatsApp Manager for now and use <bold>Sync from Meta</bold> to bring them in.",
-      
+
       "templateName": "Template Name",
       "namePlaceholder": "e.g. order_confirmation",
       "nameFixed": "Name is fixed once a template exists on Meta — create a new template to change it.",
@@ -2215,7 +2232,7 @@
       "language": "Language",
       "langFixed": "Language is fixed once a template exists on Meta.",
       "langHint": "Must match the exact code on Meta — <code>en_US</code> and <code>en</code> are distinct.",
-      
+
       "header": "Header",
       "headerNone": "None",
       "headerText": "Text",
@@ -2225,7 +2242,7 @@
       "headerTextPlaceholder": "Header text (max 60 chars, optional {{1}})",
       "headerSampleAria": "Sample value for header variable",
       "headerSamplePlaceholder": "Sample value for {{1}} (required for Meta review)",
-      
+
       "uploadImage": "Upload image",
       "uploadHint": "JPEG or PNG, ≤5 MB",
       "mediaUrlPlaceholder": "https://… (or paste a public {format} link)",
@@ -2233,17 +2250,17 @@
       "mediaHint": "Must be a publicly accessible HTTPS link. Meta fetches it once during review, so it needs to stay live for ~24 hrs.",
       "videoHint": " Recommended: MP4 / 3GPP, ≤16 MB, ≤60 seconds.",
       "documentHint": " Recommended: PDF, ≤100 MB.",
-      
+
       "bodyText": "Body Text",
       "bodyPlaceholder": "Hello {{1}}, your order {{2}} is confirmed.",
       "bodyHint": "Use {{1}}, {{2}} for variables (must be contiguous starting at {{1}}).",
       "sampleValues": "Sample values (Meta uses these to review your template)",
       "sampleAria": "Sample value for body variable {var}",
       "samplePlaceholder": "Sample for {var}",
-      
+
       "footer": "Footer (optional)",
       "footerPlaceholder": "Optional footer text (max 60 chars)",
-      
+
       "buttons": "Buttons (optional)",
       "addButton": "Add Button",
       "buttonsLimit": "Up to {max} buttons. QUICK_REPLY buttons must come before URL / phone / copy-code buttons.",
@@ -2256,19 +2273,19 @@
       "urlSamplePlaceholder": "Example value for {{1}} (required when URL has a variable)",
       "phonePlaceholder": "+15551234567",
       "codePlaceholder": "Example code (e.g. SUMMER20)",
-      
+
       "cancel": "Cancel",
       "saving": "Saving…",
       "submitting": "Submitting…",
       "saveResubmit": "Save & Resubmit",
       "submitApproval": "Submit for Approval",
-      
+
       "deleteDialogTitle": "Delete template?",
       "deleteMetaDesc": "\"{name}\" will be deleted from Meta and from wacrm. Active broadcasts using this template will start failing on their next send. This can't be undone.",
       "deleteLocalDesc": "\"{name}\" will be deleted from wacrm. It was never submitted to Meta, so no remote cleanup is needed.",
       "deleting": "Deleting…",
       "delete": "Delete",
-      
+
       "toastLoadFailed": "Failed to load templates",
       "toastSubmitFailed": "Failed to submit",
       "toastSubmitEditSuccess": "Edit submitted — Meta typically reviews within 24 hours.",
@@ -2536,7 +2553,7 @@
       "profileSaved": "Profile saved",
       "emailChangeFailed": "Email change failed: {message}",
       "profileSavedEmailCheck": "Profile saved — check your email to confirm the address change",
-      
+
       "passwordTitle": "Password",
       "passwordDesc": "Use at least {min} characters. You will stay signed in on this device after changing it.",
       "currentPassword": "Current password",
@@ -2550,7 +2567,7 @@
       "currentPasswordIncorrect": "Current password is incorrect",
       "passwordUpdateFailed": "Password update failed: {message}",
       "passwordUpdated": "Password updated",
-      
+
       "sessionsTitle": "Active sessions",
       "sessionsDesc": "Sign out of every device where you're logged in — including this one. Useful if you lost a laptop or shared your password.",
       "signOutAll": "Sign out of all devices",
