@@ -20,6 +20,46 @@ import { toast } from "sonner";
 import { WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+// Drag handle between conversation list and message thread
+function ConvListResizeHandle() {
+  const dragging = useRef(false);
+  const startX = useRef(0);
+  const startW = useRef(0);
+
+  const onMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    dragging.current = true;
+    startX.current = e.clientX;
+    const panel = (e.currentTarget as HTMLElement).previousElementSibling as HTMLElement | null;
+    startW.current = panel?.offsetWidth ?? 280;
+
+    const onMove = (ev: MouseEvent) => {
+      if (!dragging.current) return;
+      const delta = ev.clientX - startX.current;
+      const newW = Math.min(400, Math.max(220, startW.current + delta));
+      const panelEl = document.getElementById('conv-list-panel');
+      if (panelEl) panelEl.style.width = `${newW}px`;
+    };
+    const onUp = () => {
+      dragging.current = false;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  return (
+    <div
+      onMouseDown={onMouseDown}
+      className="hidden lg:flex w-1.5 cursor-col-resize items-center justify-center hover:bg-primary/20 active:bg-primary/30 transition-colors group"
+      title="Drag to resize"
+    >
+      <div className="h-8 w-0.5 rounded-full bg-border group-hover:bg-primary/50 transition-colors" />
+    </div>
+  );
+}
+
 // Remembers the agent's show/hide choice for the desktop contact panel
 // across reloads and sessions (device-scoped, like the theme prefs).
 const CONTACT_PANEL_STORAGE_KEY = "wacrm:inbox:contact-panel-open";
@@ -591,14 +631,14 @@ function InboxPageInner() {
       )}
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Left panel: Conversation list.
-            Hidden on mobile when a conversation is selected so the
-            thread can occupy the full width. Always visible on lg+. */}
+        {/* Panel 2: Conversation list — draggable width */}
         <div
+          id="conv-list-panel"
           className={cn(
             "flex h-full flex-1 lg:flex-none",
             hasActiveConv ? "hidden lg:flex" : "flex",
           )}
+          style={{ minWidth: 220, maxWidth: 400 }}
         >
           <ConversationList
             activeConversationId={activeConversation?.id ?? null}
@@ -610,47 +650,42 @@ function InboxPageInner() {
           />
         </div>
 
-        {/* Center panel: Message thread.
-            Hidden on mobile when no conversation is selected so the
-            list can occupy the full width. Always visible on lg+
-            (shows its own empty-state if no thread is picked yet).
+        {/* Drag handle between panel 2 and panel 3 */}
+        <ConvListResizeHandle />
 
-            `min-w-0` is load-bearing: without it, a single wide piece
-            of content inside the thread (long quote preview, very
-            long URL in a message body) forces the flex child past
-            its share and pushes the contact-sidebar panel off-screen
-            on the right. Issue #165. */}
+        {/* Panel 3: Message thread — curved box */}
         <div
           className={cn(
-            "flex h-full min-w-0 flex-1 lg:flex",
+            "flex h-full min-w-0 flex-1 lg:flex p-2",
             hasActiveConv ? "flex" : "hidden lg:flex",
           )}
         >
-          <MessageThread
-            conversation={activeConversation}
-            contact={activeContact}
-            messages={messages}
-            onMessagesLoaded={handleMessagesLoaded}
-            onNewMessage={handleNewMessage}
-            onUpdateMessage={handleUpdateMessage}
-            onStatusChange={handleStatusChange}
-            onAssignChange={handleAssignChange}
-            onBack={handleCloseConversation}
-            resyncToken={resyncToken}
-            onRefresh={handleManualRefresh}
-            contactPanelOpen={contactPanelOpen}
-            onToggleContactPanel={handleToggleContactPanel}
-            onOpenContactDetails={handleOpenContactDetails}
-          />
+          <div className="flex h-full flex-1 min-w-0 min-h-0 flex-col rounded-2xl border border-border shadow-sm overflow-hidden">
+            <MessageThread
+              conversation={activeConversation}
+              contact={activeContact}
+              messages={messages}
+              onMessagesLoaded={handleMessagesLoaded}
+              onNewMessage={handleNewMessage}
+              onUpdateMessage={handleUpdateMessage}
+              onStatusChange={handleStatusChange}
+              onAssignChange={handleAssignChange}
+              onBack={handleCloseConversation}
+              resyncToken={resyncToken}
+              onRefresh={handleManualRefresh}
+              contactPanelOpen={contactPanelOpen}
+              onToggleContactPanel={handleToggleContactPanel}
+              onOpenContactDetails={handleOpenContactDetails}
+            />
+          </div>
         </div>
 
-        {/* Right panel: Contact sidebar — desktop only, and only when the
-            agent hasn't collapsed it via the thread-header toggle (#258).
-            On mobile it's always hidden (the `lg:block` below), so the
-            toggle — which is itself desktop-only — never affects it. */}
+        {/* Panel 4: Contact sidebar — open card box */}
         {contactPanelOpen && (
-          <div className="hidden lg:block">
-            <ContactSidebar contact={activeContact} conversation={activeConversation} onContactUpdated={() => setResyncToken((n) => n + 1)} />
+          <div className="hidden lg:flex h-full py-2 pr-2">
+            <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
+              <ContactSidebar contact={activeContact} conversation={activeConversation} onContactUpdated={() => setResyncToken((n) => n + 1)} />
+            </div>
           </div>
         )}
       </div>

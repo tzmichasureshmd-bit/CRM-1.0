@@ -37,14 +37,11 @@ export function QuickActions() {
             <Link
               key={a.href}
               href={a.href}
-              className="group flex flex-col items-center gap-2.5 rounded-xl border border-transparent bg-muted/30 px-3 py-4 text-center transition-all duration-200 hover:border-border hover:bg-muted/60 hover:shadow-sm"
+              title={t(a.labelKey as string)}
+              className="group flex flex-col items-center justify-center rounded-xl border border-transparent bg-muted/30 px-3 py-4 transition-all duration-200 hover:border-border hover:bg-muted/60 hover:shadow-sm"
             >
               <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${a.bg} ${a.tint} transition-all duration-200 group-hover:scale-110 group-hover:shadow-sm`}>
                 <Icon className="h-5 w-5" />
-              </div>
-              <div>
-                <span className="block text-sm font-medium text-foreground">{t(a.labelKey as string)}</span>
-                <span className="mt-0.5 block text-[11px] text-muted-foreground leading-tight">{t(a.descKey as string)}</span>
               </div>
             </Link>
           )

@@ -74,12 +74,20 @@ export interface RecentConversation {
   last_message_text?: string
   last_message_at?: string
   unread_count: number
+  platform?: string | null
   contact: {
     id: string
     name?: string | null
     phone: string
     avatar_url?: string | null
   } | null
+}
+
+export interface PlatformChannelCounts {
+  whatsapp: number
+  instagram: number
+  facebook: number
+  telegram: number
 }
 
 // --- 7. Sales overview (dashboard "Sales Overview" section) -----------

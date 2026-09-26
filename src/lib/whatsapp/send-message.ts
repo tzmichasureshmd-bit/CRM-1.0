@@ -46,6 +46,8 @@ import type { MessageTemplate } from '@/types';
 import { isMessageTemplate } from '@/lib/whatsapp/template-row-guard';
 import { sendMessagingToConversation } from '@/lib/meta/messaging-send';
 import { sendTelegramMessage } from '@/lib/telegram/telegram-send';
+import { sendXMessage } from '@/lib/x/x-send';
+import { sendThreadsMessage } from '@/lib/threads/threads-send';
 
 export const MEDIA_KINDS = ['image', 'video', 'document', 'audio'] as const;
 export const VALID_MESSAGE_TYPES = [
@@ -240,7 +242,7 @@ export async function sendMessageToConversation(
   // this branch is WhatsApp-only: phone validation, whatsapp_config,
   // Cloud API send with phone-variant retry.
   const platform =
-    (conversation.platform as 'whatsapp' | 'facebook' | 'instagram' | 'telegram' | null) ??
+    (conversation.platform as 'whatsapp' | 'facebook' | 'instagram' | 'telegram' | 'x' | 'threads' | null) ??
     'whatsapp';
 
   // Telegram: route through Telegram Bot API
@@ -252,6 +254,28 @@ export async function sendMessageToConversation(
       { messageType, contentText, mediaUrl, filename, replyToMessageId },
     );
     return { messageId, whatsappMessageId: telegramMessageId };
+  }
+
+  // X (Twitter): route through X API v2 — tweet reply (text only on Free tier)
+  if (platform === 'x') {
+    const { messageId, externalMessageId } = await sendXMessage(
+      db,
+      accountId,
+      conversation,
+      { messageType, contentText },
+    );
+    return { messageId, whatsappMessageId: externalMessageId };
+  }
+
+  // Threads: route through Threads API — reply to post
+  if (platform === 'threads') {
+    const { messageId, externalMessageId } = await sendThreadsMessage(
+      db,
+      accountId,
+      conversation,
+      { messageType, contentText },
+    );
+    return { messageId, whatsappMessageId: externalMessageId };
   }
 
   // Messenger / Instagram: route through Meta Graph API

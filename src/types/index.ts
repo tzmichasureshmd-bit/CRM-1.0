@@ -238,7 +238,7 @@ export interface FollowUp {
 }
 
 export type ConversationStatus = 'open' | 'pending' | 'closed';
-export type ConversationPlatform = 'whatsapp' | 'facebook' | 'instagram' | 'telegram';
+export type ConversationPlatform = 'whatsapp' | 'facebook' | 'instagram' | 'telegram' | 'threads' | 'x';
 export type LeadStatus = 'new' | 'contacted' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost';
 
 export interface Conversation {

@@ -57,13 +57,26 @@ export interface IntegrationOverviewPayload {
     whatsapp: number;
     google_form: number;
   };
+  threads: {
+    connected: boolean;
+    username: string | null;
+    name: string | null;
+    connectedAt: string | null;
+  };
+  x: {
+    connected: boolean;
+    username: string | null;
+    name: string | null;
+    connectedAt: string | null;
+    accessLevel: string | null;
+  };
 }
 
 export async function GET() {
   try {
     const ctx = await requireRole("viewer");
 
-    const [whatsappRes, metaRes, emailRes, googleRes, webhookRes, metaConnRes, apiKeyRes] =
+    const [whatsappRes, metaRes, emailRes, googleRes, webhookRes, metaConnRes, apiKeyRes, threadsRes, xRes] =
       await Promise.all([
         ctx.supabase
           .from("whatsapp_config")
@@ -100,6 +113,18 @@ export async function GET() {
         ctx.supabase
           .from("api_keys")
           .select("id, is_active", { count: "exact", head: false }),
+        ctx.supabase
+          .from("channel_integrations")
+          .select("status, account_name, external_account_id, connected_at, metadata")
+          .eq("account_id", ctx.accountId)
+          .eq("platform", "threads")
+          .maybeSingle(),
+        ctx.supabase
+          .from("channel_integrations")
+          .select("status, account_name, external_account_id, connected_at, metadata")
+          .eq("account_id", ctx.accountId)
+          .eq("platform", "x")
+          .maybeSingle(),
       ]);
 
     const whatsappRows = whatsappRes.data ?? [];
@@ -202,6 +227,29 @@ export async function GET() {
             .length,
       },
       leadCounts,
+      threads: (() => {
+        const row = threadsRes.data as Record<string, unknown> | null;
+        if (!row || row.status !== "connected") return { connected: false, username: null, name: null, connectedAt: null };
+        const meta = (row.metadata ?? {}) as Record<string, unknown>;
+        return {
+          connected: true,
+          username: (meta.username as string | null) ?? null,
+          name: (row.account_name as string | null) ?? null,
+          connectedAt: (row.connected_at as string | null) ?? null,
+        };
+      })(),
+      x: (() => {
+        const row = xRes.data as Record<string, unknown> | null;
+        if (!row || row.status !== "connected") return { connected: false, username: null, name: null, connectedAt: null, accessLevel: null };
+        const meta = (row.metadata ?? {}) as Record<string, unknown>;
+        return {
+          connected: true,
+          username: (meta.username as string | null) ?? null,
+          name: (row.account_name as string | null) ?? null,
+          connectedAt: (row.connected_at as string | null) ?? null,
+          accessLevel: (meta.access_level as string | null) ?? "free",
+        };
+      })(),
     };
 
     return NextResponse.json(payload);

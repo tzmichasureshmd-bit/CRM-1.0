@@ -36,6 +36,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LandingNav } from "@/components/landing/landing-nav";
+import { LandingHero } from "@/components/landing/landing-hero";
 import { LandingMarquee } from "@/components/landing/landing-marquee";
 import { LandingReveal } from "@/components/landing/landing-reveal";
 
@@ -192,120 +193,12 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-background text-foreground font-sans">
       {/* ====== NAVIGATION ====== */}
-      <LandingNav />
+      <div className="relative">
+        <LandingNav />
 
-      {/* ====== HERO ====== */}
-      <section className="relative overflow-hidden">
-        {/* Background decoration */}
-        <div className="absolute inset-0 landing-dots-bg opacity-60" />
-        <div className="absolute left-1/2 top-0 -z-10 h-[600px] w-[900px] -translate-x-1/2 -translate-y-1/4 rounded-full bg-primary/5 blur-3xl landing-glow" />
-
-        <div className="relative mx-auto max-w-7xl px-4 pb-20 pt-16 sm:px-6 sm:pt-24 lg:px-8 lg:pt-32">
-          <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
-            {/* Left: Copy */}
-            <div className="text-center lg:text-left">
-              <Badge variant="secondary" className="mb-5 text-xs font-medium">
-                TZMICHA IT SOLUTIONS
-              </Badge>
-              <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
-                Turn Conversations
-                <br />
-                Into{" "}
-                <span className="landing-gradient-text">Customers</span>
-              </h1>
-              <p className="mx-auto mt-6 max-w-lg text-lg text-muted-foreground lg:mx-0">
-                Manage WhatsApp conversations, leads, contacts, campaigns and automation
-                from one powerful CRM.
-              </p>
-              <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row lg:justify-start">
-                <Link href="/signup">
-                  <Button size="lg" className="px-7 landing-btn-lift">
-                    Get Started
-                    <ArrowRight className="size-4" />
-                  </Button>
-                </Link>
-                <a href="#product">
-                  <Button variant="outline" size="lg" className="px-7">
-                    See the Product
-                  </Button>
-                </a>
-              </div>
-              <p className="mt-5 text-xs text-muted-foreground">
-                Trusted by growing businesses across India
-              </p>
-            </div>
-
-            {/* Right: Product screenshot with floating cards */}
-            <div className="landing-perspective hidden lg:block">
-              <div className="relative">
-                {/* Glow behind image */}
-                <div className="absolute -inset-4 rounded-2xl bg-primary/10 blur-2xl landing-glow" />
-
-                {/* Main screenshot */}
-                <div className="relative landing-3d-tilt overflow-hidden rounded-2xl border border-border/60 bg-card shadow-2xl shadow-black/10">
-                  <Image
-                    src="/crm/crm1.jpeg"
-                    alt="WhatsApp CRM Dashboard"
-                    width={800}
-                    height={500}
-                    className="h-auto w-full"
-                    priority
-                  />
-                </div>
-
-                {/* Floating notification cards */}
-                {heroFloatCards.map((card, i) => (
-                  <div
-                    key={card.text}
-                    className={`absolute -right-2 flex items-center gap-2.5 rounded-xl border border-border/60 bg-card/95 px-3.5 py-2.5 shadow-lg backdrop-blur-sm landing-float-card ${card.delay}`}
-                    style={{
-                      top: `${15 + i * 20}%`,
-                      right: i % 2 === 0 ? "-12px" : "-8px",
-                    }}
-                  >
-                    <div className={`flex h-8 w-8 items-center justify-center rounded-lg bg-background ${card.color}`}>
-                      <card.icon className="h-4 w-4" />
-                    </div>
-                    <span className="whitespace-nowrap text-xs font-medium">{card.text}</span>
-                  </div>
-                ))}
-
-                {/* Floating marketing words */}
-                <div
-                  className="pointer-events-none absolute left-[-8px] top-[2%] text-sm font-bold uppercase tracking-[0.2em] text-primary/50 landing-float-word"
-                  style={{ transform: "rotate(-8deg)" }}
-                >
-                  LEADS
-                </div>
-                <div
-                  className="pointer-events-none absolute right-[-6px] top-[58%] text-sm font-bold uppercase tracking-[0.2em] text-foreground/40 landing-float-word"
-                  style={{ animationDelay: "1.2s", transform: "rotate(6deg)" }}
-                >
-                  AUTOMATION
-                </div>
-                <div
-                  className="pointer-events-none absolute bottom-[-8px] left-[8%] text-sm font-bold uppercase tracking-[0.2em] text-blue-500/50 landing-float-word"
-                  style={{ animationDelay: "2.4s", transform: "rotate(3deg)" }}
-                >
-                  GROWTH
-                </div>
-                <div
-                  className="pointer-events-none absolute left-[-20px] top-[34%] text-sm font-bold uppercase tracking-[0.2em] text-pink-500/50 landing-float-word"
-                  style={{ animationDelay: "3.6s", transform: "rotate(-4deg)" }}
-                >
-                  AI
-                </div>
-                <div
-                  className="pointer-events-none absolute right-[4px] top-[2%] text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground/40 landing-float-word"
-                  style={{ animationDelay: "1.8s", transform: "rotate(-6deg)" }}
-                >
-                  CONVERSATIONS
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+        {/* ====== HERO ====== */}
+        <LandingHero />
+      </div>
 
       {/* ====== TRUST STRIP ====== */}
       <section className="border-y border-border/40 bg-muted/20">
@@ -850,60 +743,60 @@ export default function LandingPage() {
       </section>
 
       {/* ====== FOOTER ====== */}
-      <footer className="border-t border-border bg-muted/20">
-        <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-          <div className="grid gap-8 sm:grid-cols-2 md:grid-cols-5">
-            <div className="sm:col-span-2 md:col-span-1">
-              <Link href="/" className="mb-3 flex items-center gap-2 font-bold">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                  <MessageSquare className="h-3.5 w-3.5" />
-                </div>
-                <span className="text-sm">TZMICHA IT SOLUTIONS</span>
-              </Link>
-              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                Powering smarter customer conversations.
-              </p>
-            </div>
-
+      <footer className="border-t border-white/10 bg-[#111]">
+        <div className="mx-auto max-w-7xl px-4 pt-14 pb-0 sm:px-6 lg:px-8">
+          {/* Link columns */}
+          <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
             <div>
-              <h4 className="mb-3 text-sm font-semibold">Product</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><a href="#features" className="transition-colors hover:text-foreground">Features</a></li>
-                <li><a href="#pricing" className="transition-colors hover:text-foreground">Pricing</a></li>
-                <li><a href="#product" className="transition-colors hover:text-foreground">Product</a></li>
-                <li><a href="#leads" className="transition-colors hover:text-foreground">Lead Management</a></li>
+              <h4 className="mb-4 text-xs font-semibold uppercase tracking-widest text-white/40">Product</h4>
+              <ul className="space-y-3 text-sm text-white/60">
+                <li><a href="#features" className="transition-colors hover:text-white">Features</a></li>
+                <li><a href="#pricing" className="transition-colors hover:text-white">Pricing</a></li>
+                <li><a href="#product" className="transition-colors hover:text-white">Product</a></li>
+                <li><a href="#leads" className="transition-colors hover:text-white">Lead Management</a></li>
               </ul>
             </div>
 
             <div>
-              <h4 className="mb-3 text-sm font-semibold">Company</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><a href="mailto:support@tzmicha.com" className="transition-colors hover:text-foreground">Contact</a></li>
-                <li><a href="mailto:support@tzmicha.com" className="transition-colors hover:text-foreground">Support</a></li>
+              <h4 className="mb-4 text-xs font-semibold uppercase tracking-widest text-white/40">Company</h4>
+              <ul className="space-y-3 text-sm text-white/60">
+                <li><a href="mailto:support@tzmicha.com" className="transition-colors hover:text-white">Contact</a></li>
+                <li><a href="mailto:support@tzmicha.com" className="transition-colors hover:text-white">Support</a></li>
               </ul>
             </div>
 
             <div>
-              <h4 className="mb-3 text-sm font-semibold">Legal</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><Link href="/privacy" className="transition-colors hover:text-foreground">Privacy Policy</Link></li>
-                <li><Link href="/terms" className="transition-colors hover:text-foreground">Terms of Service</Link></li>
-                <li><Link href="/refund" className="transition-colors hover:text-foreground">Refund Policy</Link></li>
+              <h4 className="mb-4 text-xs font-semibold uppercase tracking-widest text-white/40">Legal</h4>
+              <ul className="space-y-3 text-sm text-white/60">
+                <li><Link href="/privacy" className="transition-colors hover:text-white">Privacy Policy</Link></li>
+                <li><Link href="/terms" className="transition-colors hover:text-white">Terms of Service</Link></li>
+                <li><Link href="/refund" className="transition-colors hover:text-white">Refund Policy</Link></li>
               </ul>
             </div>
 
             <div>
-              <h4 className="mb-3 text-sm font-semibold">Resources</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><Link href="/login" className="transition-colors hover:text-foreground">Login</Link></li>
-                <li><Link href="/signup" className="transition-colors hover:text-foreground">Sign Up</Link></li>
-                <li><Link href="/support" className="transition-colors hover:text-foreground">Help Center</Link></li>
+              <h4 className="mb-4 text-xs font-semibold uppercase tracking-widest text-white/40">Resources</h4>
+              <ul className="space-y-3 text-sm text-white/60">
+                <li><Link href="/login" className="transition-colors hover:text-white">Login</Link></li>
+                <li><Link href="/signup" className="transition-colors hover:text-white">Sign Up</Link></li>
+                <li><Link href="/support" className="transition-colors hover:text-white">Help Center</Link></li>
               </ul>
             </div>
           </div>
 
-          <div className="mt-10 border-t border-border pt-6 text-center text-xs text-muted-foreground">
-            &copy; 2026 TZMICHA IT SOLUTIONS. All rights reserved. | Not affiliated with Meta or WhatsApp.
+          {/* Big brand name — Google-style */}
+          <div className="mt-16 select-none overflow-hidden">
+            <p
+              className="whitespace-nowrap text-center font-extrabold leading-none tracking-tighter text-white"
+              style={{ fontSize: "clamp(2rem, 9vw, 7rem)" }}
+            >
+              TZMICHACRM 2.0
+            </p>
+          </div>
+
+          {/* Bottom bar */}
+          <div className="border-t border-white/10 py-5 text-center text-xs text-white/30">
+            &copy; 2026 TZMICHA IT SOLUTIONS. All rights reserved. &nbsp;|&nbsp; Not affiliated with Meta or WhatsApp.
           </div>
         </div>
       </footer>

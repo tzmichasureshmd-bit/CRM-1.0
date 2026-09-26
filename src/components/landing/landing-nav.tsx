@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { MessageSquare, ArrowRight, Menu, X } from "lucide-react";
+import Image from "next/image";
+import { useState, useEffect } from "react";
+import { ArrowRight, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const navLinks = [
@@ -15,18 +16,50 @@ const navLinks = [
 
 export function LandingNav() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 80);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border/40 bg-background/70 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
+    <header
+      className="left-0 right-0 top-0 z-50 transition-all duration-500"
+      style={{
+        position: scrolled ? "fixed" : "absolute",
+        background: scrolled ? "rgba(var(--background-rgb, 4,6,14), 0.92)" : "transparent",
+        backdropFilter: scrolled ? "blur(16px)" : "none",
+        WebkitBackdropFilter: scrolled ? "blur(16px)" : "none",
+        borderBottom: scrolled ? "1px solid rgba(255,255,255,0.08)" : "none",
+        boxShadow: scrolled ? "0 2px 24px rgba(0,0,0,0.3)" : "none",
+      }}
+    >
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+
+        {/* Logo: image + text. Image fades in on scroll */}
         <Link href="/" className="flex items-center gap-2.5 font-bold tracking-tight">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm shadow-primary/20">
-            <MessageSquare className="h-4 w-4" />
+          <div
+            className="flex items-center justify-center overflow-hidden transition-all duration-500 ease-in-out"
+            style={{ width: scrolled ? 48 : 0, opacity: scrolled ? 1 : 0 }}
+          >
+            <Image src="/images/logo.png" alt="TZMICHA Logo" width={48} height={48} className="rounded-lg object-contain shrink-0" />
           </div>
-          <span className="text-base">TZMICHA</span>
+          <span
+            className="text-base transition-colors duration-300"
+            style={{ color: scrolled ? "var(--foreground)" : "#fff" }}
+          >
+            TZMICHA
+          </span>
         </Link>
 
-        <nav className="hidden items-center gap-1 md:flex">
+        {/* Nav links: hidden at top (over video), fade in on scroll */}
+        <nav
+          className="hidden items-center gap-1 md:flex transition-all duration-500"
+          style={{ opacity: scrolled ? 1 : 0, pointerEvents: scrolled ? "auto" : "none" }}
+        >
           {navLinks.map((link) => (
             <a
               key={link.href}
@@ -38,9 +71,14 @@ export function LandingNav() {
           ))}
         </nav>
 
+        {/* Buttons: always visible, white text over video, normal on scroll */}
         <div className="hidden items-center gap-2 md:flex">
           <Link href="/login">
-            <Button variant="ghost" size="sm">
+            <Button
+              variant="ghost"
+              size="sm"
+              style={{ color: scrolled ? undefined : "rgba(255,255,255,0.85)" }}
+            >
               Login
             </Button>
           </Link>
@@ -55,7 +93,8 @@ export function LandingNav() {
         <button
           type="button"
           onClick={() => setMobileOpen(!mobileOpen)}
-          className="flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground md:hidden"
+          className="flex h-10 w-10 items-center justify-center rounded-md hover:bg-muted hover:text-foreground md:hidden"
+          style={{ color: scrolled ? undefined : "rgba(255,255,255,0.85)" }}
           aria-label="Toggle menu"
         >
           {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -77,9 +116,7 @@ export function LandingNav() {
             ))}
             <div className="mt-3 flex flex-col gap-2 border-t border-border/40 pt-3">
               <Link href="/login" onClick={() => setMobileOpen(false)}>
-                <Button variant="ghost" className="w-full">
-                  Login
-                </Button>
+                <Button variant="ghost" className="w-full">Login</Button>
               </Link>
               <Link href="/signup" onClick={() => setMobileOpen(false)}>
                 <Button className="w-full">

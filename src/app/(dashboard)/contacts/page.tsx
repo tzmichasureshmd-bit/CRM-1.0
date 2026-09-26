@@ -136,13 +136,14 @@ function RatingStars({ value }: { value?: number | null }) {
 }
 
 const SOURCE_BADGE_STYLES: Record<string, string> = {
-  facebook: 'bg-blue-950/40 text-blue-300 border-blue-700/50',
-  instagram: 'bg-pink-950/40 text-pink-300 border-pink-700/50',
-  whatsapp: 'bg-emerald-950/40 text-emerald-300 border-emerald-700/50',
-  website: 'bg-violet-950/40 text-violet-300 border-violet-700/50',
-  manual: 'bg-slate-950/40 text-slate-300 border-slate-700/50',
-  google_form: 'bg-amber-950/40 text-amber-300 border-amber-700/50',
-  meta: 'bg-primary/10 text-primary border-primary/30',
+  facebook:    'bg-[#E8F1FE] text-[#1565d8] border-[#1877F2]/30',
+  instagram:   'bg-[#FEE8F0] text-[#c0185a] border-[#E1306C]/30',
+  whatsapp:    'bg-[#E8FBF0] text-[#1a9e4e] border-[#25D366]/30',
+  telegram:    'bg-[#E8F6FD] text-[#1a8fc4] border-[#26A5E4]/30',
+  website:     'bg-[#F3F0FF] text-[#6d28d9] border-[#7C3AED]/30',
+  manual:      'bg-[#F1F5F9] text-[#475569] border-[#94a3b8]/30',
+  google_form: 'bg-[#FFFBEA] text-[#b45309] border-[#f59e0b]/30',
+  meta:        'bg-[#EEF4FF] text-[#3462EE] border-[#3462EE]/30',
 };
 
 function resolveSourceKey(
@@ -195,15 +196,15 @@ function SourceBadge({
 }
 
 function LeadStatusBadge({ status }: { status?: string | null }) {
-  if (!status) return <span className="text-muted-foreground">—</span>;
+  if (!status) return <span className="text-[#667085]">—</span>;
   const map: Record<string, string> = {
-    new: 'bg-blue-950/40 text-blue-300 border-blue-700/50',
-    contacted: 'bg-sky-950/40 text-sky-300 border-sky-700/50',
-    qualified: 'bg-violet-950/40 text-violet-300 border-violet-700/50',
-    proposal: 'bg-purple-950/40 text-purple-300 border-purple-700/50',
-    negotiation: 'bg-amber-950/40 text-amber-300 border-amber-700/50',
-    won: 'bg-emerald-950/40 text-emerald-300 border-emerald-700/50',
-    lost: 'bg-red-950/40 text-red-300 border-red-700/50',
+    new:         'bg-[#EEF4FF] text-[#3462EE] border-[#3462EE]/30',
+    contacted:   'bg-[#E8F6FD] text-[#1a8fc4] border-[#26A5E4]/30',
+    qualified:   'bg-[#F3F0FF] text-[#6d28d9] border-[#7C3AED]/30',
+    proposal:    'bg-[#FDF4FF] text-[#9333ea] border-[#a855f7]/30',
+    negotiation: 'bg-[#FFFBEA] text-[#b45309] border-[#f59e0b]/30',
+    won:         'bg-[#EDFAF4] text-[#1a9e4e] border-[#25D366]/30',
+    lost:        'bg-[#FEF2F2] text-[#dc2626] border-[#ef4444]/30',
   };
   return (
     <span
@@ -1795,14 +1796,18 @@ function StatCard({
 }) {
   return (
     <div
-      className={`flex flex-col justify-center rounded-lg border px-3 py-2 ${
-        highlight ? 'border-primary/40 bg-primary/10' : 'border-border bg-card'
+      className={`flex flex-col justify-center rounded-xl border px-3 py-2.5 ${
+        highlight
+          ? 'border-[#3462EE]/30 bg-[#EEF4FF]'
+          : 'border-[#E4E8EF] bg-white'
       }`}
     >
-      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+      <span className="text-[10px] font-semibold uppercase tracking-wide text-[#667085]">
         {label}
       </span>
-      <span className={`text-xl font-bold tabular-nums ${highlight ? 'text-primary' : 'text-foreground'}`}>
+      <span className={`text-xl font-bold tabular-nums ${
+        highlight ? 'text-[#3462EE]' : 'text-[#172033]'
+      }`}>
         {value.toLocaleString()}
       </span>
     </div>
