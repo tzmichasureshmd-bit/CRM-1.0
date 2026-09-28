@@ -5,51 +5,25 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { createClient } from "@/lib/supabase/client";
-import { ShieldCheck } from "lucide-react";
-import {
-  LoginBrand,
-  LoginCard,
-  LoginDivider,
-  LoginEmailInput,
-  LoginError,
-  LoginField,
-  LoginFooter,
-  LoginHeading,
-  LoginPasswordInput,
-  LoginSecondary,
-  LoginShell,
-  LoginSubmit,
-} from "@/components/auth/login-shell";
+import { Eye, EyeOff, Mail } from "lucide-react";
 
-// `useSearchParams` opts the component out of static prerendering
-// unless it sits under a Suspense boundary. We split the form into
-// a child component so the outer page can prerender the chrome
-// (background, card frame) while the form hydrates with the query
-// string on the client.
 export default function LoginPage() {
   return (
-    // The premium chrome (CRM4 image pane, glass frame) is served in
-    // the static HTML outside the Suspense boundary so the visual
-    // paints immediately, while the form itself (which needs
-    // useSearchParams for the invite token) hydrates on the client.
-    <LoginShell>
-      <Suspense fallback={null}>
-        <LoginPageInner />
-      </Suspense>
-    </LoginShell>
+    <Suspense fallback={null}>
+      <LoginPageInner />
+    </Suspense>
   );
 }
 
 function LoginPageInner() {
   const searchParams = useSearchParams();
-  // Forwarded from `/join/<token>` when the visitor already has an
-  // account. After a successful sign-in we send them to the join
-  // page to accept rather than to /dashboard.
   const inviteToken = searchParams.get("invite");
   const t = useTranslations("LoginPage");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -57,130 +31,77 @@ function LoginPageInner() {
     e.preventDefault();
     setError(null);
     setLoading(true);
-
     try {
       const supabase = createClient();
-
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        setError(error.message);
-        setLoading(false);
-        return;
-      }
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) { setError(error.message); setLoading(false); return; }
     } catch (err) {
-      console.error("[LOGIN] Unexpected error:", err);
-      const isMisconfigured =
-        err instanceof Error && err.message.includes("Supabase is not configured");
-      setError(
-        isMisconfigured
-          ? "Login is temporarily unavailable. Supabase is not configured. Please contact the administrator."
-          : "Unable to sign in. Please try again later.",
-      );
+      const isMisconfigured = err instanceof Error && err.message.includes("Supabase is not configured");
+      setError(isMisconfigured ? "Supabase is not configured. Please contact the administrator." : "Unable to sign in. Please try again later.");
       setLoading(false);
       return;
     }
-
-    // Always land in the customer CRM. Super Admin access is a
-    // deliberate, separate flow entered via the "Super Admin" button
-    // (/super-admin/login) — never auto-triggered from the customer
-    // login, even for users whose profile carries the super_admin
-    // platform role.
-    const destination = inviteToken
-      ? `/join/${encodeURIComponent(inviteToken)}`
-      : "/dashboard";
-
-    // Full-page navigation (not router.push) so the browser issues a
-    // fresh top-level request that carries the just-written Supabase
-    // auth cookies to the middleware gating /dashboard. A soft
-    // client-side navigation can reach the protected route before the
-    // server observes the new session, so the middleware bounces it
-    // back to /login — which looks like the page "just refreshing"
-    // instead of signing in (issue #365). Mirrors the deliberate full
-    // reload the invite-accept flow already uses in join/[token].
+    const destination = inviteToken ? `/join/${encodeURIComponent(inviteToken)}` : "/dashboard";
     window.location.href = destination;
   };
 
   return (
-    <>
-      <LoginCard>
-        <LoginBrand />
+    <div className="login-page">
+      <div className="login-card">
 
-        <LoginHeading title={inviteToken ? t("titleAccept") : t("titleWelcome")}>
-          {inviteToken
-            ? t("descAccept")
-            : "Sign in to manage your conversations, leads, contacts and business communication."}
-        </LoginHeading>
+        {/* LEFT — form */}
+        <div className="login-left">
+          <div className="login-content">
+            <h1 className="login-heading-cursive">Welcome back</h1>
+            <p className="login-subtitle">Sign in to manage your conversations, leads, contacts and business communication.</p>
 
-        <form onSubmit={handleLogin} className="mt-2 flex flex-col gap-4">
-          <LoginError>{error}</LoginError>
+            <form className="login-form" onSubmit={handleLogin}>
+              {error && <div className="login-error-banner">{error}</div>}
 
-          <LoginField label={t("emailLabel")} htmlFor="email">
-            <LoginEmailInput
-              id="email"
-              placeholder={t("emailPlaceholder")}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </LoginField>
+              <div className="input-wrapper">
+                <input id="email" type="email" placeholder="Email" autoComplete="email"
+                  value={email} onChange={(e) => setEmail(e.target.value)} required />
+                <Mail className="input-icon" style={{ width: 16, height: 16 }} />
+              </div>
 
-          <LoginField
-            label={t("passwordLabel")}
-            htmlFor="password"
-            action={
-              <Link href="/forgot-password" className="login-link-accent">
-                {t("forgotPassword")}
+              <div className="input-wrapper">
+                <input id="password" type={showPassword ? "text" : "password"} placeholder="Password"
+                  autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                <button type="button" className="password-toggle" onClick={() => setShowPassword(v => !v)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}>
+                  {showPassword ? <EyeOff style={{ width: 15, height: 15 }} /> : <Eye style={{ width: 15, height: 15 }} />}
+                </button>
+              </div>
+
+              <div className="login-options">
+                <label className="remember-me">
+                  <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+                  Remember for 30 days
+                </label>
+                <Link href="/forgot-password">Forgot password?</Link>
+              </div>
+
+              <button type="submit" className="login-button" disabled={loading}>
+                {loading ? t("signingIn") : "Login"}
+              </button>
+            </form>
+
+            <p className="login-switch">
+              Don&apos;t have an account?{" "}
+              <Link href={inviteToken ? `/signup?invite=${encodeURIComponent(inviteToken)}` : "/signup"}>
+                Sign up
               </Link>
-            }
-          >
-            <LoginPasswordInput
-              id="password"
-              placeholder={t("passwordPlaceholder")}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              showLabel={t("showPassword")}
-              hideLabel={t("hidePassword")}
-            />
-          </LoginField>
+            </p>
+          </div>
+        </div>
 
-          <LoginSubmit loading={loading} loadingText={t("signingIn")}>
-            {t("signIn")}
-          </LoginSubmit>
-        </form>
+        {/* RIGHT — image */}
+        <div className="login-right">
+          <img src="/images/3804820b-a1d6-4a83-923c-e509ff58a324.png" alt=""
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center" }} />
+        </div>
 
-        <LoginDivider>{t("or")}</LoginDivider>
-
-        <LoginSecondary
-          href="/super-admin/login"
-          icon={<ShieldCheck className="h-4 w-4" aria-hidden="true" />}
-        >
-          {t("superAdmin")}
-        </LoginSecondary>
-
-        <p className="login-muted mt-6 text-center">
-          {t("noAccount")}{" "}
-          <Link
-            href={
-              inviteToken
-                ? `/signup?invite=${encodeURIComponent(inviteToken)}`
-                : "/signup"
-            }
-            className="login-link-accent"
-          >
-            {t("createAccount")}
-          </Link>
-        </p>
-      </LoginCard>
-
-      <LoginFooter>
-        &copy; {new Date().getFullYear()} TZmicha IT Solutions &middot; WhatsApp
-        CRM
-      </LoginFooter>
-    </>
+      </div>
+    </div>
   );
 }

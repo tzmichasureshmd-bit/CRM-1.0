@@ -161,9 +161,15 @@ export function MessageComposer({
   const isWhatsApp = platform === "whatsapp";
   const isInstagram = platform === "instagram";
   const isTelegram = platform === "telegram";
+  const isX = platform === "x";
+  const isThreads = platform === "threads";
+  // X and Threads: text only (no templates, no interactive, no audio/document)
+  const isTextOnly = isX || isThreads;
   // Telegram supports text + media but not WhatsApp templates or interactive messages
   const supportsTemplates = isWhatsApp;
   const supportsInteractive = isWhatsApp;
+  // X Free tier: text only. Threads: text only via API.
+  const supportsMedia = !isTextOnly;
 
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
@@ -598,7 +604,7 @@ export function MessageComposer({
           />
         </div>
       )}
-      {sessionExpired && !isTelegram && (
+      {sessionExpired && !isTelegram && !isTextOnly && (
         <div className="mb-2 flex items-center justify-between rounded-lg bg-amber-500/10 px-3 py-2">
           <p className="text-xs text-amber-400">
             {t("sessionExpiredHint")}
@@ -685,13 +691,15 @@ export function MessageComposer({
           {/* Attach menu — photo / video / document / voice. */}
           <DropdownMenu>
             <DropdownMenuTrigger
-              disabled={inputsDisabled || busy}
+              disabled={inputsDisabled || busy || !supportsMedia}
               title={
                 readOnly
                   ? t("readOnlyTitle")
-                  : inputsDisabled
-                    ? undefined
-                    : t("attachMedia")
+                  : !supportsMedia
+                    ? isX ? "X Free tier: text only" : "Threads: text only"
+                    : inputsDisabled
+                      ? undefined
+                      : t("attachMedia")
               }
               className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md p-0 text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
             >

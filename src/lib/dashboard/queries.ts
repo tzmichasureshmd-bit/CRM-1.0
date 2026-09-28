@@ -16,6 +16,7 @@ import type {
   ResponseTimeBucket,
   ResponseTimeSummary,
   RecentConversation,
+  PlatformChannelCounts,
 } from './types'
 
 // ------------------------------------------------------------
@@ -420,7 +421,7 @@ export async function loadRecentConversations(
 ): Promise<RecentConversation[]> {
   const { data, error } = await db
     .from('conversations')
-    .select('*, contact:contacts(id, name, phone, avatar_url)')
+    .select('*, platform, contact:contacts(id, name, phone, avatar_url)')
     .order('last_message_at', { ascending: false, nullsFirst: false })
     .limit(limit)
 
@@ -435,4 +436,19 @@ export async function loadRecentConversations(
   }
 
   return (data ?? []) as RecentConversation[]
+}
+
+// --- 7. Platform channel counts (always-visible channel KPI cards) ----
+
+export async function loadPlatformCounts(db: DB): Promise<PlatformChannelCounts> {
+  const { data } = await db
+    .from('conversations')
+    .select('platform')
+
+  const counts: Record<string, number> = { whatsapp: 0, instagram: 0, facebook: 0, telegram: 0 }
+  for (const row of (data ?? []) as { platform: string | null }[]) {
+    const p = (row.platform || 'whatsapp').toLowerCase()
+    if (p in counts) counts[p]++
+  }
+  return counts as unknown as PlatformChannelCounts
 }

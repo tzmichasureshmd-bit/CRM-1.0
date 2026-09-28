@@ -15,6 +15,7 @@ import {
   Calendar,
   Users,
   TrendingUp,
+  ChevronRight,
 } from 'lucide-react'
 
 import {
@@ -24,6 +25,7 @@ import {
   loadPipelineDonut,
   loadRecentConversations,
   loadResponseTime,
+  loadPlatformCounts,
 } from '@/lib/dashboard/queries'
 import type {
   ActivityItem,
@@ -32,11 +34,11 @@ import type {
   PipelineDonutData,
   ResponseTimeSummary,
   RecentConversation,
+  PlatformChannelCounts,
 } from '@/lib/dashboard/types'
 
 import { MetricCard } from '@/components/dashboard/metric-card'
 import { SkeletonCard } from '@/components/dashboard/skeleton'
-import { QuickActions } from '@/components/dashboard/quick-actions'
 import { SalesOverview } from '@/components/dashboard/sales-overview'
 import { ConversationsChart } from '@/components/dashboard/conversations-chart'
 import { PipelineDonut } from '@/components/dashboard/pipeline-donut'
@@ -45,17 +47,52 @@ import { ActivityFeed } from '@/components/dashboard/activity-feed'
 import { RecentConversationsCard } from '@/components/dashboard/recent-conversations-card'
 import { LeadStatCards, type LeadStats } from '@/components/social-media/lead-stat-cards'
 import { RecentLeads, type RecentLead } from '@/components/social-media/recent-leads'
+import { MessagesByChannel } from '@/components/dashboard/messages-by-channel'
 
 import { useTranslations } from 'next-intl'
 
 type RangeDays = 7 | 30 | 90
 
-function getGreeting(): string {
-  const hour = new Date().getHours()
-  if (hour < 12) return 'Good morning'
-  if (hour < 17) return 'Good afternoon'
-  return 'Good evening'
+// ── Platform brand icons (inline SVG, full HD crisp) ──────────
+function PlatformBrandIcon({ platform, size = 22 }: { platform: string; size?: number }) {
+  switch (platform) {
+    case 'whatsapp':
+      return (
+        <svg viewBox="0 0 24 24" fill="white" width={size} height={size}>
+          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+          <path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.528 5.845L.057 23.5l5.797-1.522A11.95 11.95 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 01-5.006-1.371l-.36-.214-3.717.976.993-3.63-.234-.373A9.818 9.818 0 1112 21.818z"/>
+        </svg>
+      );
+    case 'instagram':
+      return (
+        <svg viewBox="0 0 24 24" fill="white" width={size} height={size}>
+          <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/>
+        </svg>
+      );
+    case 'facebook':
+      return (
+        <svg viewBox="0 0 24 24" fill="white" width={size} height={size}>
+          <path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.41c0-3.025 1.792-4.697 4.533-4.697 1.312 0 2.686.236 2.686.236v2.97h-1.513c-1.491 0-1.956.93-1.956 1.886v2.268h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z"/>
+        </svg>
+      );
+    case 'telegram':
+      return (
+        <svg viewBox="0 0 24 24" fill="white" width={size} height={size}>
+          <path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0a12 12 0 00-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+        </svg>
+      );
+    default:
+      return null;
+  }
 }
+
+// ── Platform channel cards config ──────────────────────────────
+const PLATFORM_CARDS = [
+  { key: 'whatsapp' as const, label: 'WhatsApp',  color: '#25D366', bg: 'bg-[#E8FBF0]', textColor: 'text-[#1a9e4e]', abbr: 'WA' },
+  { key: 'instagram' as const, label: 'Instagram', color: '#E1306C', bg: 'bg-[#FEE8F0]', textColor: 'text-[#c0185a]', abbr: 'IG' },
+  { key: 'facebook' as const, label: 'Facebook',  color: '#1877F2', bg: 'bg-[#E8F1FE]', textColor: 'text-[#1565d8]', abbr: 'FB' },
+  { key: 'telegram' as const, label: 'Telegram',  color: '#26A5E4', bg: 'bg-[#E8F6FD]', textColor: 'text-[#1a8fc4]', abbr: 'TG' },
+]
 
 export default function DashboardPage() {
   const t = useTranslations('Dashboard.page')
@@ -65,238 +102,131 @@ export default function DashboardPage() {
 
   const [range, setRange] = useState<RangeDays>(30)
   const [series, setSeries] = useState<Record<RangeDays, ConversationsSeriesPoint[] | null>>({
-    7: null,
-    30: null,
-    90: null,
+    7: null, 30: null, 90: null,
   })
   const [seriesLoading, setSeriesLoading] = useState(true)
-
   const [pipeline, setPipeline] = useState<PipelineDonutData | null>(null)
   const [pipelineLoading, setPipelineLoading] = useState(true)
-
   const [responseTime, setResponseTime] = useState<ResponseTimeSummary | null>(null)
   const [responseTimeLoading, setResponseTimeLoading] = useState(true)
-
   const [activity, setActivity] = useState<ActivityItem[] | null>(null)
   const [activityLoading, setActivityLoading] = useState(true)
-
   const [recentConversations, setRecentConversations] = useState<RecentConversation[] | null>(null)
   const [recentLoading, setRecentLoading] = useState(true)
-
   const [leadStats, setLeadStats] = useState<LeadStats | null>(null)
   const [leadStatsLoading, setLeadStatsLoading] = useState(true)
   const [recentLeads, setRecentLeads] = useState<RecentLead[]>([])
   const [recentLeadsLoading, setRecentLeadsLoading] = useState(true)
-
-  const loadLeads = useCallback(() => {
-    fetch('/api/social-media/overview', { cache: 'no-store' })
-      .then((r) => r.json())
-      .then((d) => {
-        setLeadStats(d.stats ?? null)
-        setRecentLeads(d.recentLeads ?? [])
-      })
-      .catch((err) => console.error('[dashboard] social overview failed:', err))
-      .finally(() => {
-        setLeadStatsLoading(false)
-        setRecentLeadsLoading(false)
-      })
-  }, [])
-
+  const [platformCounts, setPlatformCounts] = useState<PlatformChannelCounts | null>(null)
   const [whatsappConnected, setWhatsappConnected] = useState<boolean | null>(null)
-
   const [totalContacts, setTotalContacts] = useState<number | null>(null)
   const [totalConversations, setTotalConversations] = useState<number | null>(null)
   const [unassignedCount, setUnassignedCount] = useState<number | null>(null)
   const [overdueFollowUpsCount, setOverdueFollowUpsCount] = useState<number | null>(null)
 
-  const loadAll = useCallback(() => {
-    const db = createClient()
-
-    void loadMetrics(db)
-      .then((m) => setMetrics(m))
-      .catch((err) => console.error('[dashboard] metrics failed:', err))
-      .finally(() => setMetricsLoading(false))
-
-    void loadConversationsSeries(db, 30)
-      .then((s) => setSeries((prev) => ({ ...prev, 30: s })))
-      .catch((err) => console.error('[dashboard] series failed:', err))
-      .finally(() => setSeriesLoading(false))
-
-    void loadPipelineDonut(db)
-      .then((p) => setPipeline(p))
-      .catch((err) => console.error('[dashboard] pipeline failed:', err))
-      .finally(() => setPipelineLoading(false))
-
-    void loadResponseTime(db)
-      .then((r) => setResponseTime(r))
-      .catch((err) => console.error('[dashboard] response time failed:', err))
-      .finally(() => setResponseTimeLoading(false))
-
-     void loadActivity(db, 50)
-      .then((a) => setActivity(a))
-      .catch((err) => console.error('[dashboard] activity failed:', err))
-      .finally(() => setActivityLoading(false))
-
-    void loadRecentConversations(db, 6)
-      .then((r) => setRecentConversations(r))
-      .catch((err) => console.error('[dashboard] recent convs failed:', err))
-      .finally(() => setRecentLoading(false))
-
-    void (async () => {
-      try {
-        const { count } = await db
-          .from('contacts')
-          .select('id', { count: 'exact', head: true })
-        setTotalContacts(count ?? 0)
-      } catch {
-        setTotalContacts(0)
-      }
-    })()
-
-    void (async () => {
-      try {
-        const { count } = await db
-          .from('conversations')
-          .select('id', { count: 'exact', head: true })
-        setTotalConversations(count ?? 0)
-      } catch {
-        setTotalConversations(0)
-      }
-    })()
-
-    void (async () => {
-      try {
-        const { count } = await db
-          .from('conversations')
-          .select('id', { count: 'exact', head: true })
-          .is('assigned_agent_id', null)
-          .neq('status', 'closed')
-        setUnassignedCount(count ?? 0)
-      } catch {
-        setUnassignedCount(0)
-      }
-    })()
-
-    void (async () => {
-      try {
-        const now = new Date().toISOString()
-        const { count } = await db
-          .from('follow_ups')
-          .select('id', { count: 'exact', head: true })
-          .eq('status', 'pending')
-          .lt('due_date', now)
-        setOverdueFollowUpsCount(count ?? 0)
-      } catch {
-        setOverdueFollowUpsCount(0)
-      }
-    })()
+  const loadLeads = useCallback(() => {
+    fetch('/api/social-media/overview', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d) => { setLeadStats(d.stats ?? null); setRecentLeads(d.recentLeads ?? []) })
+      .catch((err) => console.error('[dashboard] social overview failed:', err))
+      .finally(() => { setLeadStatsLoading(false); setRecentLeadsLoading(false) })
   }, [])
 
-  useEffect(() => {
-    loadAll()
-  }, [loadAll])
+  const loadAll = useCallback(() => {
+    const db = createClient()
+    void loadPlatformCounts(db).then(setPlatformCounts).catch(console.error)
+    void loadMetrics(db).then((m) => setMetrics(m)).catch(console.error).finally(() => setMetricsLoading(false))
+    void loadConversationsSeries(db, 30).then((s) => setSeries((p) => ({ ...p, 30: s }))).catch(console.error).finally(() => setSeriesLoading(false))
+    void loadPipelineDonut(db).then((p) => setPipeline(p)).catch(console.error).finally(() => setPipelineLoading(false))
+    void loadResponseTime(db).then((r) => setResponseTime(r)).catch(console.error).finally(() => setResponseTimeLoading(false))
+    void loadActivity(db, 50).then((a) => setActivity(a)).catch(console.error).finally(() => setActivityLoading(false))
+    void loadRecentConversations(db, 6).then((r) => setRecentConversations(r)).catch(console.error).finally(() => setRecentLoading(false))
+    void (async () => { try { const { count } = await db.from('contacts').select('id', { count: 'exact', head: true }); setTotalContacts(count ?? 0) } catch { setTotalContacts(0) } })()
+    void (async () => { try { const { count } = await db.from('conversations').select('id', { count: 'exact', head: true }); setTotalConversations(count ?? 0) } catch { setTotalConversations(0) } })()
+    void (async () => { try { const { count } = await db.from('conversations').select('id', { count: 'exact', head: true }).is('assigned_agent_id', null).neq('status', 'closed'); setUnassignedCount(count ?? 0) } catch { setUnassignedCount(0) } })()
+    void (async () => { try { const now = new Date().toISOString(); const { count } = await db.from('follow_ups').select('id', { count: 'exact', head: true }).eq('status', 'pending').lt('due_date', now); setOverdueFollowUpsCount(count ?? 0) } catch { setOverdueFollowUpsCount(0) } })()
+  }, [])
+
+  useEffect(() => { loadAll() }, [loadAll])
+  useEffect(() => { loadLeads() }, [loadLeads])
 
   useEffect(() => {
-    loadLeads()
-  }, [loadLeads])
-
-  useEffect(() => {
-    const checkConnection = async () => {
-      if (!accountId) {
-        setWhatsappConnected(false)
-        return
-      }
-
+    const check = async () => {
+      if (!accountId) { setWhatsappConnected(false); return }
       const db = createClient()
-      const { data } = await db
-        .from('whatsapp_config')
-        .select('status')
-        .eq('account_id', accountId)
-        .limit(1)
-
+      const { data } = await db.from('whatsapp_config').select('status').eq('account_id', accountId).limit(1)
       setWhatsappConnected(data?.[0]?.status === 'connected')
     }
-    void checkConnection()
+    void check()
   }, [accountId])
 
-  const handleRangeChange = useCallback(
-    (r: RangeDays) => {
-      setRange(r)
-      if (series[r] !== null) return
-      setSeriesLoading(true)
-      const db = createClient()
-      loadConversationsSeries(db, r)
-        .then((s) => setSeries((prev) => ({ ...prev, [r]: s })))
-        .catch((err) => console.error('[dashboard] series failed:', err))
-        .finally(() => setSeriesLoading(false))
-    },
-    [series],
-  )
+  const handleRangeChange = useCallback((r: RangeDays) => {
+    setRange(r)
+    if (series[r] !== null) return
+    setSeriesLoading(true)
+    const db = createClient()
+    loadConversationsSeries(db, r)
+      .then((s) => setSeries((p) => ({ ...p, [r]: s })))
+      .catch(console.error)
+      .finally(() => setSeriesLoading(false))
+  }, [series])
 
   const firstName = profile?.full_name?.split(' ')[0] ?? t('there')
 
+  // Live clock — updates every minute so greeting + date stay current
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60_000)
+    return () => clearInterval(id)
+  }, [])
+  const greeting = (() => {
+    const h = now.getHours()
+    if (h < 12) return 'Good morning'
+    if (h < 17) return 'Good afternoon'
+    return 'Good evening'
+  })()
+  const today = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <OnboardingBanner />
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      {/* ── Header ── */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            {getGreeting()}, {firstName}
+          <h1 className="text-[28px] font-bold tracking-tight text-foreground">
+            {greeting}, {firstName} 👋
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {t('description')}
-          </p>
+          <p className="mt-1 text-sm text-muted-foreground">{t('description')}</p>
         </div>
-        <div className="flex items-center gap-3">
-          {whatsappConnected !== null && (
-            <div className="flex items-center gap-2 text-xs">
-              {whatsappConnected ? (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/5 px-2.5 py-1 text-xs font-medium text-emerald-500">
-                  <span className="flex h-1.5 w-1.5">
-                    <span className="absolute inline-flex h-1.5 w-1.5 animate-ping rounded-full bg-emerald-400 opacity-75" />
-                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                  </span>
-                  Connected
-                </span>
-              ) : (
-                <Link
-                  href="/settings?tab=whatsapp"
-                  className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/20 bg-amber-500/5 px-2.5 py-1 text-xs font-medium text-amber-400 transition-colors hover:bg-amber-500/10"
-                >
-                  <WifiOff className="h-3 w-3" />
-                  Connect WhatsApp
-                </Link>
-              )}
-            </div>
+        <div className="flex items-center gap-2.5">
+          <div className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-medium text-foreground shadow-sm">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <span>{today}</span>
+            <span className="text-muted-foreground">·</span>
+            <span className="tabular-nums text-primary font-semibold">{timeStr}</span>
+          </div>
+          {whatsappConnected === false && (
+            <Link href="/settings?tab=whatsapp"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-colors">
+              <WifiOff className="h-3.5 w-3.5" />
+              Connect WhatsApp
+            </Link>
+          )}
+          {whatsappConnected && (
+            <span className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-2 w-2 animate-ping rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+              </span>
+              Connected
+            </span>
           )}
         </div>
       </div>
 
-      {whatsappConnected === false && (
-        <div className="relative overflow-hidden rounded-xl border border-amber-500/20 bg-gradient-to-r from-amber-500/5 to-amber-500/[0.02] px-5 py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/10">
-              <WifiOff className="h-5 w-5 text-amber-400" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-foreground">
-                {t('whatsappNotConnected')}
-              </p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Connect your WhatsApp Business account to start receiving and sending messages.
-              </p>
-            </div>
-            <Link
-              href="/settings?tab=whatsapp"
-              className="shrink-0 rounded-lg bg-amber-500/10 px-4 py-2 text-xs font-semibold text-amber-400 transition-all hover:bg-amber-500/20 hover:shadow-sm"
-            >
-              {t('connectNow')}
-            </Link>
-          </div>
-        </div>
-      )}
-
+      {/* ── 4 KPI Cards ── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {metricsLoading || !metrics ? (
           Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
@@ -306,169 +236,73 @@ export default function DashboardPage() {
               title={t('activeConversations')}
               value={metrics.activeConversations.current.toLocaleString()}
               icon={MessageSquare}
-              iconBg="bg-blue-500/10 text-blue-500"
-              delta={{
-                sign: metrics.activeConversations.previous,
-                label: deltaLabel(
-                  metrics.activeConversations.previous, 
-                  t('newTodayVsYesterday'), 
-                  t('noChange', { suffix: t('newTodayVsYesterday') })
-                ),
-              }}
+              cardBg="bg-[#EEF4FF]"
+              iconBg="bg-[#3462EE]/15 text-[#3462EE]"
+              delta={{ sign: metrics.activeConversations.previous, label: t('newTodayVsYesterday') }}
             />
             <MetricCard
               title={t('newContactsToday')}
               value={metrics.newContactsToday.current.toLocaleString()}
               icon={UserPlus}
-              iconBg="bg-emerald-500/10 text-emerald-500"
-              delta={{
-                sign:
-                  metrics.newContactsToday.current - metrics.newContactsToday.previous,
-                label: deltaLabel(
-                  metrics.newContactsToday.current - metrics.newContactsToday.previous,
-                  t('vsYesterday'),
-                  t('noChange', { suffix: t('vsYesterday') })
-                ),
-              }}
+              cardBg="bg-[#EDFAF4]"
+              iconBg="bg-[#4A91A8]/15 text-[#4A91A8]"
+              delta={{ sign: metrics.newContactsToday.current - metrics.newContactsToday.previous, label: t('vsYesterday') }}
             />
             <MetricCard
               title={t('openDealsValue')}
               value={formatCurrency(metrics.openDealsValue, defaultCurrency)}
               icon={DollarSign}
-              iconBg="bg-amber-500/10 text-amber-500"
+              cardBg="bg-[#FFFBEA]"
+              iconBg="bg-[#EFE347]/30 text-[#b89a00]"
               subtitle={t('openDeals', { count: metrics.openDealsCount })}
             />
             <MetricCard
               title={t('messagesSentToday')}
               value={metrics.messagesSentToday.current.toLocaleString()}
               icon={Send}
-              iconBg="bg-violet-500/10 text-violet-500"
-              delta={{
-                sign:
-                  metrics.messagesSentToday.current - metrics.messagesSentToday.previous,
-                label: deltaLabel(
-                  metrics.messagesSentToday.current - metrics.messagesSentToday.previous,
-                  t('vsYesterday'),
-                  t('noChange', { suffix: t('vsYesterday') })
-                ),
-              }}
+              cardBg="bg-[#F3F0FF]"
+              iconBg="bg-[#7C3AED]/15 text-[#7C3AED]"
+              delta={{ sign: metrics.messagesSentToday.current - metrics.messagesSentToday.previous, label: t('vsYesterday') }}
             />
           </>
         )}
       </div>
 
-      <QuickActions />
-
-      {/* Sales Overview — real pipeline + lead-source aggregates keyed off
-          the account's contacts/deals tables (see /api/dashboard/sales-overview). */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-foreground">{t('salesOverviewTitle')}</h2>
-          <Link href="/pipelines" className="text-xs font-medium text-primary hover:underline">
-            {t('salesOverviewLink')}
-          </Link>
-        </div>
-        <SalesOverview defaultCurrency={defaultCurrency} />
-      </section>
-
-      {/* Lead Overview — Meta Lead Ads stats (clickable → filtered Contacts) */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-foreground">Lead Overview</h2>
-          <Link href="/social-media" className="text-xs font-medium text-primary hover:underline">
-            Social Media
-          </Link>
-        </div>
-        <LeadStatCards stats={leadStats} loading={leadStatsLoading} />
-      </section>
-
-      <div className="rounded-xl border border-border/60 bg-card p-5">
-        <h2 className="mb-4 text-sm font-semibold text-foreground">{t('overview')}</h2>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <StatCard
-            icon={Users}
-            label={t('totalContacts')}
-            value={totalContacts}
-            loading={metricsLoading}
-          />
-          <StatCard
-            icon={MessageSquare}
-            label={t('totalConversations')}
-            value={totalConversations}
-            loading={metricsLoading}
-          />
-          <StatCard
-            icon={Calendar}
-            label={t('todaysFollowUps')}
-            value={metrics?.followUpsToday.current ?? null}
-            loading={metricsLoading}
-          />
-          <StatCard
-            icon={TrendingUp}
-            label={t('openDealsCountLabel')}
-            value={metrics?.openDealsCount ?? null}
-            loading={metricsLoading}
-          />
-        </div>
+      {/* ── Platform Channel Cards (WhatsApp / Instagram / Facebook / Telegram) ── */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {PLATFORM_CARDS.map((p) => {
+          const count = platformCounts?.[p.key] ?? 0
+          return (
+            <Link
+              key={p.key}
+              href={`/inbox?platform=${p.key}`}
+              className={`group flex items-center gap-3 rounded-2xl border border-border bg-card p-4 transition-all hover:-translate-y-0.5 hover:shadow-md`}
+            >
+              <div
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl shadow-sm"
+                style={{ backgroundColor: p.color }}
+              >
+                <PlatformBrandIcon platform={p.key} size={22} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">{p.label}</p>
+                {platformCounts === null ? (
+                  <div className="mt-1 h-5 w-10 animate-pulse rounded bg-muted" />
+                ) : (
+                  <p className={`text-xl font-bold tabular-nums ${p.textColor}`}>
+                    {count.toLocaleString()}
+                  </p>
+                )}
+                <p className="text-[10px] text-muted-foreground">conversations</p>
+              </div>
+            </Link>
+          )
+        })}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Link
-          href="/inbox?filter=unassigned"
-          className="group relative overflow-hidden rounded-xl border border-border/60 bg-card p-5 transition-all duration-200 hover:border-orange-500/20 hover:shadow-md hover:shadow-orange-500/5"
-        >
-          <div className="absolute inset-0 bg-gradient-to-br from-orange-500/[0.03] to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
-          <div className="relative flex items-center gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-orange-500/10 transition-transform group-hover:scale-105">
-              <Users className="h-5 w-5 text-orange-500" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-muted-foreground">{t('unassignedConversations')}</p>
-              <p className="text-2xl font-bold tabular-nums text-foreground">
-                {unassignedCount !== null ? unassignedCount.toLocaleString() : '—'}
-              </p>
-            </div>
-          </div>
-        </Link>
-        <Link
-          href="/inbox?filter=followups"
-          className="group relative overflow-hidden rounded-xl border border-border/60 bg-card p-5 transition-all duration-200 hover:border-red-500/20 hover:shadow-md hover:shadow-red-500/5"
-        >
-          <div className="absolute inset-0 bg-gradient-to-br from-red-500/[0.03] to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
-          <div className="relative flex items-center gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-red-500/10 transition-transform group-hover:scale-105">
-              <Calendar className="h-5 w-5 text-red-500" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-muted-foreground">{t('overdueFollowUps')}</p>
-              <p className="text-2xl font-bold tabular-nums text-foreground">
-                {overdueFollowUpsCount !== null ? overdueFollowUpsCount.toLocaleString() : '—'}
-              </p>
-            </div>
-          </div>
-        </Link>
-      </div>
-
-      <div className="rounded-xl border border-border bg-card p-6">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-foreground">Recent Leads</h2>
-          <Link href="/contacts?tab=meta_leads" className="text-xs font-medium text-primary hover:underline">
-            View all
-          </Link>
-        </div>
-        <RecentLeads leads={recentLeads} loading={recentLeadsLoading} />
-      </div>
-
-      <div className="rounded-xl border border-border bg-card p-6">
-        <h2 className="mb-4 text-sm font-semibold text-foreground">{t('recentConversations')}</h2>
-        <RecentConversationsCard
-          conversations={recentConversations ?? []}
-          loading={recentLoading}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
-        <div className="h-full lg:col-span-3">
+      {/* ── Main 3-column grid ── */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="lg:col-span-2">
           <ConversationsChart
             series={series}
             loading={seriesLoading}
@@ -476,48 +310,128 @@ export default function DashboardPage() {
             onRangeChange={handleRangeChange}
           />
         </div>
-        <div className="h-full lg:col-span-2">
+        <div className="lg:col-span-1 rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <h2 className="mb-4 text-[15px] font-semibold text-foreground">Messages by Channel</h2>
+          <MessagesByChannel />
+        </div>
+      </div>
+
+      {/* ── Second row: Sales Funnel + Pipeline + Recent Conversations ── */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="lg:col-span-1 rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-[15px] font-semibold text-foreground">{t('salesOverviewTitle')}</h2>
+            <Link href="/pipelines"
+              className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors">
+              View Pipeline
+            </Link>
+          </div>
+          <SalesOverview defaultCurrency={defaultCurrency} />
+        </div>
+
+        <div className="lg:col-span-1">
           <PipelineDonut
             data={pipeline}
             loading={pipelineLoading}
             currency={defaultCurrency}
           />
         </div>
+
+        <div className="lg:col-span-1 rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-[15px] font-semibold text-foreground">{t('recentConversations')}</h2>
+            <Link href="/inbox"
+              className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors">
+              View All
+            </Link>
+          </div>
+          <RecentConversationsCard conversations={recentConversations ?? []} loading={recentLoading} />
+        </div>
       </div>
 
-      <ResponseTimeChart data={responseTime} loading={responseTimeLoading} />
+      {/* ── Overview stat mini-cards ── */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <MiniStatCard icon={Users} label={t('totalContacts')} value={totalContacts} loading={metricsLoading} color="text-primary" bg="bg-primary/10" />
+        <MiniStatCard icon={MessageSquare} label={t('totalConversations')} value={totalConversations} loading={metricsLoading} color="text-[#4A91A8]" bg="bg-[#4A91A8]/10" />
+        <MiniStatCard icon={Calendar} label={t('todaysFollowUps')} value={metrics?.followUpsToday.current ?? null} loading={metricsLoading} color="text-amber-600" bg="bg-amber-500/10" />
+        <MiniStatCard icon={TrendingUp} label={t('openDealsCountLabel')} value={metrics?.openDealsCount ?? null} loading={metricsLoading} color="text-violet-600" bg="bg-violet-500/10" />
+      </div>
 
+      {/* ── Unassigned + Overdue ── */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Link href="/inbox?filter=unassigned"
+          className="group flex items-center gap-4 rounded-2xl border border-border bg-card p-5 transition-all hover:shadow-md hover:-translate-y-0.5">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-orange-500/10 transition-transform group-hover:scale-105">
+            <Users className="h-5 w-5 text-orange-500" />
+          </div>
+          <div>
+            <p className="text-xs font-medium text-muted-foreground">{t('unassignedConversations')}</p>
+            <p className="text-2xl font-bold tabular-nums text-foreground">
+              {unassignedCount !== null ? unassignedCount.toLocaleString() : '—'}
+            </p>
+          </div>
+        </Link>
+        <Link href="/inbox?filter=followups"
+          className="group flex items-center gap-4 rounded-2xl border border-border bg-card p-5 transition-all hover:shadow-md hover:-translate-y-0.5">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-red-500/10 transition-transform group-hover:scale-105">
+            <Calendar className="h-5 w-5 text-red-500" />
+          </div>
+          <div>
+            <p className="text-xs font-medium text-muted-foreground">{t('overdueFollowUps')}</p>
+            <p className="text-2xl font-bold tabular-nums text-foreground">
+              {overdueFollowUpsCount !== null ? overdueFollowUpsCount.toLocaleString() : '—'}
+            </p>
+          </div>
+        </Link>
+      </div>
+
+      {/* ── Lead Overview ── */}
+      <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-[15px] font-semibold text-foreground">Lead Overview</h2>
+          <Link href="/social-media" className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline">
+            Social Media <ChevronRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+        <LeadStatCards stats={leadStats} loading={leadStatsLoading} />
+      </div>
+
+      {/* ── Recent Leads ── */}
+      <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-[15px] font-semibold text-foreground">Recent Leads</h2>
+          <Link href="/contacts?tab=meta_leads" className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline">
+            View all <ChevronRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+        <RecentLeads leads={recentLeads} loading={recentLeadsLoading} />
+      </div>
+
+      {/* ── Response Time + Activity ── */}
+      <ResponseTimeChart data={responseTime} loading={responseTimeLoading} />
       <ActivityFeed items={activity} loading={activityLoading} />
     </div>
   )
 }
 
-// ------------------------------------------------------------
-
-function deltaLabel(delta: number, suffix: string, noChangeLabel: string): string {
-  if (delta === 0) return noChangeLabel
-  const sign = delta > 0 ? '+' : ''
-  return `${sign}${delta.toLocaleString()} ${suffix}`
-}
-
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-  loading,
+// ── Mini stat card ──────────────────────────────────────────────
+function MiniStatCard({
+  icon: Icon, label, value, loading, color, bg,
 }: {
   icon: React.ComponentType<{ className?: string }>
   label: string
   value: number | null
   loading: boolean
+  color?: string
+  bg?: string
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-transparent bg-muted/30 p-3 transition-colors hover:bg-muted/50">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-background text-muted-foreground shadow-sm">
+    <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 transition-colors hover:bg-muted/50">
+      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${bg ?? 'bg-muted'} ${color ?? 'text-muted-foreground'}`}>
         <Icon className="h-4 w-4" />
       </div>
       <div>
-        <p className="text-xs font-medium text-muted-foreground">{label}</p>
+        <p className="text-[11px] font-medium text-muted-foreground">{label}</p>
         {loading ? (
           <div className="mt-1 h-5 w-12 animate-pulse rounded bg-muted" />
         ) : (

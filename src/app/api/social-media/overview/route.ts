@@ -24,11 +24,11 @@ export async function GET() {
         ctx.supabase
           .from("contacts")
           .select(
-            "id, name, phone, source_platform, source_page_name, " +
+            "id, name, phone, source, source_platform, source_page_name, " +
               "source_instagram_username, campaign_name, lead_status, created_at",
           )
           .eq("account_id", accountId)
-          .not("source_platform", "is", null)
+          .or("source_platform.not.is.null,source.not.is.null")
           .order("created_at", { ascending: false })
           .limit(10),
         ctx.supabase
@@ -170,6 +170,7 @@ export async function GET() {
         id: string;
         name: string | null;
         phone: string | null;
+        source: string | null;
         source_platform: string | null;
         source_page_name: string | null;
         source_instagram_username: string | null;
@@ -177,17 +178,31 @@ export async function GET() {
         lead_status: string | null;
         created_at: string | null;
       }>
-    ).map((c) => ({
-      id: c.id,
-      name: c.name,
-      phone: c.phone,
-      sourcePlatform: c.source_platform,
-      pageName: c.source_page_name,
-      instagramUsername: c.source_instagram_username,
-      campaignName: c.campaign_name,
-      leadStatus: c.lead_status,
-      createdAt: c.created_at,
-    }));
+    ).map((c) => {
+      // Resolve effective platform from source_platform or source field
+      let effectivePlatform = c.source_platform
+      if (!effectivePlatform && c.source) {
+        const s = c.source.toLowerCase()
+        if (s.includes('whatsapp')) effectivePlatform = 'whatsapp'
+        else if (s.includes('telegram')) effectivePlatform = 'telegram'
+        else if (s.includes('instagram')) effectivePlatform = 'instagram'
+        else if (s.includes('facebook')) effectivePlatform = 'facebook'
+        else if (s.includes('google')) effectivePlatform = 'google_form'
+        else if (s.includes('website') || s.includes('web')) effectivePlatform = 'website'
+        else if (s.includes('manual')) effectivePlatform = 'manual'
+      }
+      return {
+        id: c.id,
+        name: c.name,
+        phone: c.phone,
+        sourcePlatform: effectivePlatform,
+        pageName: c.source_page_name,
+        instagramUsername: c.source_instagram_username,
+        campaignName: c.campaign_name,
+        leadStatus: c.lead_status,
+        createdAt: c.created_at,
+      }
+    });
 
     return NextResponse.json({
       stats,

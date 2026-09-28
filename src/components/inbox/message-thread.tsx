@@ -155,19 +155,129 @@ const PLATFORM_BADGE_CLASS: Record<ConversationPlatform, string> = {
   facebook: "bg-[#1877F2]/15 text-[#1877F2]",
   instagram: "bg-[#E1306C]/15 text-[#E1306C]",
   telegram: "bg-[#2AABEE]/15 text-[#2AABEE]",
+  threads: "bg-foreground/10 text-foreground",
+  x: "bg-foreground/10 text-foreground",
 };
 
 /**
- * WhatsApp-style doodle background applied to the chat area (both the
- * active thread and the empty state). The SVG tile lives at
- * `/public/inbox-doodle.svg`; the slate-950 colour sits underneath so
- * the doodles read as a subtle pattern rather than a stark grid.
- *
- * Defined once at module scope so the two render paths can't drift —
- * if we ever switch the asset, both spots update together.
+ * Wave gradient background — platform-themed per conversation.
  */
-const DOODLE_BG_CLASSES =
-  "bg-background bg-[url('/inbox-doodle.svg')] bg-repeat";
+const DOODLE_BG_CLASSES = "relative";
+
+/** Platform-specific background SVG */
+function WaveBg({ platform }: { platform?: string }) {
+  // WhatsApp — classic green tile pattern
+  if (!platform || platform === 'whatsapp') {
+    return (
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-0 overflow-hidden">
+        {/* WhatsApp-style subtle green tiled doodle */}
+        <div className="absolute inset-0" style={{
+          backgroundColor: '#e5ddd5',
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%2325D366' fill-opacity='0.07'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+        }} />
+        <div className="absolute inset-0 dark:bg-[#0b141a] dark:opacity-100 opacity-0" />
+      </div>
+    );
+  }
+
+  // Instagram — warm purple/pink/orange gradient
+  if (platform === 'instagram') {
+    return (
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-0 overflow-hidden">
+        <div className="absolute inset-0" style={{
+          background: 'linear-gradient(135deg, #fdf0f8 0%, #fce4f3 30%, #f3e8ff 60%, #ffecd2 100%)',
+        }} />
+        <svg viewBox="0 0 900 600" preserveAspectRatio="xMidYMid slice"
+          className="absolute inset-0 h-full w-full opacity-[0.15] dark:opacity-[0.1]">
+          <defs>
+            <radialGradient id="ig1" cx="70%" cy="20%" r="60%">
+              <stop offset="0%" stopColor="#E1306C" />
+              <stop offset="100%" stopColor="#E1306C" stopOpacity="0" />
+            </radialGradient>
+            <radialGradient id="ig2" cx="20%" cy="80%" r="60%">
+              <stop offset="0%" stopColor="#f77737" />
+              <stop offset="100%" stopColor="#f77737" stopOpacity="0" />
+            </radialGradient>
+            <radialGradient id="ig3" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#833ab4" />
+              <stop offset="100%" stopColor="#833ab4" stopOpacity="0" />
+            </radialGradient>
+          </defs>
+          <rect width="900" height="600" fill="url(#ig1)" />
+          <rect width="900" height="600" fill="url(#ig2)" />
+          <rect width="900" height="600" fill="url(#ig3)" />
+          <path d="M0 300 Q225 150 450 280 T900 260 L900 600 L0 600 Z" fill="#E1306C" fillOpacity="0.06" />
+          <path d="M0 400 Q300 250 550 380 T900 350 L900 600 L0 600 Z" fill="#f77737" fillOpacity="0.05" />
+        </svg>
+      </div>
+    );
+  }
+
+  // Telegram — clean blue/cyan gradient
+  if (platform === 'telegram') {
+    return (
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-0 overflow-hidden">
+        <div className="absolute inset-0" style={{
+          background: 'linear-gradient(160deg, #e8f4fd 0%, #d0eaf8 40%, #c5e3f7 100%)',
+        }} />
+        <svg viewBox="0 0 900 600" preserveAspectRatio="xMidYMid slice"
+          className="absolute inset-0 h-full w-full opacity-[0.18] dark:opacity-[0.1]">
+          <defs>
+            <radialGradient id="tg1" cx="30%" cy="30%" r="70%">
+              <stop offset="0%" stopColor="#26A5E4" />
+              <stop offset="100%" stopColor="#26A5E4" stopOpacity="0" />
+            </radialGradient>
+            <radialGradient id="tg2" cx="80%" cy="70%" r="50%">
+              <stop offset="0%" stopColor="#5bc8f5" />
+              <stop offset="100%" stopColor="#5bc8f5" stopOpacity="0" />
+            </radialGradient>
+          </defs>
+          <rect width="900" height="600" fill="url(#tg1)" />
+          <rect width="900" height="600" fill="url(#tg2)" />
+          <path d="M0 250 Q200 100 450 230 T900 210 L900 600 L0 600 Z" fill="#26A5E4" fillOpacity="0.07" />
+          <path d="M0 380 Q250 260 500 360 T900 330 L900 600 L0 600 Z" fill="#5bc8f5" fillOpacity="0.06" />
+          <circle cx="750" cy="100" r="180" fill="#26A5E4" fillOpacity="0.05" />
+          <circle cx="150" cy="500" r="140" fill="#5bc8f5" fillOpacity="0.05" />
+        </svg>
+      </div>
+    );
+  }
+
+  // Facebook/Messenger — blue gradient
+  if (platform === 'facebook') {
+    return (
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-0 overflow-hidden">
+        <div className="absolute inset-0" style={{
+          background: 'linear-gradient(160deg, #e8f0fe 0%, #dce8fd 40%, #d0e0fc 100%)',
+        }} />
+        <svg viewBox="0 0 900 600" preserveAspectRatio="xMidYMid slice"
+          className="absolute inset-0 h-full w-full opacity-[0.15] dark:opacity-[0.1]">
+          <defs>
+            <radialGradient id="fb1" cx="60%" cy="25%" r="65%">
+              <stop offset="0%" stopColor="#1877F2" />
+              <stop offset="100%" stopColor="#1877F2" stopOpacity="0" />
+            </radialGradient>
+            <radialGradient id="fb2" cx="25%" cy="75%" r="55%">
+              <stop offset="0%" stopColor="#4a9af5" />
+              <stop offset="100%" stopColor="#4a9af5" stopOpacity="0" />
+            </radialGradient>
+          </defs>
+          <rect width="900" height="600" fill="url(#fb1)" />
+          <rect width="900" height="600" fill="url(#fb2)" />
+          <path d="M0 280 Q220 130 450 260 T900 240 L900 600 L0 600 Z" fill="#1877F2" fillOpacity="0.06" />
+          <path d="M0 400 Q280 270 530 380 T900 360 L900 600 L0 600 Z" fill="#4a9af5" fillOpacity="0.05" />
+        </svg>
+      </div>
+    );
+  }
+
+  // Default fallback — neutral
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0 -z-0">
+      <div className="absolute inset-0 bg-muted/20" />
+    </div>
+  );
+}
 
 export function MessageThread({
   conversation,
@@ -957,8 +1067,9 @@ export function MessageThread({
 
   if (!conversation || !contact) {
     return (
-      <div className={cn("flex flex-1 flex-col items-center justify-center", DOODLE_BG_CLASSES)}>
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+      <div className={cn("flex flex-1 flex-col items-center justify-center bg-background", DOODLE_BG_CLASSES)}>
+      <WaveBg platform="whatsapp" />
+        <div className="relative z-10 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
           <MessageSquare className="h-8 w-8 text-muted-foreground" />
         </div>
         <h3 className="mt-4 text-sm font-medium text-muted-foreground">
@@ -1005,10 +1116,10 @@ export function MessageThread({
     // clipped and the hover toolbar overlaps the Tags panel. Letting the
     // root shrink lets the bubbles' break-words / max-w caps apply.
     // Issue #257.
-    <div className={cn("flex min-w-0 flex-1 flex-col", DOODLE_BG_CLASSES)}>
-      {/* Header — solid card surface sits on top of the doodle so the
-          name/avatar/dropdowns stay legible. */}
-      <div className="flex items-center justify-between gap-2 border-b border-border bg-card px-3 py-3 sm:px-4">
+    <div className={cn("flex min-w-0 flex-1 flex-col h-full min-h-0 bg-background", DOODLE_BG_CLASSES)}>
+      <WaveBg platform={platform} />
+      {/* Header */}
+      <div className="relative z-10 flex items-center justify-between gap-2 border-b border-border bg-card px-3 py-3 sm:px-4">
         <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           {/* Back-to-list button — mobile only. Hidden on lg+ where the
               conversation list is always visible next to the thread. */}
@@ -1272,7 +1383,7 @@ export function MessageThread({
       </div>
 
       {/* Messages Area */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4">
+      <div ref={scrollRef} className="relative z-10 min-h-0 flex-1 overflow-y-auto px-4 py-4">
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />

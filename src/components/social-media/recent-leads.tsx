@@ -16,80 +16,112 @@ export interface RecentLead {
   createdAt: string | null;
 }
 
+const PLATFORM_STYLES: Record<string, { bg: string; text: string; border: string; label: string; abbr: string; dot: string }> = {
+  facebook:    { bg: 'bg-[#E8F1FE]', text: 'text-[#1565d8]', border: 'border-[#1877F2]/30', label: 'Facebook',  abbr: 'FB', dot: '#1877F2' },
+  instagram:   { bg: 'bg-[#FEE8F0]', text: 'text-[#c0185a]', border: 'border-[#E1306C]/30', label: 'Instagram', abbr: 'IG', dot: '#E1306C' },
+  whatsapp:    { bg: 'bg-[#E8FBF0]', text: 'text-[#1a9e4e]', border: 'border-[#25D366]/30', label: 'WhatsApp',  abbr: 'WA', dot: '#25D366' },
+  telegram:    { bg: 'bg-[#E8F6FD]', text: 'text-[#1a8fc4]', border: 'border-[#26A5E4]/30', label: 'Telegram',  abbr: 'TG', dot: '#26A5E4' },
+  google_form: { bg: 'bg-[#FFFBEA]', text: 'text-[#b45309]', border: 'border-[#f59e0b]/30', label: 'Google Form', abbr: 'GF', dot: '#f59e0b' },
+  website:     { bg: 'bg-[#F3F0FF]', text: 'text-[#6d28d9]', border: 'border-[#7C3AED]/30', label: 'Website',   abbr: 'WB', dot: '#7C3AED' },
+  manual:      { bg: 'bg-[#F1F5F9]', text: 'text-[#475569]', border: 'border-[#94a3b8]/30', label: 'Manual',    abbr: 'MN', dot: '#94a3b8' },
+}
+
 function SourceBadge({ platform }: { platform?: string | null }) {
   if (!platform) return null;
-  const isFb = platform === "facebook";
-  return (
-    <span
-      className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${
-        isFb
-          ? "bg-blue-950/40 text-blue-300 border-blue-700/50"
-          : "bg-pink-950/40 text-pink-300 border-pink-700/50"
-      }`}
-    >
-      {isFb ? "Facebook" : "Instagram"}
+  const s = PLATFORM_STYLES[platform.toLowerCase()]
+  if (!s) return (
+    <span className="inline-flex items-center rounded-full border border-[#E4E8EF] bg-[#F1F5F9] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[#475569]">
+      {platform}
     </span>
-  );
+  )
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${s.bg} ${s.text} ${s.border}`}>
+      <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: s.dot }} />
+      {s.label}
+    </span>
+  )
+}
+
+const STATUS_STYLES: Record<string, string> = {
+  new:         'bg-[#EEF4FF] text-[#3462EE] border-[#3462EE]/30',
+  contacted:   'bg-[#E8F6FD] text-[#1a8fc4] border-[#26A5E4]/30',
+  qualified:   'bg-[#F3F0FF] text-[#6d28d9] border-[#7C3AED]/30',
+  proposal:    'bg-[#FDF4FF] text-[#9333ea] border-[#a855f7]/30',
+  negotiation: 'bg-[#FFFBEA] text-[#b45309] border-[#f59e0b]/30',
+  won:         'bg-[#EDFAF4] text-[#1a9e4e] border-[#25D366]/30',
+  lost:        'bg-[#FEF2F2] text-[#dc2626] border-[#ef4444]/30',
 }
 
 function StatusBadge({ status }: { status?: string | null }) {
   if (!status) return null;
+  const cls = STATUS_STYLES[status.toLowerCase()] ?? 'bg-[#F1F5F9] text-[#475569] border-[#94a3b8]/30'
   return (
-    <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium capitalize text-primary">
+    <span className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium capitalize ${cls}`}>
       {status}
     </span>
   );
 }
 
-/**
- * Compact list of the most recent Meta leads. Clicking a lead opens the
- * existing CRM contact detail drawer (`/contacts/<id>`). Source / page /
- * account / campaign all come from the real stored contact row.
- */
 export function RecentLeads({ leads, loading }: { leads: RecentLead[]; loading?: boolean }) {
   if (loading && leads.length === 0) {
     return (
       <div className="flex justify-center py-8">
-        <Loader2 className="size-5 animate-spin text-muted-foreground" />
+        <Loader2 className="size-5 animate-spin text-[#667085]" />
       </div>
     );
   }
   if (leads.length === 0) {
     return (
-      <p className="py-6 text-center text-sm text-muted-foreground">
-        No Meta leads yet. Connect Facebook / Instagram to start capturing leads.
+      <p className="py-6 text-center text-sm text-[#667085]">
+        No leads yet. Connect Facebook / Instagram to start capturing leads.
       </p>
     );
   }
   return (
-    <ul className="divide-y divide-border/60">
+    <ul className="divide-y divide-[#E4E8EF]">
       {leads.map((lead) => {
-        const account = lead.sourcePlatform === "instagram"
+        const platform = lead.sourcePlatform?.toLowerCase()
+        const account = platform === "instagram"
           ? (lead.instagramUsername ? `@${lead.instagramUsername}` : "Instagram")
-          : (lead.pageName ?? "Facebook");
+          : platform === "facebook"
+          ? (lead.pageName ?? "Facebook")
+          : platform === "whatsapp"
+          ? "WhatsApp"
+          : platform === "telegram"
+          ? "Telegram"
+          : (lead.pageName ?? lead.sourcePlatform ?? "")
         return (
           <li key={lead.id}>
             <Link
               href={`/contacts/${lead.id}`}
-              className="flex items-center gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-muted/50"
+              className="flex items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-[#F5F8F5]"
             >
+              {/* Avatar circle with platform color */}
+              <div
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white text-[11px] font-bold"
+                style={{ background: PLATFORM_STYLES[platform ?? '']?.dot ?? '#94a3b8' }}
+              >
+                {(lead.name || 'U').charAt(0).toUpperCase()}
+              </div>
+
               <div className="flex min-w-0 flex-1 items-center gap-2.5">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-foreground">
+                  <p className="truncate text-[13px] font-semibold text-[#172033]">
                     {lead.name || "Unnamed lead"}
                   </p>
-                  <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-muted-foreground">
+                  <p className="mt-0.5 flex items-center gap-1.5 truncate text-[11px] text-[#667085]">
                     <SourceBadge platform={lead.sourcePlatform} />
-                    <span className="truncate">{account}</span>
+                    {account && <span className="truncate">{account}</span>}
                     {lead.campaignName && (
-                      <span className="hidden truncate sm:inline">· {lead.campaignName}</span>
+                      <span className="hidden truncate sm:inline text-[#667085]">· {lead.campaignName}</span>
                     )}
                   </p>
                 </div>
               </div>
-              <div className="flex shrink-0 items-center gap-2">
+
+              <div className="flex shrink-0 flex-col items-end gap-1">
                 <StatusBadge status={lead.leadStatus} />
-                <span className="hidden text-xs text-muted-foreground sm:inline">
+                <span className="text-[10px] text-[#667085]">
                   {lead.createdAt ? formatDistanceToNow(new Date(lead.createdAt), { addSuffix: true }) : ""}
                 </span>
               </div>

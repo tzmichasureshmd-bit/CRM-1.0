@@ -48,13 +48,16 @@
   --color-primary-hover: var(--primary-hover);
   --color-primary-soft: var(--primary-soft);
   --color-primary-soft-2: var(--primary-soft-2);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
+  --shadow-card: var(--shadow-card, 0 1px 3px 0 rgba(0,0,0,0.06));
+  --shadow-card-hover: var(--shadow-card-hover, 0 4px 12px -2px rgba(0,0,0,0.1));
+  --shadow-dropdown: var(--shadow-dropdown, 0 8px 24px -4px rgba(0,0,0,0.12));
+  --radius-sm: calc(var(--radius) * 0.5);
+  --radius-md: calc(var(--radius) * 0.7);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  --radius-xl: calc(var(--radius) * 1.3);
+  --radius-2xl: calc(var(--radius) * 1.6);
+  --radius-3xl: calc(var(--radius) * 2);
+  --radius-4xl: calc(var(--radius) * 2.4);
 }
 
 /* ============================================================
@@ -117,32 +120,48 @@ html[data-mode="dark"] {
 }
 
 html[data-mode="light"] {
-  --background: oklch(0.99 0.002 260);
-  --foreground: oklch(0.21 0.01 260);
+  /* ── Surfaces ── */
+  /* Main canvas: soft off-white/pale mint #F5F8F5 */
+  --background: oklch(0.974 0.006 150);
+  /* Primary text: deep navy #172033 */
+  --foreground: oklch(0.19 0.025 240);
+  /* Card: pure white */
   --card: oklch(1 0 0);
-  --card-2: oklch(0.985 0.002 260);
-  --card-foreground: oklch(0.21 0.01 260);
+  /* Secondary card surface: very light blue-gray #EEF2F8 */
+  --card-2: oklch(0.962 0.008 240);
+  --card-foreground: oklch(0.19 0.025 240);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.21 0.01 260);
-  --secondary: oklch(0.967 0.003 260);
-  --secondary-foreground: oklch(0.25 0.01 260);
-  --muted: oklch(0.967 0.003 260);
-  --muted-foreground: oklch(0.52 0.015 260);
-  --accent: oklch(0.96 0.004 260);
-  --accent-foreground: oklch(0.25 0.01 260);
+  --popover-foreground: oklch(0.19 0.025 240);
+  /* Secondary bg: light blue-gray #EEF2F8 */
+  --secondary: oklch(0.955 0.01 240);
+  --secondary-foreground: oklch(0.25 0.02 240);
+  /* Muted: slightly tinted */
+  --muted: oklch(0.955 0.008 240);
+  /* Muted text: slate #667085 */
+  --muted-foreground: oklch(0.52 0.018 240);
+  --accent: oklch(0.955 0.01 240);
+  --accent-foreground: oklch(0.25 0.02 240);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0.004 260);
-  --input: oklch(0.922 0.004 260);
-  --chart-2: oklch(0.6 0.1 260);
-  --chart-3: oklch(0.7 0.06 260);
-  --chart-4: oklch(0.8 0.04 260);
-  --chart-5: oklch(0.87 0.03 260);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0.002 260);
-  --sidebar-foreground: oklch(0.21 0.01 260);
-  --sidebar-accent: oklch(0.96 0.004 260);
-  --sidebar-accent-foreground: oklch(0.25 0.01 260);
-  --sidebar-border: oklch(0.922 0.004 260);
+  /* Border: #E4E8EF */
+  --border: oklch(0.912 0.012 240);
+  --input: oklch(0.912 0.012 240);
+  /* Chart palette — multi-color for light mode */
+  --chart-2: oklch(0.62 0.14 195);  /* teal #429AA5 */
+  --chart-3: oklch(0.78 0.16 130);  /* green #16A673 */
+  --chart-4: oklch(0.82 0.16 85);   /* yellow #F2D94E */
+  --chart-5: oklch(0.65 0.18 250);  /* blue #3B82F6 */
+  /* Radius: 14px base for cards, scales down for controls */
+  --radius: 0.875rem;
+  /* Sidebar: white with subtle border */
+  --sidebar: oklch(1 0 0);
+  --sidebar-foreground: oklch(0.19 0.025 240);
+  --sidebar-accent: oklch(0.955 0.01 240);
+  --sidebar-accent-foreground: oklch(0.25 0.02 240);
+  --sidebar-border: oklch(0.912 0.012 240);
+  /* Elevation shadows for light mode */
+  --shadow-card: 0 1px 3px 0 rgba(23, 32, 51, 0.06), 0 1px 2px -1px rgba(23, 32, 51, 0.04);
+  --shadow-card-hover: 0 4px 12px -2px rgba(23, 32, 51, 0.1), 0 2px 6px -2px rgba(23, 32, 51, 0.06);
+  --shadow-dropdown: 0 8px 24px -4px rgba(23, 32, 51, 0.12), 0 2px 8px -2px rgba(23, 32, 51, 0.08);
 }
 
 /* ---- ACCENT: primary color ---- */
@@ -349,6 +368,74 @@ html[data-theme="red"] {
   nav::-webkit-scrollbar {
     width: 3px;
   }
+}
+
+/* ============================================================
+   PREMIUM DESIGN SYSTEM — utility classes
+   ============================================================ */
+
+/* Card with proper elevation shadow in light mode */
+html[data-mode="light"] .ds-card {
+  box-shadow: var(--shadow-card);
+}
+html[data-mode="light"] .ds-card:hover {
+  box-shadow: var(--shadow-card-hover);
+}
+html[data-mode="light"] .ds-card-elevated {
+  box-shadow: var(--shadow-card-hover);
+}
+
+/* Sidebar active item — softer pill style */
+html[data-mode="light"] .sidebar-active {
+  background: color-mix(in oklab, var(--primary) 10%, transparent);
+  color: var(--primary);
+  font-weight: 600;
+}
+html[data-mode="light"] .sidebar-active:hover {
+  background: color-mix(in oklab, var(--primary) 14%, transparent);
+}
+
+/* KPI metric card accent strips */
+.ds-metric-blue   { --metric-color: oklch(0.6 0.18 250); }
+.ds-metric-green  { --metric-color: oklch(0.55 0.16 162); }
+.ds-metric-amber  { --metric-color: oklch(0.72 0.16 65); }
+.ds-metric-violet { --metric-color: oklch(0.55 0.22 270); }
+.ds-metric-teal   { --metric-color: oklch(0.58 0.14 195); }
+.ds-metric-rose   { --metric-color: oklch(0.62 0.22 16); }
+
+.ds-metric-icon {
+  background: color-mix(in oklab, var(--metric-color) 12%, transparent);
+  color: var(--metric-color);
+}
+
+/* Page section header */
+.ds-section-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--foreground);
+}
+
+/* Stat badge */
+.ds-badge-success {
+  background: oklch(0.55 0.16 162 / 0.1);
+  color: oklch(0.45 0.14 162);
+  border: 1px solid oklch(0.55 0.16 162 / 0.2);
+}
+.ds-badge-warning {
+  background: oklch(0.72 0.16 65 / 0.1);
+  color: oklch(0.55 0.14 65);
+  border: 1px solid oklch(0.72 0.16 65 / 0.2);
+}
+.ds-badge-info {
+  background: oklch(0.6 0.18 250 / 0.1);
+  color: oklch(0.48 0.16 250);
+  border: 1px solid oklch(0.6 0.18 250 / 0.2);
+}
+.ds-badge-neutral {
+  background: var(--muted);
+  color: var(--muted-foreground);
+  border: 1px solid var(--border);
 }
 
 /* ============================================================
@@ -1102,4 +1189,212 @@ html[data-mode="dark"] .landing-dots-bg {
     max-width: 21rem;
     padding: 2rem 0 2.5rem;
   }
+}
+
+
+/* ================================
+   LOGIN / SIGNUP SPLIT LAYOUT
+================================ */
+
+.login-page {
+  min-height: 100vh;
+  width: 100%;
+  background:
+    radial-gradient(circle at 15% 20%, rgba(30, 169, 123, 0.35), transparent 40%),
+    radial-gradient(circle at 85% 80%, rgba(114, 198, 19, 0.18), transparent 35%),
+    linear-gradient(135deg, #053438 0%, #044B39 55%, #053438 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+
+.login-page--signup {
+  background:
+    radial-gradient(circle at 20% 80%, rgba(99, 102, 241, 0.3), transparent 40%),
+    radial-gradient(circle at 80% 20%, rgba(139, 92, 246, 0.2), transparent 35%),
+    linear-gradient(135deg, #0f0c29 0%, #1a1a4e 50%, #24243e 100%);
+}
+
+.login-card {
+  width: 100%;
+  max-width: 1080px;
+  height: 765px;
+  background: #ffffff;
+  border-radius: 80px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 18px;
+  overflow: hidden;
+}
+
+.login-card--reversed .login-right { order: -1; border-radius: 65px; }
+.login-card--reversed .login-left { order: 1; }
+
+.login-left {
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 60px;
+  padding: 40px;
+}
+
+.login-content {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.login-heading-cursive {
+  font-family: 'Dancing Script', cursive;
+  font-size: 44px;
+  font-weight: 700;
+  color: #111111;
+  letter-spacing: 0px;
+  line-height: 1.2;
+  margin-bottom: 6px;
+}
+
+.login-content h1 {
+  font-size: 34px;
+  font-weight: 600;
+  color: #111111;
+  letter-spacing: -1.2px;
+  line-height: 1.3;
+}
+
+.login-brand-sub {
+  font-size: 11px;
+  color: #888888;
+  margin-bottom: 18px;
+}
+
+.login-subtitle {
+  font-size: 12px;
+  color: #111111;
+  margin-top: 6px;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.login-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.input-wrapper {
+  width: 100%;
+  height: 44px;
+  border: 1px solid #d4d4d4;
+  border-radius: 30px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  margin-bottom: 10px;
+  background: #ffffff;
+  transition: border-color 0.2s ease;
+}
+
+.input-wrapper:focus-within { border-color: #2038b5; }
+.input-wrapper input {
+  width: 100%;
+  height: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 12px;
+  color: #111111;
+}
+.input-wrapper input::placeholder { color: #999999; }
+.input-icon { color: #a0a5a8; font-size: 15px; flex-shrink: 0; }
+.password-toggle { background: transparent; border: none; cursor: pointer; padding: 4px; color: #a0a5a8; display: flex; align-items: center; }
+
+.login-options {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 3px;
+  margin-bottom: 28px;
+  font-size: 10px;
+}
+
+.remember-me { display: flex; align-items: center; gap: 6px; color: #222222; cursor: pointer; }
+.remember-me input { width: 12px; height: 12px; accent-color: #2038b5; }
+.login-options a { text-decoration: none; color: #999999; font-size: 9px; }
+.login-options a:hover { color: #2038b5; }
+
+.login-button {
+  width: 100%;
+  height: 43px;
+  border: none;
+  border-radius: 30px;
+  background: #2038b5;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 400;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+.login-button:hover { background: #172d99; }
+.login-button:active { transform: scale(0.99); }
+.login-button:disabled { opacity: 0.65; cursor: not-allowed; }
+
+.login-right {
+  position: relative;
+  overflow: hidden;
+  border-radius: 65px;
+  background: #060b40;
+  min-width: 0;
+}
+
+.login-error-banner {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border-radius: 10px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: #dc2626;
+  margin-bottom: 12px;
+}
+
+.login-switch {
+  text-align: center;
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 16px;
+}
+.login-switch a { color: #2038b5; font-weight: 600; text-decoration: none; }
+.login-switch a:hover { text-decoration: underline; }
+
+@media (max-width: 1024px) {
+  .login-page { padding: 25px; }
+  .login-card { height: 700px; border-radius: 60px; }
+  .login-left { padding: 30px; }
+  .login-content { max-width: 320px; }
+  .login-content h1 { font-size: 30px; }
+  .login-right { border-radius: 50px; }
+}
+@media (max-width: 768px) {
+  .login-page { padding: 20px; min-height: 100vh; }
+  .login-card { max-width: 480px; height: auto; min-height: 650px; display: block; border-radius: 35px; padding: 15px; }
+  .login-left { min-height: 620px; padding: 30px 20px; border-radius: 25px; }
+  .login-content { max-width: 350px; }
+  .login-content h1 { font-size: 30px; }
+  .login-right { display: none; }
+}
+@media (max-width: 400px) {
+  .login-page { padding: 12px; }
+  .login-card { border-radius: 28px; padding: 10px; }
+  .login-left { padding: 25px 15px; min-height: 580px; }
+  .login-content h1 { font-size: 27px; }
+  .login-options { font-size: 9px; }
 }

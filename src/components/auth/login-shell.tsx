@@ -14,7 +14,7 @@ import {
 
 import { cn } from "@/lib/utils";
 
-const LOGIN_IMAGE_SRC = "/images/crm4.jpeg";
+const LOGIN_IMAGE_SRC = "/images/remove_background.jpg";
 
 /* ------------------------------------------------------------------
  * Cinematic shell: CRM4 image covers the entire viewport as one
@@ -23,13 +23,14 @@ const LOGIN_IMAGE_SRC = "/images/crm4.jpeg";
  * the page — there is no split-screen, side panel or separate
  * login column.
  * ------------------------------------------------------------------ */
-export function LoginShell({ children }: { children: React.ReactNode }) {
+export function LoginShell({ children, imageSrc }: { children: React.ReactNode; imageSrc?: string }) {
+  const src = imageSrc ?? LOGIN_IMAGE_SRC;
   return (
     <main className="login-shell">
       <div className="login-bg" aria-hidden="true">
         <Image
           className="login-bg__img"
-          src={LOGIN_IMAGE_SRC}
+          src={src}
           alt=""
           fill
           priority

@@ -70,6 +70,19 @@ interface OverviewPayload {
     botUsername: string | null;
     lastInboundAt: string | null;
   };
+  threads: {
+    connected: boolean;
+    username: string | null;
+    name: string | null;
+    connectedAt: string | null;
+  } | null;
+  x: {
+    connected: boolean;
+    username: string | null;
+    name: string | null;
+    connectedAt: string | null;
+    accessLevel: string | null;
+  } | null;
 }
 
 interface HealthPayload {
@@ -211,15 +224,32 @@ interface IntegrationCard {
   category: Exclude<Category, "all">;
   name: string;
   tagline: string;
-  icon: typeof Webhook;
+  icon: typeof Webhook | ((props: { className?: string }) => React.ReactElement);
   iconClass: string;
   description: string;
+  notice?: string;
   sections: (payload: OverviewPayload) => { label: string; value: string }[];
   state: (payload: OverviewPayload) => ConnectionBadgeProps;
   health?: (payload: HealthPayload) => { label: string; value: string; tone: HealthTone }[];
   action:
-    | { href: string; label: string; primary?: boolean }[]
-    | ((payload: OverviewPayload) => { href: string; label: string; primary?: boolean }[]);
+    | { href?: string; actionId?: string; label: string; primary?: boolean }[]
+    | ((payload: OverviewPayload) => { href?: string; actionId?: string; label: string; primary?: boolean }[]);
+}
+
+function XIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.253 5.622 5.911-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
+  );
+}
+
+function ThreadsIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 192 192" fill="currentColor" className={className}>
+      <path d="M141.537 88.988a66.667 66.667 0 0 0-2.518-1.143c-1.482-27.307-16.403-42.94-41.457-43.1h-.34c-14.986 0-27.449 6.396-35.12 18.036l13.779 9.452c5.73-8.695 14.724-10.548 21.348-10.548h.229c8.249.053 14.474 2.452 18.503 7.129 2.932 3.405 4.893 8.111 5.864 14.05-7.314-1.243-15.224-1.626-23.68-1.14-23.82 1.371-39.134 15.264-38.105 34.568.522 9.792 5.4 18.216 13.735 23.719 7.047 4.652 16.124 6.927 25.557 6.412 12.458-.683 22.231-5.436 29.049-14.127 5.178-6.6 8.453-15.153 9.899-25.93 5.937 3.583 10.337 8.298 12.767 13.966 4.132 9.635 4.373 25.468-8.546 38.376-11.319 11.308-24.925 16.2-45.488 16.35-22.809-.169-40.06-7.484-51.275-21.742C35.236 139.966 29.808 120.682 29.605 96c.203-24.682 5.63-43.966 16.133-57.317C56.954 24.425 74.204 17.11 97.013 16.94c22.975.17 40.526 7.52 52.171 21.847 5.71 7.026 10.015 15.86 12.853 26.162l16.147-4.308c-3.44-12.68-8.853-23.606-16.219-32.668C147.036 9.607 125.202.195 97.07 0h-.113C68.882.195 47.292 9.642 32.788 28.08 19.882 44.485 13.224 67.315 13.001 95.932L13 96v.067c.224 28.617 6.882 51.447 19.788 67.854C47.292 182.358 68.882 191.805 96.957 192h.113c24.96-.173 42.554-6.708 57.048-21.189 18.963-18.945 18.392-42.692 12.142-57.27-4.484-10.454-13.033-18.945-24.723-24.553z" />
+    </svg>
+  );
 }
 
 function buildCards(): IntegrationCard[] {
@@ -534,6 +564,60 @@ function buildCards(): IntegrationCard[] {
       state: () => ({ state: "available", label: "Available" }),
       action: [{ href: "/settings?tab=api", label: "Manage keys", primary: true }],
     },
+    {
+      id: "threads",
+      category: "social-media",
+      name: "Threads",
+      tagline: "Meta Threads API",
+      icon: ThreadsIcon,
+      iconClass: "bg-foreground/5 text-foreground",
+      description:
+        "Connect your Threads account to publish posts and manage replies via the official Meta Threads API. DMs are not supported by the Threads API.",
+      notice: "Threads does not support DMs — inbox integration is not available.",
+      sections: (p) => [
+        { label: "Account", value: p.threads?.connected ? (p.threads.username ? `@${p.threads.username}` : p.threads.name ?? "Connected") : "Not connected" },
+        { label: "Connected", value: p.threads?.connectedAt ? fmtDate(p.threads.connectedAt) : "—" },
+        { label: "Capabilities", value: "Publish posts, manage replies" },
+      ],
+      state: (p) =>
+        p.threads?.connected
+          ? { state: "connected", label: "Connected" }
+          : { state: "notConnected", label: "Not connected" },
+      action: (p) =>
+        p.threads?.connected
+          ? [
+              { actionId: "threads-refresh", label: "Refresh token" },
+              { actionId: "threads-disconnect", label: "Disconnect" },
+            ]
+          : [{ actionId: "threads-connect", label: "Connect Threads", primary: true }],
+    },
+    {
+      id: "x",
+      category: "social-media",
+      name: "X (Twitter)",
+      tagline: "X API v2 · OAuth 2.0 PKCE",
+      icon: XIcon,
+      iconClass: "bg-foreground/5 text-foreground",
+      description:
+        "Connect your X account to publish tweets and read your timeline via the official X API v2. DMs and real-time webhooks require Pro ($5,000/mo) or Enterprise tier.",
+      notice: "DMs and webhooks require X Pro/Enterprise. Free tier: publish tweets, read timeline.",
+      sections: (p) => [
+        { label: "Account", value: p.x?.connected ? (p.x.username ? `@${p.x.username}` : p.x.name ?? "Connected") : "Not connected" },
+        { label: "Access level", value: p.x?.accessLevel ?? "—" },
+        { label: "Connected", value: p.x?.connectedAt ? fmtDate(p.x.connectedAt) : "—" },
+      ],
+      state: (p) =>
+        p.x?.connected
+          ? { state: "connected", label: "Connected" }
+          : { state: "notConnected", label: "Not connected" },
+      action: (p) =>
+        p.x?.connected
+          ? [
+              { actionId: "x-refresh", label: "Refresh token" },
+              { actionId: "x-disconnect", label: "Disconnect" },
+            ]
+          : [{ actionId: "x-connect", label: "Connect X", primary: true }],
+    },
   ];
 }
 
@@ -544,21 +628,23 @@ export default function IntegrationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [category, setCategory] = useState<Category>("all");
   const [checkingHealth, setCheckingHealth] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [ovRes, hRes, tgRes] = await Promise.all([
+      const [ovRes, hRes, tgRes, thRes, xRes] = await Promise.all([
         fetch("/api/integrations/overview", { cache: "no-store" }),
         fetch("/api/integrations/health", { cache: "no-store" }),
         fetch("/api/telegram/connect", { cache: "no-store" }),
+        fetch("/api/threads/connect", { cache: "no-store" }),
+        fetch("/api/x/connect", { cache: "no-store" }),
       ]);
       if (!ovRes.ok || !hRes.ok) {
         setError("Could not load integration status. Please try again.");
         return;
       }
       const ovData = await ovRes.json();
-      // Merge Telegram bot status into the overview payload
       if (tgRes.ok) {
         const tgData = await tgRes.json();
         const bot = tgData.bot;
@@ -570,6 +656,18 @@ export default function IntegrationsPage() {
         };
       } else {
         ovData.telegram = { connected: false, botName: null, botUsername: null, lastInboundAt: null };
+      }
+      if (thRes.ok) {
+        const thData = await thRes.json();
+        ovData.threads = thData.connected ? thData.integration : { connected: false, username: null, name: null, connectedAt: null };
+      } else {
+        ovData.threads = null;
+      }
+      if (xRes.ok) {
+        const xData = await xRes.json();
+        ovData.x = xData.connected ? xData.integration : { connected: false, username: null, name: null, connectedAt: null, accessLevel: null };
+      } else {
+        ovData.x = null;
       }
       setPayload(ovData);
       setHealth((await hRes.json()) as HealthPayload);
@@ -597,6 +695,49 @@ export default function IntegrationsPage() {
       setCheckingHealth(false);
     }
   }, []);
+
+  const handleAction = useCallback(async (actionId: string) => {
+    setActionLoading(actionId);
+    try {
+      if (actionId === "threads-connect") {
+        const res = await fetch("/api/threads/connect", { method: "POST" });
+        const data = await res.json();
+        if (data.authUrl) window.location.href = data.authUrl;
+      } else if (actionId === "threads-disconnect") {
+        await fetch("/api/threads/connect", { method: "DELETE" });
+        void load();
+      } else if (actionId === "threads-refresh") {
+        await fetch("/api/threads/connect", { method: "PATCH" });
+        void load();
+      } else if (actionId === "x-connect") {
+        const res = await fetch("/api/x/connect", { method: "POST" });
+        const data = await res.json();
+        if (data.authUrl) window.location.href = data.authUrl;
+      } else if (actionId === "x-disconnect") {
+        await fetch("/api/x/connect", { method: "DELETE" });
+        void load();
+      } else if (actionId === "x-refresh") {
+        await fetch("/api/x/connect", { method: "PATCH" });
+        void load();
+      }
+    } catch (err) {
+      console.error("Action failed:", actionId, err);
+    } finally {
+      setActionLoading(null);
+    }
+  }, [load]);
+
+  // Detect OAuth return params and reload status
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("threads_oauth") || params.has("x_oauth")) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("threads_oauth");
+      url.searchParams.delete("x_oauth");
+      window.history.replaceState({}, "", url.toString());
+      void load();
+    }
+  }, [load]);
 
   const cards = payload ? buildCards() : [];
   const visible =
@@ -708,6 +849,12 @@ export default function IntegrationsPage() {
                   {card.description}
                 </p>
 
+                {card.notice && (
+                  <p className="mt-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-400">
+                    {card.notice}
+                  </p>
+                )}
+
                 <dl className="mt-4 space-y-1.5 rounded-lg bg-muted/40 px-3 py-2.5">
                   {card.sections(payload!).map((s) => (
                     <div
@@ -731,11 +878,28 @@ export default function IntegrationsPage() {
                 )}
 
                 <div className="mt-4 flex flex-wrap gap-2 pt-1">
-                  {actions.map((a) =>
-                    a.primary ? (
+                  {actions.map((a) => {
+                    if (a.actionId) {
+                      const isLoading = actionLoading === a.actionId;
+                      return (
+                        <button
+                          key={a.actionId}
+                          type="button"
+                          disabled={isLoading || actionLoading !== null}
+                          onClick={() => void handleAction(a.actionId!)}
+                          className={a.primary
+                            ? "inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
+                            : "inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted disabled:opacity-60"}
+                        >
+                          {isLoading ? <Loader2 className="size-3 animate-spin" /> : null}
+                          {a.label}
+                        </button>
+                      );
+                    }
+                    return a.primary ? (
                       <Link
                         key={a.label}
-                        href={a.href}
+                        href={a.href!}
                         className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
                       >
                         {a.label}
@@ -743,13 +907,13 @@ export default function IntegrationsPage() {
                     ) : (
                       <Link
                         key={a.label}
-                        href={a.href}
+                        href={a.href!}
                         className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted"
                       >
                         <Settings2 className="size-3.5" /> {a.label}
                       </Link>
-                    ),
-                  )}
+                    );
+                  })}
                 </div>
               </li>
             );

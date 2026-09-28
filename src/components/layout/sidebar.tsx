@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
@@ -256,20 +257,25 @@ export function Sidebar({ open = false, onClose, collapsed = false, onToggleColl
 
   const [channelStatus, setChannelStatus] = useState<{
     whatsapp: boolean; instagram: boolean; facebook: boolean; telegram: boolean;
-  }>({ whatsapp: false, instagram: false, facebook: false, telegram: false });
+    x: boolean; threads: boolean;
+  }>({ whatsapp: false, instagram: false, facebook: false, telegram: false, x: false, threads: false });
 
   useEffect(() => {
     let cancelled = false;
     Promise.all([
       fetch("/api/integrations/overview", { cache: "no-store" }).then((r) => r.ok ? r.json() : null).catch(() => null),
       fetch("/api/telegram/connect", { cache: "no-store" }).then((r) => r.ok ? r.json() : null).catch(() => null),
-    ]).then(([overview, tg]) => {
+      fetch("/api/x/connect", { cache: "no-store" }).then((r) => r.ok ? r.json() : null).catch(() => null),
+      fetch("/api/threads/connect", { cache: "no-store" }).then((r) => r.ok ? r.json() : null).catch(() => null),
+    ]).then(([overview, tg, xData, thData]) => {
       if (cancelled) return;
       setChannelStatus({
         whatsapp: overview?.whatsapp?.connected === true,
         instagram: (overview?.meta?.instagramAccounts ?? 0) > 0,
         facebook: (overview?.meta?.facebookPages ?? 0) > 0,
         telegram: tg?.bot?.status === "connected",
+        x: xData?.connected === true,
+        threads: thData?.connected === true,
       });
     });
     return () => { cancelled = true; };
@@ -336,8 +342,8 @@ export function Sidebar({ open = false, onClose, collapsed = false, onToggleColl
             href="/dashboard"
             className={cn("flex items-center gap-2.5", collapsed && "lg:justify-center")}
           >
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm shadow-primary/20">
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center">
+              <Image src="/images/logo.png" alt="Logo" width={40} height={40} className="rounded-lg object-contain" />
             </div>
             {!collapsed && (
               <div className="flex flex-col">
@@ -516,7 +522,7 @@ export function Sidebar({ open = false, onClose, collapsed = false, onToggleColl
 
                       {/* Channels block — shown inside Conversations section */}
                       {section.labelKey === "sectionConversations" && (
-                        <div className="mt-1 pl-2">
+                        <div className="mt-2 border-t border-border/40 pt-2 pl-2">
                           <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">Channels</p>
                           <ul className="flex flex-col gap-0.5">
                             {[
@@ -524,8 +530,8 @@ export function Sidebar({ open = false, onClose, collapsed = false, onToggleColl
                               { label: "Instagram", icon: InstagramIcon, color: "text-[#E1306C]", href: channelStatus.instagram ? "/inbox?channel=instagram" : "/settings?tab=meta-leads", connected: channelStatus.instagram, available: true },
                               { label: "Facebook", icon: FacebookIcon, color: "text-[#1877F2]", href: channelStatus.facebook ? "/inbox?channel=facebook" : "/settings?tab=meta-leads", connected: channelStatus.facebook, available: true },
                               { label: "Telegram", icon: TelegramIcon, color: "text-[#26A5E4]", href: channelStatus.telegram ? "/inbox?channel=telegram" : "/settings?tab=telegram", connected: channelStatus.telegram, available: true },
-                              { label: "Twitter / X", icon: TwitterXIcon, color: "text-foreground", href: "/inbox?channel=twitter", connected: false, available: false },
-                              { label: "Threads", icon: ThreadsIcon, color: "text-foreground", href: "/inbox?channel=threads", connected: false, available: false },
+                              { label: "Twitter / X", icon: TwitterXIcon, color: "text-foreground", href: channelStatus.x ? "/inbox?channel=x" : "/integrations", connected: channelStatus.x, available: true },
+                              { label: "Threads", icon: ThreadsIcon, color: "text-foreground", href: channelStatus.threads ? "/integrations" : "/integrations", connected: channelStatus.threads, available: true },
                             ].map((ch) => (
                               <li key={ch.label}>
                                 <Link
