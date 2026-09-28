@@ -110,7 +110,15 @@ export function StepCard({
   return (
     <div
       className={cn(
-        "group/step relative w-full rounded-xl border bg-card text-left transition-[border-color,box-shadow] duration-150",
+        // `max-w-[22rem]` is the canvas's one measure. The trigger node
+        // and the empty state are already capped at it; without the same
+        // cap here the step cards stretched to the full width of the
+        // `max-w-2xl` canvas column (~640px on a wide monitor) while
+        // the trigger stayed 352px, so the two halves of the same
+        // column no longer lined up. The card is also a viewport-
+        // independent unit now, which is what keeps `truncate` doing
+        // its job at every window size.
+        "group/step relative w-full max-w-[22rem] rounded-xl border bg-card text-left transition-[border-color,box-shadow] duration-150",
         overlay
           ? "border-primary/40 shadow-xl"
           : selected
@@ -143,26 +151,26 @@ export function StepCard({
           iconSize={15}
           className="mt-0.5"
         />
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="flex items-center gap-1.5">
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
             <span
-              className="text-[10px] font-semibold tracking-wider uppercase"
+              className="text-xs leading-tight font-semibold tracking-wide uppercase"
               style={{ color: colors.text }}
             >
               {t(`eyebrows.${stepEyebrow(step.step_type)}`)}
             </span>
             {!summary.configured && (
-              <span className="inline-flex items-center rounded-full bg-amber-500/15 px-1.5 py-px text-[9.5px] font-semibold tracking-wide text-amber-700 uppercase dark:text-amber-400">
+              <span className="inline-flex items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-xs leading-tight font-semibold text-amber-700 dark:text-amber-400">
                 {t("needsSetup")}
               </span>
             )}
           </span>
-          <span className="truncate text-[13.5px] leading-tight font-semibold text-foreground">
+          <span className="truncate text-sm leading-tight font-semibold text-foreground">
             {t(`steps.${step.step_type}`)}
           </span>
           <span
             className={cn(
-              "truncate text-[11.5px] leading-snug",
+              "truncate text-sm leading-snug",
               summary.configured
                 ? "text-muted-foreground"
                 : "text-muted-foreground italic"
@@ -175,15 +183,28 @@ export function StepCard({
       </button>
 
       {/* Controls. Present in the DOM either way (tabbable, announced),
-          visually recessive until hover or keyboard focus — and pinned
-          open below `sm`, because a touch device never fires hover and
-          a control that only exists on hover does not exist at all. */}
+          visually recessive until hover or keyboard focus — and always
+          visible below `sm`, because a touch device never fires hover
+          and a control that only exists on hover does not exist at all.
+
+          These sit in the normal flow, in their own row, rather than
+          absolutely positioned over the card. Overlaying them put a
+          ~104px cluster on top of the eyebrow and the title, so the
+          two lines that name the step were covered by an opaque
+          backdrop the moment the pointer arrived — and on a touch
+          device the `mt-auto` escape hatch did nothing at all, because
+          the card is a block, not a flex column, so the controls fell
+          flush against the border with no padding.
+
+          `opacity` is what reveals them, and opacity is not a layout
+          property: the row is always measured, so revealing the
+          controls never reflows the canvas under the cursor. */}
       {!overlay && (
         <div
           className={cn(
-            "absolute top-1.5 right-1.5 z-10 flex items-center gap-0.5 rounded-lg border border-border bg-card/95 p-0.5 shadow-xs backdrop-blur-sm",
+            "flex items-center justify-end gap-0.5 px-3.5 pb-2.5",
             "opacity-0 transition-opacity duration-150 group-hover/step:opacity-100 group-focus-within/step:opacity-100",
-            "max-sm:static max-sm:mt-auto max-sm:border-0 max-sm:bg-transparent max-sm:p-0 max-sm:shadow-none max-sm:opacity-100"
+            "max-sm:opacity-100"
           )}
         >
           {dragHandle}

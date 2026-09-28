@@ -424,7 +424,7 @@ function ReadinessBadge({
 
   if (ready) {
     return (
-      <span className="hidden items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-700 sm:inline-flex dark:text-emerald-400">
+      <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs leading-tight font-medium text-emerald-700 dark:text-emerald-400">
         {t("readiness.ready")}
       </span>
     )
@@ -435,8 +435,16 @@ function ReadinessBadge({
   // workflow with no steps at all — there is nowhere to jump, so this
   // degrades to a plain label rather than a button that does nothing
   // when pressed.
+  //
+  // `inline-flex` has to be in the base, not at `sm`. The two variants
+  // used to differ (`hidden sm:inline-flex` for the ready one), so
+  // below `sm` the not-ready badge fell back to `display: inline`,
+  // where `gap` and `py-1` are both inert — the text sat on the
+  // border with no padding around it, and the one badge that tells the
+  // user their workflow cannot be activated was the only one that
+  // rendered broken. It is also the one they most need to read.
   const className =
-    "items-center gap-1.5 rounded-full bg-amber-500/12 px-2.5 py-1 text-[11px] font-medium text-amber-700 sm:inline-flex dark:text-amber-400"
+    "inline-flex shrink-0 items-center gap-1.5 rounded-full bg-amber-500/12 px-2.5 py-1 text-xs leading-tight font-medium text-amber-700 dark:text-amber-400"
   if (!jumpTarget) {
     return <span className={className}>{t("readiness.incomplete", { count: total })}</span>
   }

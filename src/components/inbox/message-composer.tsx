@@ -115,6 +115,30 @@ interface MediaDraft {
   caption: string;
 }
 
+/**
+ * The row of square icon controls beside the textarea: attach, `+`,
+ * templates, AI draft, emoji.
+ *
+ * They were `text-muted-foreground` with a `hover:text-foreground` and
+ * nothing else. Read at rest against the bar they are legible, but
+ * there was no affordance and no focus state at all — nothing to tell a
+ * keyboard user which control they were on, and nothing to make them
+ * read as buttons rather than stray glyphs.
+ *
+ * The border is transparent at rest and only appears on hover/focus, so
+ * the resting row is unchanged; the `disabled:` tail is required because
+ * otherwise a disabled control keeps the hover surface it can no longer
+ * act on.
+ */
+const ROW_ICON_BUTTON = cn(
+  "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-transparent p-0",
+  "text-muted-foreground transition-colors",
+  "hover:border-border hover:bg-card hover:text-foreground",
+  "focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+  "disabled:cursor-not-allowed disabled:opacity-50",
+  "disabled:border-transparent disabled:bg-transparent disabled:hover:border-transparent disabled:hover:bg-transparent",
+);
+
 interface MessageComposerProps {
   conversationId: string;
   /** The conversation's channel. WhatsApp keeps its 24h-window rules,
@@ -594,7 +618,31 @@ export function MessageComposer({
   // ---- Render --------------------------------------------------------
 
   return (
-    <div className="border-t border-border bg-card p-3">
+    // `shrink-0` is load-bearing, not decoration. This is the last flex
+    // child of a `flex-col` whose message list is `flex-1` — and
+    // `flex-1` means `flex-shrink: 1; flex-basis: 0%`, so the list's
+    // scaled shrink factor is zero and it never gives up any height.
+    // This bar defaulted to `flex-shrink: 1`, so whenever the column
+    // overflowed it absorbed the ENTIRE overflow on its own: on a short
+    // viewport (1366x768, 1280x720, or any laptop with browser chrome)
+    // the textarea was squeezed and its content spilled up over the
+    // message list, which is what "the typing box isn't visible" looked
+    // like. It only reproduced on the smaller screens, which is why it
+    // looked fine on a big monitor.
+    //
+    // `z-20` keeps the bar and the emoji popover (which opens upward
+    // from inside it) above the scrolling message list.
+    //
+    // `bg-background`, where this was `bg-card`: the bar is now the
+    // RECESSED surface and the textarea is the RAISED one. The token
+    // pairs in this app are close in lightness — dark mode `--card`
+    // L.18 vs `--muted` L.22 is a 0.04 gap, light mode `--card` L1.0
+    // vs `--muted` L.955 is 0.045 — so with a `bg-card` bar the
+    // `bg-muted` field was a near-invisible tint difference, which is
+    // why the input read as "not there" in dark mode. Putting the
+    // lighter surface on the thing you type into is legible in both
+    // modes, and the field's border plus `shadow-xs` do the rest.
+    <div className="relative z-20 shrink-0 border-t border-border bg-background p-3">
       {replyTo && (
         <div className="mb-2">
           <ReplyQuote
@@ -665,7 +713,9 @@ export function MessageComposer({
         />
       ) : recording ? (
         // Recording bar — replaces the composer while the mic is live.
-        <div className="flex items-center gap-3 rounded-xl border border-border bg-muted px-4 py-2.5">
+        // Same surface treatment as the textarea it stands in for, so the
+        // swap between the two doesn't jump the layout around.
+        <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-2.5 shadow-xs">
           <span className="flex h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-red-500" />
           <span className="flex-1 text-sm text-foreground">
             {t("recording", { current: formatDuration(recordSeconds), max: formatDuration(MAX_RECORDING_SECONDS) })}
@@ -673,14 +723,14 @@ export function MessageComposer({
           <button
             type="button"
             onClick={cancelRecording}
-            className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-card hover:text-foreground"
+            className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             {t("cancel")}
           </button>
           <Button
             size="sm"
             onClick={stopRecording}
-            className="h-9 w-9 shrink-0 bg-primary p-0 hover:bg-primary/90"
+            className="h-9 w-9 shrink-0 bg-primary p-0 text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             title={t("stopAndAttach")}
           >
             <Square className="h-4 w-4" />
@@ -701,7 +751,7 @@ export function MessageComposer({
                       ? undefined
                       : t("attachMedia")
               }
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md p-0 text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              className={ROW_ICON_BUTTON}
             >
               {busy ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -745,7 +795,7 @@ export function MessageComposer({
                     ? undefined
                     : t("moreActions")
               }
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md p-0 text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              className={ROW_ICON_BUTTON}
             >
               <Plus className="h-4 w-4" />
             </DropdownMenuTrigger>
@@ -769,7 +819,7 @@ export function MessageComposer({
             canAct={!readOnly}
             gateReason="send messages"
             title={readOnly ? undefined : t("sendTemplate")}
-            className="h-9 w-9 shrink-0 p-0 text-muted-foreground hover:text-foreground"
+            className={ROW_ICON_BUTTON}
             onClick={onOpenTemplates}
           >
             <LayoutTemplate className="h-4 w-4" />
@@ -783,7 +833,7 @@ export function MessageComposer({
             gateReason="send messages"
             disabled={drafting}
             title={readOnly ? undefined : t("draftWithAI")}
-            className="h-9 w-9 shrink-0 p-0 text-muted-foreground hover:text-primary"
+            className={cn(ROW_ICON_BUTTON, "hover:text-primary")}
             onClick={handleDraft}
           >
             {drafting ? (
@@ -800,7 +850,7 @@ export function MessageComposer({
             <PopoverTrigger
               disabled={sessionExpired || readOnly}
               title={readOnly ? undefined : t("emojiPicker")}
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md p-0 text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              className={ROW_ICON_BUTTON}
             >
               <SmilePlus className="h-4 w-4" />
             </PopoverTrigger>
@@ -838,13 +888,61 @@ export function MessageComposer({
             }
             disabled={sessionExpired || readOnly}
             rows={1}
+            // Mobile keyboard behaviour. Enter already sends (see
+            // `handleKeyDown`), so label the key accordingly instead of
+            // letting iOS/Android show a bare "return". `sentences`
+            // auto-capitalisation and no spellcheck underline match the
+            // chat-app convention users expect; neither affects what is
+            // actually sent.
+            enterKeyHint="send"
+            autoCapitalize="sentences"
+            autoCorrect="off"
+            spellCheck={false}
             // Textarea keeps its own inline title — the GatedButton
             // wrapping pattern doesn't apply to non-button inputs.
             // The placeholder text also surfaces the read-only state.
             title={readOnly ? t("readOnlyTitle") : undefined}
             className={cn(
-              "flex-1 resize-none rounded-xl border border-border bg-muted px-4 py-2.5 text-sm text-foreground placeholder-muted-foreground outline-none transition-colors focus:border-primary/50",
-              (sessionExpired || readOnly) && "cursor-not-allowed opacity-50"
+              // `min-w-0` is required for correctness, not looks: this is
+              // a `flex-1` child of a flex row, and a flex item's default
+              // `min-width: auto` refuses to shrink below its content,
+              // so the textarea's intrinsic width (a bare `<textarea>`
+              // defaults to cols=20) pushed the row wider than the
+              // conversation panel and dragged the send button off the
+              // right edge on tablet and mobile.
+              //
+              // `bg-card` on a `bg-background` bar: the raised surface on
+              // the field, in both modes. `shadow-xs` gives the container
+              // an edge in dark mode, where a 0.04 lightness gap between
+              // two greys is otherwise invisible.
+              //
+              // The focus ring is new and deliberate. `outline-none` on
+              // its own removed the browser default and left only
+              // `focus:border-primary/50` — a 50%-opacity border tint,
+              // which is close to invisible and left keyboard and
+              // mouse users with no indication of where the caret was.
+              // `overflow-y-auto` + `overscroll-contain`: `adjustHeight`
+              // caps the field at 96px, so a long message or a 4-line
+              // reply has to scroll INSIDE the textarea. Without an
+              // explicit overflow the UA default is relied upon, and
+              // without `overscroll-contain` reaching the end of that
+              // inner scroll chains to the shell and drags the page
+              // under the keyboard.
+              //
+              // `break-words`: a pasted URL or a long customer id is a
+              // single unbreakable token and would otherwise stretch the
+              // field wider than the row.
+              "min-w-0 flex-1 resize-none overflow-y-auto overscroll-contain break-words rounded-xl border border-border bg-card px-4 py-2.5 text-sm leading-relaxed text-foreground shadow-xs",
+              "placeholder-muted-foreground",
+              "transition-[border-color,box-shadow] outline-none",
+              "focus:border-primary focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+              // A blanket `opacity-50` on the field — the previous
+              // treatment — halved the contrast of the PLACEHOLDER, and
+              // in the session-expired state the placeholder is the only
+              // thing telling the user why they cannot type. Dim the
+              // fill and the text instead and leave the placeholder
+              // readable.
+              (sessionExpired || readOnly) && "cursor-not-allowed bg-card-2 text-muted-foreground",
             )}
           />
 
@@ -854,34 +952,51 @@ export function MessageComposer({
             gateReason="send messages"
             disabled={!text.trim() || sessionExpired || sending}
             onClick={handleSend}
-            className="h-9 w-9 shrink-0 bg-primary p-0 hover:bg-primary/90 disabled:opacity-40"
+            // A focus ring as well as the fill: the send button is the
+            // one control a keyboard user tabs to from the textarea, and
+            // it had no visible focus state.
+            className="h-9 w-9 shrink-0 bg-primary p-0 text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-40"
           >
             <Send className="h-4 w-4" />
           </GatedButton>
         </div>
       )}
 
-      {/* Hint sits outside the flex row so its height doesn't push
-          `items-end` buttons below the textarea. Indented to line up
-          under the textarea left edge. */}
-       {!draft && !recording && (
-        <p className="mt-1 pl-[5.5rem] text-[10px] text-muted-foreground">
-          {t("draftHint")}
-        </p>
-      )}
-
-      {/* Character counter */}
-      {!draft && !recording && text.length > 0 && (
-        <p
-          className={cn(
-            "mt-1 pl-[5.5rem] text-[10px]",
-            text.length >= TEXT_CHAR_LIMIT
-              ? "text-red-400"
-              : "text-muted-foreground",
+      {/* Hint + counter share one reserved-height row.
+          It used to carry a hard-coded `pl-[5.5rem]` to line up under
+          the textarea's left edge, which cannot be right: the number of
+          buttons to the left of the field is per-channel (WhatsApp shows
+          attach + interactive + template + AI + emoji, Instagram shows
+          only attach + emoji), so 88px lined up with nothing on some
+          channels and pushed the text into a cramped indent on others.
+          The bar's own left edge is the one alignment that is correct
+          for every channel and every width, and it costs no space on
+          mobile. `min-h-5` keeps the bar from jumping as the hint is
+          replaced by the counter on the first keystroke. */}
+      {!draft && !recording && (
+        <div className="mt-1.5 flex min-h-5 items-start justify-between gap-3 text-[12px] leading-snug">
+          <p className="min-w-0 flex-1 text-muted-foreground">
+            {t("draftHint")}
+          </p>
+          {/* Counter replaces the hint once there is text, and turns
+              destructive at the limit. `text-destructive` rather than a
+              fixed `text-red-400`: red-400 is a light-mode-tuned red
+              and lands around 2.5:1 on the composer bar, so the one
+              number the user must react to was the least readable
+              thing in the component. The token is defined per mode. */}
+          {text.length > 0 && (
+            <p
+              className={cn(
+                "shrink-0 tabular-nums",
+                text.length >= TEXT_CHAR_LIMIT
+                  ? "font-medium text-destructive"
+                  : "text-muted-foreground",
+              )}
+            >
+              {text.length}/{TEXT_CHAR_LIMIT} {t("characters")}
+            </p>
           )}
-        >
-          {text.length}/{TEXT_CHAR_LIMIT} {t("characters")}
-        </p>
+        </div>
       )}
 
       {/* Interactive-message builder dialog. */}
@@ -951,7 +1066,13 @@ function MediaDraftPreview({
   t: ReturnType<typeof useTranslations>;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-muted/40 p-3">
+    // The panel is the recessed surface and the caption field sits
+    // inside it. `bg-muted` at full strength, not `bg-muted/40`: at 40%
+    // the panel was a tint so faint it read as part of the bar behind
+    // it and the whole attachment state looked like nothing had
+    // happened. Against the `bg-background` bar the panel is now
+    // clearly a distinct surface in both modes.
+    <div className="rounded-xl border border-border bg-muted p-3 shadow-xs">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           {draft.kind === "image" && (
@@ -959,14 +1080,14 @@ function MediaDraftPreview({
             <img
               src={draft.mediaUrl}
               alt={draft.filename}
-              className="max-h-40 rounded-lg object-cover"
+              className="max-h-40 rounded-lg border border-border object-cover"
             />
           )}
           {draft.kind === "video" && (
-            <video src={draft.mediaUrl} controls className="max-h-40 rounded-lg" />
+            <video src={draft.mediaUrl} controls className="max-h-40 rounded-lg border border-border" />
           )}
           {draft.kind === "audio" && (
-            <audio src={draft.mediaUrl} controls className="w-full" />
+            <audio src={draft.mediaUrl} controls className="h-9 w-full" />
           )}
           {draft.kind === "document" && (
             <div className="flex items-center gap-2 text-sm text-foreground">
@@ -975,11 +1096,15 @@ function MediaDraftPreview({
             </div>
           )}
         </div>
+        {/* 36x36 to match every other control in the composer, so the
+            discard affordance lines up with the send button it sits
+            opposite. It was `rounded p-1`, a ~24px target floating
+            above the row with no focus state. */}
         <button
           type="button"
           onClick={onDiscard}
           aria-label={t("removeAttachment")}
-          className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-transparent text-muted-foreground transition-colors hover:border-border hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-card"
         >
           <X className="h-4 w-4" />
         </button>
@@ -998,7 +1123,8 @@ function MediaDraftPreview({
               }
             }}
             placeholder={t("addCaption")}
-            className="flex-1 rounded-xl border border-border bg-muted px-4 py-2.5 text-sm text-foreground placeholder-muted-foreground outline-none transition-colors focus:border-primary/50"
+            enterKeyHint="send"
+            className="min-w-0 flex-1 rounded-xl border border-border bg-card px-4 py-2.5 text-sm leading-relaxed text-foreground shadow-xs placeholder-muted-foreground outline-none transition-[border-color,box-shadow] focus:border-primary focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-muted"
           />
         )}
         <GatedButton
@@ -1007,8 +1133,10 @@ function MediaDraftPreview({
           gateReason="send messages"
           disabled={busy}
           onClick={onSend}
+          // Identical treatment to the text composer's send button so
+          // the primary action looks the same in both states.
           className={cn(
-            "h-9 w-9 shrink-0 bg-primary p-0 hover:bg-primary/90 disabled:opacity-40",
+            "h-9 w-9 shrink-0 bg-primary p-0 text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-card disabled:opacity-40",
             draft.kind === "audio" && "ml-auto",
           )}
         >

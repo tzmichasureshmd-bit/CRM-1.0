@@ -67,26 +67,26 @@ export function TriggerNode({
         className="mt-0.5"
       />
 
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="flex items-center gap-1.5">
+      <span className="flex min-w-0 flex-1 flex-col gap-1">
+        <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
           <span
-            className="text-[10px] font-semibold tracking-wider uppercase"
+            className="text-xs leading-tight font-semibold tracking-wide uppercase"
             style={{ color: TRIGGER_COLORS.text }}
           >
             {t("canvas.triggerStarts")}
           </span>
           {needsConfig && (
-            <span className="inline-flex items-center rounded-full bg-amber-500/15 px-1.5 py-px text-[9.5px] font-semibold tracking-wide text-amber-700 uppercase dark:text-amber-400">
+            <span className="inline-flex items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-xs leading-tight font-semibold text-amber-700 dark:text-amber-400">
               {t("needsSetup")}
             </span>
           )}
         </span>
-        <span className="truncate text-[13.5px] leading-tight font-semibold text-foreground">
+        <span className="truncate text-sm leading-tight font-semibold text-foreground">
           {t(`triggers.${type}.label`)}
         </span>
         <span
           className={cn(
-            "truncate text-[11.5px] leading-snug",
+            "truncate text-sm leading-snug",
             needsConfig ? "text-muted-foreground italic" : "text-muted-foreground"
           )}
           title={describeTrigger(type, config, t, lookups)}

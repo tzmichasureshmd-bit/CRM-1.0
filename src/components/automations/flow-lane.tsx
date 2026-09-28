@@ -85,7 +85,16 @@ function LaneItem({
 }) {
   return (
     <div className="flex w-full flex-col items-center">
-      <div className="w-full">
+      {/* The cap belongs here, not only on the card itself. `w-full` on
+          its own made this box as wide as the whole canvas column
+          (~640px), so the card's own `max-w-[22rem]` pinned it to the
+          lane's LEFT edge while the trigger, the add-step pill and the
+          condition's two branch columns all sat on the lane's centre
+          line. A condition therefore forked visibly off to the right of
+          the card it belongs to, by half the excess width. Capping the
+          box puts the card back on the centre line, where the fork's
+          drop lines and the two branch columns meet it. */}
+      <div className="w-full max-w-[22rem]">
         <SortableStep
           step={step}
           selected={handlers.selectedCid === step.cid}
@@ -130,7 +139,11 @@ export function Connector({ children }: { children?: ReactNode }) {
 /** The card that follows the pointer mid-drag. */
 export function StepDragGhost({ step }: { step: BuilderStep }) {
   return (
-    <div className="w-80">
+    // Same measure as the card it replaces (StepCard's own
+    // `max-w-[22rem]`). The overlay renders in a portal at the root, so
+    // it cannot inherit the canvas's width — pinning it here is what
+    // stops the ghost from resizing the moment a drag starts.
+    <div className="w-[22rem] max-w-[calc(100vw-2rem)]">
       <StepCard
         step={step}
         selected={false}

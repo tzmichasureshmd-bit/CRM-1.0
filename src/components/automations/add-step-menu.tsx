@@ -80,7 +80,7 @@ export function AddStepMenu({
       <DropdownMenuTrigger
         className={cn(
           variant === "pill"
-            ? "group/add inline-flex h-8 items-center gap-1.5 rounded-full border border-dashed border-border bg-background px-3 text-xs font-medium text-muted-foreground transition-all outline-none hover:border-primary hover:bg-primary/10 hover:text-primary focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 data-[popup-open]:border-primary data-[popup-open]:bg-primary/15 data-[popup-open]:text-primary"
+            ? "group/add inline-flex h-8 items-center gap-1.5 rounded-full border border-dashed border-border bg-background px-3 text-sm font-medium text-muted-foreground transition-all outline-none hover:border-primary hover:bg-primary/10 hover:text-primary focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 data-[popup-open]:border-primary data-[popup-open]:bg-primary/15 data-[popup-open]:text-primary"
             : "flex h-8 w-8 items-center justify-center rounded-full border-2 border-dashed border-border bg-background text-muted-foreground transition-all outline-none hover:border-primary hover:bg-primary/10 hover:text-primary focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 data-[popup-open]:border-primary data-[popup-open]:bg-primary/20 data-[popup-open]:text-primary",
           className
         )}
@@ -97,8 +97,10 @@ export function AddStepMenu({
         // an 8px-wide circle or a short pill — which collapsed the
         // old menu to a 32px column. An explicit width plus a
         // viewport cap is what makes the descriptions readable and
-        // keeps the menu on-screen on a phone.
-        className="w-[21rem] max-w-[calc(100vw-1.5rem)] overflow-hidden p-0"
+        // keeps the menu on-screen on a phone. `w-88` is the canvas's
+        // one measure (22rem), so the menu is exactly as wide as the
+        // card it is adding to and never has to re-wrap its blurbs.
+        className="w-88 max-w-[calc(100vw-1.5rem)] overflow-hidden p-0"
       >
         <div className="flex items-center gap-2 border-b border-border px-3 py-2">
           <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
@@ -119,7 +121,7 @@ export function AddStepMenu({
           ) : (
             groups.map((group) => (
               <DropdownMenuGroup key={group.id}>
-                <DropdownMenuLabel className="px-2 pt-2.5 pb-1 text-[10.5px] font-semibold tracking-wider text-muted-foreground uppercase">
+                <DropdownMenuLabel className="px-2 pt-2.5 pb-1 text-xs leading-tight font-semibold tracking-wide text-muted-foreground uppercase">
                   {t(group.labelKey)}
                 </DropdownMenuLabel>
                 {group.types.map((type) => {
@@ -143,10 +145,10 @@ export function AddStepMenu({
                         className="mt-0.5"
                       />
                       <span className="flex min-w-0 flex-col gap-0.5 text-left">
-                        <span className="text-[13px] leading-tight font-medium text-foreground">
+                        <span className="text-sm leading-tight font-medium text-foreground">
                           {t(`steps.${type}`)}
                         </span>
-                        <span className="text-[11.5px] leading-snug text-muted-foreground">
+                        <span className="text-xs leading-snug text-muted-foreground">
                           {t(`blurbs.${type}`)}
                         </span>
                       </span>

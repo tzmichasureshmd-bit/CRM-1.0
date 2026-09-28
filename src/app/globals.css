@@ -7,9 +7,38 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+/* The sans token names the families outright instead of pointing back at
+   the variable `next/font` injects onto <html>.
+
+   `--font-sans: var(--font-sans)` was a self-reference, which resolved
+   to nothing at all whenever the `next/font` stylesheet was not
+   applied. That stylesheet is a separate production chunk, so the
+   failure was invisible in `next dev` (which injects the same
+   declaration inline) and hit a real deployment: a stale CDN copy, a
+   standalone image built without `.next/static`, or any request that
+   missed the chunk. `--font-sans` then computed to the empty/invalid
+   value, `font-family: var(--font-sans)` fell through to the
+   guaranteed-invalid branch, and every page rendered in the browser
+   default serif.
+
+   Reading the variable with a `var()` fallback is not enough, because
+   that fallback is all-or-nothing: while the chunk is present the token
+   would be exactly `"Inter", "Inter Fallback"` — a list with no generic
+   family in it, so a `.woff2` that fails to load on its own puts the
+   page straight back into the default serif. Spelling the families out
+   keeps the list valid and generic-terminated in every state, and the
+   webfont is still what gets used, because the family the generated
+   `@font-face` declares is literally `Inter`. If a future version of
+   `next/font` ever renames it, this degrades to the platform UI font
+   rather than to a broken one.
+
+   `--font-geist-mono` was never defined anywhere in the project, so
+   `font-mono` was broken the same way. */
+--font-sans: "Inter", "Inter Fallback", ui-sans-serif, system-ui, -apple-system,
+  "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+--font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+  "Liberation Mono", monospace;
+--font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -61,11 +90,11 @@
 }
 
 /* ============================================================
- * THEMING — two orthogonal dimensions
+ * THEMING â€” two orthogonal dimensions
  *
- *   1. MODE   (light / dark)  → neutral surfaces. Selected with
+ *   1. MODE   (light / dark)  â†’ neutral surfaces. Selected with
  *      `document.documentElement.dataset.mode`. Defaults to dark.
- *   2. ACCENT (violet / …)    → the primary color only. Selected
+ *   2. ACCENT (violet / â€¦)    â†’ the primary color only. Selected
  *      with `document.documentElement.dataset.theme`.
  *
  * The two compose: any accent works in either mode. Neutral
@@ -84,7 +113,7 @@
  * active pill, validation badges).
  *
  * Token shapes come straight from the design handoff at
- * project/Color Themes.html — change one, change the other.
+ * project/Color Themes.html â€” change one, change the other.
  * ============================================================ */
 
 /* ---- MODE: neutral surfaces ---- */
@@ -120,7 +149,7 @@ html[data-mode="dark"] {
 }
 
 html[data-mode="light"] {
-  /* ── Surfaces ── */
+  /* â”€â”€ Surfaces â”€â”€ */
   /* Main canvas: soft off-white/pale mint #F5F8F5 */
   --background: oklch(0.974 0.006 150);
   /* Primary text: deep navy #172033 */
@@ -145,7 +174,7 @@ html[data-mode="light"] {
   /* Border: #E4E8EF */
   --border: oklch(0.912 0.012 240);
   --input: oklch(0.912 0.012 240);
-  /* Chart palette — multi-color for light mode */
+  /* Chart palette â€” multi-color for light mode */
   --chart-2: oklch(0.62 0.14 195);  /* teal #429AA5 */
   --chart-3: oklch(0.78 0.16 130);  /* green #16A673 */
   --chart-4: oklch(0.82 0.16 85);   /* yellow #F2D94E */
@@ -345,7 +374,7 @@ html[data-theme="red"] {
     @apply font-sans;
   }
 
-  /* ── Thin theme-colored scrollbars ── */
+  /* â”€â”€ Thin theme-colored scrollbars â”€â”€ */
   * {
     scrollbar-width: thin;
     scrollbar-color: var(--primary) transparent;
@@ -371,7 +400,7 @@ html[data-theme="red"] {
 }
 
 /* ============================================================
-   PREMIUM DESIGN SYSTEM — utility classes
+   PREMIUM DESIGN SYSTEM â€” utility classes
    ============================================================ */
 
 /* Card with proper elevation shadow in light mode */
@@ -385,7 +414,7 @@ html[data-mode="light"] .ds-card-elevated {
   box-shadow: var(--shadow-card-hover);
 }
 
-/* Sidebar active item — softer pill style */
+/* Sidebar active item â€” softer pill style */
 html[data-mode="light"] .sidebar-active {
   background: color-mix(in oklab, var(--primary) 10%, transparent);
   color: var(--primary);
@@ -442,7 +471,7 @@ html[data-mode="light"] .sidebar-active:hover {
    DATA-PROTECTION utilities
    -------------------------
    Browser-level deterrents for sensitive CRM surfaces. These are a
-   UI measure only — the real security boundary is server-side
+   UI measure only â€” the real security boundary is server-side
    (auth, authorization, tenant isolation, RLS, API authorization).
    They must never be the sole protection and must never break form
    inputs / search fields / textareas / keyboard navigation, so they
@@ -515,7 +544,7 @@ html[data-mode="light"] .sidebar-active:hover {
 }
 
 /* ============================================================
-   PREMIUM LANDING PAGE — animations & utility classes
+   PREMIUM LANDING PAGE â€” animations & utility classes
    ============================================================ */
 
 /* ---- Marquee (infinite horizontal scroll) ---- */
@@ -715,13 +744,13 @@ html[data-mode="dark"] .landing-dots-bg {
 }
 
 /* ============================================================
-   PREMIUM LOGIN — full-screen CRM4 image + floating glass card
+   PREMIUM LOGIN â€” full-screen CRM4 image + floating glass card
    ------------------------------------------------------------
    Scoped, unlayered styles for the /login, /admin/login and
    /super-admin/login screens. Kept outside @layer so they win
    over Tailwind utility conflicts, and paired with a
    prefers-reduced-motion block at the end.
-   The CRM4 image IS the page background — there is no split
+   The CRM4 image IS the page background â€” there is no split
    screen, side panel or video. A single glass card floats above.
    ============================================================ */
 
@@ -768,7 +797,7 @@ html[data-mode="dark"] .landing-dots-bg {
   object-position: center;
 }
 /* Subtle neutral scrim so the glass card + text stay readable.
-   The image must remain clearly visible — keep it light. */
+   The image must remain clearly visible â€” keep it light. */
 .login-bg__overlay {
   position: absolute;
   inset: 0;
@@ -797,7 +826,7 @@ html[data-mode="dark"] .landing-dots-bg {
     inset 0 1px 0 rgba(255, 255, 255, 0.2),
     inset 0 -1px 0 rgba(255, 255, 255, 0.06);
 }
-/* Very subtle top sheen — pure decoration, never blocks interaction */
+/* Very subtle top sheen â€” pure decoration, never blocks interaction */
 .login-glass::before {
   content: "";
   position: absolute;
@@ -1185,7 +1214,7 @@ html[data-mode="dark"] .landing-dots-bg {
     padding-left: 0;
   }
   .login-shell__content {
-    width: calc(100% - 2rem); /* card ≈ viewport − 32px */
+    width: calc(100% - 2rem); /* card â‰ˆ viewport âˆ’ 32px */
     max-width: 21rem;
     padding: 2rem 0 2.5rem;
   }

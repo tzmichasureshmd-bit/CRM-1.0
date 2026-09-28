@@ -117,7 +117,21 @@ export function ConfigPanel({
         className="hidden w-[23rem] shrink-0 border-l border-border bg-muted/15 lg:block"
         aria-label={t("configPanel.label")}
       >
-        <div className="sticky top-0 flex h-[calc(100dvh-var(--app-header-h,3.5rem))] flex-col overflow-hidden">
+        {/* `h-full` + `min-h-0`, not `sticky` + a hard-coded
+            `100dvh - var(--app-header-h)`. Two things were wrong with
+            the arithmetic: `--app-header-h` is not defined anywhere in
+            this app, so the fallback always won, and the fallback
+            (3.5rem) is smaller than the real header (36px of control
+            plus `py-3` either side and a border ≈ 61px), so the panel
+            was a few pixels taller than the row it lives in and spilled
+            past the bottom of the viewport. It was also `sticky` inside
+            an ancestor that never scrolls, which does nothing.
+
+            The row above is a flex item that is already exactly the
+            height of the space under the header, so `h-full` tracks the
+            real header height at every breakpoint and at every zoom
+            level, and `min-h-0` lets the form below it actually scroll. */}
+        <div className="flex h-full min-h-0 flex-col overflow-hidden">
           {body}
         </div>
       </aside>
@@ -125,8 +139,17 @@ export function ConfigPanel({
   }
 
   return (
+    // A definite height, because `h-full` inside the panel resolves
+    // against it. With only `max-h-[88dvh]` the sheet's height was
+    // auto, so the percentage had nothing to resolve against, the
+    // panel grew to its content, and `max-h` then clipped the bottom
+    // of it — taking the delete/duplicate footer with it, and leaving
+    // the form's fields overlapping the footer where it did show.
     <Sheet open={open} onOpenChange={(next) => !next && onClose()}>
-      <SheetContent side="bottom" className="max-h-[88dvh] gap-0 p-0">
+      <SheetContent
+        side="bottom"
+        className="h-[88dvh] max-h-[88dvh] gap-0 overflow-hidden p-0"
+      >
         <SheetTitle className="sr-only">{t("configPanel.label")}</SheetTitle>
         <SheetDescription className="sr-only">{t("configPanel.label")}</SheetDescription>
         {body}
@@ -173,7 +196,7 @@ function ConfigBody({
     // no other home, and the old builder's description field is what
     // explains a workflow to whoever inherits it six months later.
     return (
-      <div className="flex h-full flex-col gap-5 overflow-y-auto px-5 py-4">
+      <div className="flex h-full min-h-0 flex-col gap-5 overflow-y-auto px-5 py-4">
         <Field label={t("details.name")}>
           <Input
             value={name}
@@ -271,20 +294,23 @@ function PanelFrame({
       <div className="flex shrink-0 items-start gap-3 border-b border-border p-4">
         <StepIconChip icon={Icon} solid={solid} soft={soft} size={36} iconSize={18} />
         <div className="min-w-0 flex-1">
-          <div className="text-[10px] font-semibold tracking-wider uppercase" style={{ color: solid }}>
+          <div
+            className="text-xs leading-tight font-semibold tracking-wide uppercase"
+            style={{ color: solid }}
+          >
             {eyebrow}
           </div>
-          <div className="mt-0.5 text-sm leading-tight font-semibold text-foreground">{title}</div>
-          <p className="mt-1 text-[11.5px] leading-snug text-muted-foreground">{description}</p>
+          <div className="mt-1 text-sm leading-tight font-semibold text-foreground">{title}</div>
+          <p className="mt-1.5 text-sm leading-snug text-muted-foreground">{description}</p>
         </div>
       </div>
 
       {issueKeys.length > 0 ? (
         <div className="flex shrink-0 items-start gap-2 border-b border-amber-500/25 bg-amber-500/8 px-4 py-2.5">
-          <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
-          <div className="min-w-0 text-[11.5px] leading-snug">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
+          <div className="min-w-0 text-sm leading-snug">
             <span className="font-medium text-foreground">{t("configPanel.notReady")}</span>
-            <ul className="mt-0.5 list-inside list-disc text-muted-foreground">
+            <ul className="mt-1 list-inside list-disc space-y-0.5 text-muted-foreground">
               {issueKeys.map((key) => (
                 <li key={key}>{r(key as Parameters<typeof r>[0])}</li>
               ))}
@@ -293,7 +319,7 @@ function PanelFrame({
         </div>
       ) : null}
 
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">{children}</div>
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4">{children}</div>
 
       {onDelete || onDuplicate ? (
         <div className="flex shrink-0 items-center justify-between gap-2 border-t border-border p-3">

@@ -565,11 +565,14 @@ function AutomationCard({
                 {automation.name}
               </span>
               {automation.is_active ? (
-                <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
+                <Badge variant="secondary" className="h-5 px-2 text-[11px] leading-none">
                   {t("status.active")}
                 </Badge>
               ) : (
-                <Badge variant="outline" className="h-4 px-1.5 text-[10px] text-muted-foreground">
+                <Badge
+                  variant="outline"
+                  className="h-5 px-2 text-[11px] leading-none text-muted-foreground"
+                >
                   {t("status.paused")}
                 </Badge>
               )}
@@ -688,7 +691,9 @@ function StepStrip({ preview }: { preview: PreviewStep[] }) {
           </span>
         )
       })}
-      {rest > 0 && <span className="text-[11px] text-muted-foreground">+{rest}</span>}
+      {rest > 0 && (
+        <span className="text-[12px] leading-none text-muted-foreground">+{rest}</span>
+      )}
     </div>
   )
 }
