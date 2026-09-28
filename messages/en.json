@@ -1139,6 +1139,23 @@
       "templatesTitle": "Quick-start templates",
       "emptyTitle": "No automations yet",
       "emptyDesc": "Pick a template above or create one from scratch.",
+      "searchPlaceholder": "Search automations…",
+      "searchLabel": "Search automations",
+      "clearSearch": "Clear search",
+      "filterLabel": "Filter by status",
+      "noResultsTitle": "Nothing matches",
+      "noResultsDesc": "No automation matches these filters.",
+      "clearFilters": "Clear filters",
+      "rowMenu": "Automation actions",
+      "status": {
+        "active": "Live",
+        "paused": "Paused"
+      },
+      "filters": {
+        "all": "All",
+        "active": "Live",
+        "paused": "Paused"
+      },
       "runs": "{count} run",
       "runsPlural": "{count} runs",
       "lastRun": "last {time}",
@@ -1286,14 +1303,119 @@
         "templateNameLabel": "Template name",
         "languageLabel": "Language",
         "select": "Select a template…",
+        "approvedHint": "Only templates already approved by Meta can be sent.",
         "unknown": "{name} ({lang}) — not in approved list",
         "unknownLang": "unknown"
       },
       "branches": {
         "yes": "Yes",
-        "no": "No"
+        "no": "No",
+        "yesCaption": "when true",
+        "noCaption": "when false",
+        "emptyYes": "Nothing happens on this path yet.",
+        "emptyNo": "Nothing happens on this path yet.",
+        "twoPaths": "This condition splits into two paths."
       },
-      "addStep": "Add step",
+      "categories": {
+        "messaging": "Talk to the customer",
+        "crm": "Update your CRM",
+        "flow": "Control what happens next"
+      },
+      "blurbs": {
+        "send_message": "Send a plain text message to the contact.",
+        "send_buttons": "Send up to 3 reply buttons the customer can tap.",
+        "send_list": "Send a scrollable menu of options.",
+        "send_template": "Send a pre-approved WhatsApp template.",
+        "add_tag": "Label the contact so you can find them later.",
+        "remove_tag": "Take a label off the contact.",
+        "assign_conversation": "Hand the conversation to the next available agent, or a specific one.",
+        "update_contact_field": "Write a value into one of the contact's fields.",
+        "create_deal": "Add a deal to your pipeline at a chosen stage.",
+        "wait": "Pause here for a set amount of time, then continue.",
+        "condition": "Ask a yes/no question and send the customer down one of two paths.",
+        "send_webhook": "Call an external URL with your data as JSON.",
+        "close_conversation": "Mark the conversation as closed and stop."
+      },
+      "eyebrows": {
+        "action": "Action",
+        "logic": "Logic",
+        "wait": "Timing"
+      },
+      "canvas": {
+        "triggerStarts": "When this starts"
+      },
+      "addStep": {
+        "label": "Add step",
+        "search": "Search steps…",
+        "noResults": "No step matches your search."
+      },
+      "needsSetup": "Needs setup",
+      "editStep": "Edit",
+      "duplicateStep": "Duplicate",
+      "deleteStep": "Delete",
+      "dragHandle": "Drag to reorder",
+      "triggerTypeHint": "This is what makes the workflow start.",
+      "keywordsPlaceholder": "refund, order, shipping",
+      "replyIdsPlaceholder": "yes, no, talk_to_human",
+      "schedulePlaceholder": "0 9 * * 1-5",
+      "summaries": {
+        "notSet": {
+          "text": "No message written yet.",
+          "message": "No options set yet.",
+          "template": "No template chosen yet.",
+          "tag": "No tag chosen yet.",
+          "agent": "No agent chosen yet.",
+          "field": "Field and value not set yet.",
+          "deal": "Pipeline, stage and title still needed.",
+          "duration": "How long to wait is not set.",
+          "rule": "No question set yet.",
+          "url": "No URL yet."
+        },
+        "template": {
+          "nameOnly": "{name}",
+          "withLanguage": "{name} · {lang}"
+        },
+        "addTag": "Adds the tag {tag}",
+        "removeTag": "Removes the tag {tag}",
+        "roundRobin": "Goes to the next available agent",
+        "assignTo": "Goes to {agent}",
+        "setField": "Sets {field} to “{value}”",
+        "createDeal": "Creates “{title}” at {stage}",
+        "createDealWith": "Creates “{title}” at {stage} in {pipeline}",
+        "pauseFor": "Waits {count} {unit}",
+        "wait": {
+          "minutes": "{count, plural, one {# minute} other {# minutes}}",
+          "hours": "{count, plural, one {# hour} other {# hours}}",
+          "days": "{count, plural, one {# day} other {# days}}"
+        },
+        "ifRule": "If {subject} is “{operand}”{value}",
+        "closeConversation": "Closes the conversation",
+        "unavailable": "unavailable ({id})",
+        "triggerKeywords": "Message contains: {words}",
+        "triggerNeedsKeywords": "Add at least one keyword",
+        "triggerTag": "Tag “{tag}” is added",
+        "triggerNeedsTag": "Choose a tag",
+        "triggerReplyIds": "Customer replies with: {ids}",
+        "triggerNeedsReplyIds": "Add at least one button or list id",
+        "triggerSchedule": "Runs on: {schedule}",
+        "triggerNeedsSchedule": "Add a schedule"
+      },
+      "configPanel": {
+        "label": "Step settings",
+        "emptyTitle": "Nothing selected",
+        "emptyBody": "Choose a step on the canvas to set it up, or add a new one.",
+        "notReady": "Not ready to run yet:",
+        "whenItStarts": "When this runs"
+      },
+      "readiness": {
+        "ready": "Ready to run",
+        "incomplete": "{count, plural, one {# thing needs attention} other {# things need attention}}"
+      },
+      "emptyCanvas": {
+        "title": "Add your first step",
+        "body": "This workflow is a trigger plus the steps it runs. Add a step to say what happens when the trigger fires.",
+        "action": "Add a step"
+      },
       "config": {
         "messageText": "Message text",
         "placeholderMessageText": "Hi! Thanks for reaching out…",
@@ -1322,20 +1444,83 @@
           "message_content": "Message content",
           "time_of_day": "Time of day"
         },
-        "operandLabel": "Operand",
+        "subjectHints": {
+          "tag_presence": "True when the contact has this tag.",
+          "contact_field": "True when a contact field matches.",
+          "message_content": "True when the incoming message matches.",
+          "time_of_day": "True when the current time is inside the range."
+        },
+        "operandLabel": "Value to check",
+        "operandHints": {
+          "tag_presence": "The tag to look for.",
+          "contact_field": "Field name and value, e.g. email is bob@acme.com.",
+          "message_content": "The word or phrase to look for in the message.",
+          "time_of_day": "The hours it applies, e.g. 09:00-18:00."
+        },
+        "operandPlaceholders": {
+          "tag_presence": "vip",
+          "contact_field": "email is bob@acme.com",
+          "message_content": "refund",
+          "time_of_day": "09:00-18:00"
+        },
         "placeholderTime": "HH:mm-HH:mm",
         "placeholderContact": "name / email / company",
         "placeholderTag": "tag id",
+        "placeholderTitle": "Website redesign — Acme Inc.",
         "urlLabel": "URL",
         "headersLabel": "Headers",
         "placeholderHeaders": "{\"Authorization\": \"Bearer ...\"}",
         "bodyTemplateLabel": "Body template",
         "placeholderBody": "{\"id\": \"{{ contact.id }}\"}",
         "matchType": "Match type",
+        "matchTypeHint": "Contains matches anywhere in the message; Exact matches the whole message.",
         "matchContains": "Contains",
         "matchExact": "Exact",
+        "messageTextHint": "You can personalise it with variables like {{ contact.name }}.",
+        "tagHint": "Existing tags are listed by name.",
+        "modeHint": "Round-robin picks the next free agent; Specific always goes to one person.",
+        "agentHint": "Only shown when the mode is “Specific agent”.",
+        "fieldHint": "Pick a contact field to write into.",
+        "valueHint": "The value to store in that field.",
+        "titleHint": "Name the deal so the team recognises it.",
+        "dealValueHint": "Optional deal amount. Leave 0 if there isn't one.",
+        "conditionValueHint": "Leave empty to only check the word itself.",
+        "urlHint": "Your endpoint. We POST to it as JSON.",
+        "bodyTemplateHint": "Optional JSON body. Variables like {{ contact.id }} are filled in before sending.",
         "closeConversationHint": "Sets the conversation status to \"closed\". No configuration needed."
+      },
+      "details": {
+        "name": "Name",
+        "namePlaceholder": "Untitled automation",
+        "description": "Description",
+        "descriptionPlaceholder": "What does this workflow do?",
+        "hint": "Shown on the automations list. Say when it should run and what it does."
       }
+    },
+    "readiness": {
+      "text": "Write the message",
+      "interactive": "Set up the options",
+      "template": "Choose a template",
+      "tag": "Choose a tag",
+      "agent": "Choose an agent",
+      "field": "Choose a field",
+      "value": "Enter a value",
+      "pipeline": "Choose a pipeline",
+      "stage": "Choose a stage",
+      "title": "Name the deal",
+      "amount": "Set how long to wait",
+      "unit": "Set the unit",
+      "subject": "Choose what to check",
+      "operand": "Enter the value to check for",
+      "url": "Enter the webhook URL",
+      "generic": "Finish setting this step up",
+      "noSteps": "Add a step before turning this workflow on.",
+      "triggerKeywords": "Add at least one keyword",
+      "triggerMatchType": "Choose a match type",
+      "triggerSchedule": "Add a schedule",
+      "triggerTag": "Choose a tag",
+      "triggerReplyIds": "Add at least one button or list id",
+      "triggerGeneric": "Finish setting up the trigger"
     },
     "keyboardTriggers": {
       "title": "Keyboard Triggers",
@@ -2217,13 +2402,11 @@
       "deleteLocallyAria": "Delete template locally",
       "deleteMetaLocallyTitle": "Delete from Meta and locally",
       "deleteLocallyTitle": "Delete locally",
-
       "dialogEditTitle": "Edit Message Template",
       "dialogNewTitle": "New Message Template",
       "dialogEditDesc": "Save your changes to re-submit to Meta. Status will flip back to PENDING during review.",
       "dialogNewDesc": "Build a template and submit it to Meta for approval. Once approved, you can use it in broadcasts and the inbox.",
       "authWarning": "AUTHENTICATION templates have a fixed body + OTP button shape that needs a different builder. Create them in Meta WhatsApp Manager for now and use <bold>Sync from Meta</bold> to bring them in.",
-
       "templateName": "Template Name",
       "namePlaceholder": "e.g. order_confirmation",
       "nameFixed": "Name is fixed once a template exists on Meta — create a new template to change it.",
@@ -2232,7 +2415,6 @@
       "language": "Language",
       "langFixed": "Language is fixed once a template exists on Meta.",
       "langHint": "Must match the exact code on Meta — <code>en_US</code> and <code>en</code> are distinct.",
-
       "header": "Header",
       "headerNone": "None",
       "headerText": "Text",
@@ -2242,7 +2424,6 @@
       "headerTextPlaceholder": "Header text (max 60 chars, optional {{1}})",
       "headerSampleAria": "Sample value for header variable",
       "headerSamplePlaceholder": "Sample value for {{1}} (required for Meta review)",
-
       "uploadImage": "Upload image",
       "uploadHint": "JPEG or PNG, ≤5 MB",
       "mediaUrlPlaceholder": "https://… (or paste a public {format} link)",
@@ -2250,17 +2431,14 @@
       "mediaHint": "Must be a publicly accessible HTTPS link. Meta fetches it once during review, so it needs to stay live for ~24 hrs.",
       "videoHint": " Recommended: MP4 / 3GPP, ≤16 MB, ≤60 seconds.",
       "documentHint": " Recommended: PDF, ≤100 MB.",
-
       "bodyText": "Body Text",
       "bodyPlaceholder": "Hello {{1}}, your order {{2}} is confirmed.",
       "bodyHint": "Use {{1}}, {{2}} for variables (must be contiguous starting at {{1}}).",
       "sampleValues": "Sample values (Meta uses these to review your template)",
       "sampleAria": "Sample value for body variable {var}",
       "samplePlaceholder": "Sample for {var}",
-
       "footer": "Footer (optional)",
       "footerPlaceholder": "Optional footer text (max 60 chars)",
-
       "buttons": "Buttons (optional)",
       "addButton": "Add Button",
       "buttonsLimit": "Up to {max} buttons. QUICK_REPLY buttons must come before URL / phone / copy-code buttons.",
@@ -2273,19 +2451,16 @@
       "urlSamplePlaceholder": "Example value for {{1}} (required when URL has a variable)",
       "phonePlaceholder": "+15551234567",
       "codePlaceholder": "Example code (e.g. SUMMER20)",
-
       "cancel": "Cancel",
       "saving": "Saving…",
       "submitting": "Submitting…",
       "saveResubmit": "Save & Resubmit",
       "submitApproval": "Submit for Approval",
-
       "deleteDialogTitle": "Delete template?",
       "deleteMetaDesc": "\"{name}\" will be deleted from Meta and from wacrm. Active broadcasts using this template will start failing on their next send. This can't be undone.",
       "deleteLocalDesc": "\"{name}\" will be deleted from wacrm. It was never submitted to Meta, so no remote cleanup is needed.",
       "deleting": "Deleting…",
       "delete": "Delete",
-
       "toastLoadFailed": "Failed to load templates",
       "toastSubmitFailed": "Failed to submit",
       "toastSubmitEditSuccess": "Edit submitted — Meta typically reviews within 24 hours.",
@@ -2553,7 +2728,6 @@
       "profileSaved": "Profile saved",
       "emailChangeFailed": "Email change failed: {message}",
       "profileSavedEmailCheck": "Profile saved — check your email to confirm the address change",
-
       "passwordTitle": "Password",
       "passwordDesc": "Use at least {min} characters. You will stay signed in on this device after changing it.",
       "currentPassword": "Current password",
@@ -2567,7 +2741,6 @@
       "currentPasswordIncorrect": "Current password is incorrect",
       "passwordUpdateFailed": "Password update failed: {message}",
       "passwordUpdated": "Password updated",
-
       "sessionsTitle": "Active sessions",
       "sessionsDesc": "Sign out of every device where you're logged in — including this one. Useful if you lost a laptop or shared your password.",
       "signOutAll": "Sign out of all devices",

@@ -121,6 +121,279 @@ export function mapAtPath<T extends TreeStep<T>>(
   )
 }
 
+// ------------------------------------------------------------
+// Scope-addressed operations.
+//
+// The path functions above are the historical API and stay exactly as
+// they are. These are the ones the redesigned builder actually calls,
+// and they are addressed by (scope, index) instead of by path — which
+// is what the UI has in hand when the user clicks a card.
+//
+// The difference is not cosmetic. A path has to be DERIVED: the caller
+// walks the tree computing one marker per level, and a derivation bug
+// doesn't throw, it just quietly addresses the wrong step (issue #474
+// was exactly that, and it cost every keystroke inside a condition
+// branch). A scope is already sitting in the component that owns the
+// list, so there is nothing to derive and nothing to get wrong.
+//
+// They are kept separate rather than reimplementing paths on top of
+// scopes because the path API is still the thing builder-tree.test.ts
+// pins, and the two addressing styles document two different eras of
+// the builder.
+// ------------------------------------------------------------
+
+/** Where a step lives: which bucket, and its slot in that bucket. */
+export interface StepLocation {
+  scope: ParentScope;
+  index: number;
+}
+
+/** The `index`-th step in `scope`, or null when there isn't one. */
+export function getInScope<T extends TreeStep<T>>(
+  steps: T[],
+  scope: ParentScope,
+  index: number,
+): T | null {
+  const bucket = resolveBucket(steps, scope);
+  return bucket?.[index] ?? null;
+}
+
+/**
+ * The steps a scope addresses, or null when the scope's owning
+ * condition isn't in this tree.
+ *
+ * The search for the condition is a full walk, not a `.find` on the
+ * root list. A condition inside another condition's branch is a normal
+ * thing to build, and a root-only lookup made every operation addressed
+ * to it resolve to nothing: reading, reordering and dragging steps two
+ * forks deep silently did nothing, and because nothing throws, the
+ * builder just ignored the user. `insertAt` and the walkers below
+ * already recurse for exactly this reason.
+ */
+function resolveBucket<T extends TreeStep<T>>(
+  steps: T[],
+  scope: ParentScope,
+): T[] | null {
+  if (scope.kind === "root") return steps
+  const owner = findByCid(steps, scope.parentCid)
+  if (!owner?.branches) return null
+  return owner.branches[scope.branch]
+}
+
+/** The step with this cid, wherever it sits. */
+function findByCid<T extends TreeStep<T>>(steps: T[], cid: string): T | null {
+  for (const step of steps) {
+    if (step.cid === cid) return step
+    if (!step.branches) continue
+    const yes = findByCid(step.branches.yes, cid)
+    if (yes) return yes
+    const no = findByCid(step.branches.no, cid)
+    if (no) return no
+  }
+  return null
+}
+
+/**
+ * Where the step carrying `cid` lives, searching depth-first: the
+ * bucket itself, then each condition's YES bucket, then its NO.
+ *
+ * The builder selects steps by cid rather than by location because a
+ * location is index-based — reorder or delete a step and every location
+ * below it shifts, so a stored one silently starts pointing at a
+ * different card. A cid is minted once and never changes, so the UI
+ * holds a cid and asks where it is at the moment of the edit. Returns
+ * null once the step is gone, which is how the builder learns to drop
+ * a selection.
+ */
+export function findCidLocation<T extends TreeStep<T>>(
+  steps: T[],
+  cid: string,
+  scope: ParentScope = { kind: "root" },
+): StepLocation | null {
+  const bucket = resolveBucket(steps, scope);
+  if (!bucket) return null;
+
+  for (let index = 0; index < bucket.length; index++) {
+    const step = bucket[index];
+    if (step.cid === cid) return { scope, index };
+    // A condition's own branches are searched with its own cid as the
+    // scope anchor — the same identity `insertAt` matches on, so the
+    // two can never disagree about which node a branch belongs to.
+    if (!step.branches) continue;
+    for (const branch of ["yes", "no"] as const) {
+      const found = findCidLocation(steps, cid, {
+        kind: "branch",
+        parentCid: step.cid,
+        branch,
+      });
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+/**
+ * Whether `cid` appears anywhere inside these steps or the branches
+ * they own.
+ *
+ * Used to refuse an illegal drop: moving a condition into its own YES
+ * branch would detach the branch from the tree the finder walks (the
+ * inserted node is no longer reachable from the root, so it becomes
+ * invisible AND unsaveable), which is the kind of data loss a drag
+ * gesture must never be able to cause.
+ */
+export function containsCid<T extends TreeStep<T>>(steps: T[], cid: string): boolean {
+  return steps.some(
+    (step) =>
+      step.cid === cid ||
+      (!!step.branches &&
+        (containsCid(step.branches.yes, cid) || containsCid(step.branches.no, cid))),
+  );
+}
+
+/** Replace the `index`-th step in `scope` with `updater`'s result. */
+export function updateInScope<T extends TreeStep<T>>(
+  steps: T[],
+  scope: ParentScope,
+  index: number,
+  updater: (step: T) => T,
+): T[] {
+  if (scope.kind === "root") {
+    if (!steps[index]) return steps;
+    return steps.map((step, i) => (i === index ? updater(step) : step));
+  }
+  return steps.map((step) => {
+    if (!step.branches) return step;
+    if (step.cid === scope.parentCid) {
+      return {
+        ...step,
+        branches: {
+          ...step.branches,
+          [scope.branch]: step.branches[scope.branch].map((child, i) =>
+            i === index ? updater(child) : child,
+          ),
+        },
+      };
+    }
+    // Not the owning condition — keep looking inside both of its
+    // branches, because a condition nested in a condition is a normal
+    // thing to build.
+    return {
+      ...step,
+      branches: {
+        yes: updateInScope(step.branches.yes, scope, index, updater),
+        no: updateInScope(step.branches.no, scope, index, updater),
+      },
+    };
+  });
+}
+
+/** Drop the `index`-th step in `scope`, and with it any branch it owns. */
+export function removeInScope<T extends TreeStep<T>>(
+  steps: T[],
+  scope: ParentScope,
+  index: number,
+): T[] {
+  if (scope.kind === "root") {
+    if (!steps[index]) return steps;
+    return steps.filter((_, i) => i !== index);
+  }
+  return steps.map((step) => {
+    if (!step.branches) return step;
+    if (step.cid === scope.parentCid) {
+      return {
+        ...step,
+        branches: {
+          ...step.branches,
+          [scope.branch]: step.branches[scope.branch].filter(
+            (_, i) => i !== index,
+          ),
+        },
+      };
+    }
+    return {
+      ...step,
+      branches: {
+        yes: removeInScope(step.branches.yes, scope, index),
+        no: removeInScope(step.branches.no, scope, index),
+      },
+    };
+  });
+}
+
+/** Swap the `index`-th step in `scope` with its neighbour in `direction`. */
+export function moveInScope<T extends TreeStep<T>>(
+  steps: T[],
+  scope: ParentScope,
+  index: number,
+  direction: -1 | 1,
+): T[] {
+  const target = index + direction;
+  // Both slots must exist, which is what keeps a "Move up" on the first
+  // card (and "Move down" on the last) a no-op instead of a crash or a
+  // silent wrap-around.
+  if (target < 0) return steps;
+  if (!getInScope(steps, scope, index) || !getInScope(steps, scope, target))
+    return steps;
+
+  const a = getInScope(steps, scope, index) as T;
+  const b = getInScope(steps, scope, target) as T;
+  return updateInScope(updateInScope(steps, scope, index, () => b), scope, target, () => a);
+}
+
+/**
+ * Copy of the `index`-th step in `scope`, inserted directly after it.
+ *
+ * `clone` mints the copy because duplicating a condition has to
+ * produce a condition whose YES/NO children are all new nodes too: a
+ * cid identifies exactly one step in the tree (the builder selects,
+ * edits and drags by cid, so two steps sharing one would leave one of
+ * them unselectable). The caller owns id minting, which keeps this
+ * file free of runtime dependencies and unit-testable in the node
+ * test environment.
+ */
+export function duplicateInScope<T extends TreeStep<T>>(
+  steps: T[],
+  scope: ParentScope,
+  index: number,
+  clone: (step: T) => T,
+): T[] {
+  const source = getInScope(steps, scope, index);
+  if (!source) return steps;
+  return insertAt(steps, scope, index + 1, clone(source));
+}
+
+/**
+ * Lift a step out of one bucket and drop it into another, at
+ * `toIndex`. This is what a drag between lists does — main list into
+ * a YES branch, or out of a branch and back onto the main list.
+ *
+ * The caller owns the index arithmetic: lifting a node out shifts
+ * every later slot in ITS OWN bucket down by one, so a caller dragging
+ * downward inside a single list must pass `toIndex - 1`. Doing that
+ * bookkeeping here would mean this function also had to know where
+ * the step came from, which is more state than a tree walker needs.
+ */
+export function moveToScope<T extends TreeStep<T>>(
+  steps: T[],
+  from: StepLocation,
+  to: ParentScope,
+  toIndex: number,
+): T[] {
+  const node = getInScope(steps, from.scope, from.index);
+  if (!node) return steps;
+  // Checked BEFORE the lift: a destination that doesn't resolve would
+  // otherwise swallow the step — lifted out of its bucket, then
+  // inserted nowhere. A drag gesture must never be able to delete a
+  // step, and the UI cannot normally produce this case (a drop targets
+  // a rendered lane), so refusing it is free.
+  if (!resolveBucket(steps, to)) return steps;
+  const cleared = removeInScope(steps, from.scope, from.index);
+  // Bounded against the CLEARED tree: after the lift an append lands at
+  // its new length, which is a legal insertion point.
+  return insertAt(cleared, to, Math.max(0, Math.min(toIndex, cleared.length)), node);
+}
+
 /** Drop the step at `path`. */
 export function removeAt<T extends TreeStep<T>>(
   steps: T[],
