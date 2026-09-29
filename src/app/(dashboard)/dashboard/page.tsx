@@ -88,10 +88,10 @@ function PlatformBrandIcon({ platform, size = 22 }: { platform: string; size?: n
 
 // ── Platform channel cards config ──────────────────────────────
 const PLATFORM_CARDS = [
-  { key: 'whatsapp' as const, label: 'WhatsApp',  color: '#25D366', bg: 'bg-[#E8FBF0]', textColor: 'text-[#1a9e4e]', abbr: 'WA' },
-  { key: 'instagram' as const, label: 'Instagram', color: '#E1306C', bg: 'bg-[#FEE8F0]', textColor: 'text-[#c0185a]', abbr: 'IG' },
-  { key: 'facebook' as const, label: 'Facebook',  color: '#1877F2', bg: 'bg-[#E8F1FE]', textColor: 'text-[#1565d8]', abbr: 'FB' },
-  { key: 'telegram' as const, label: 'Telegram',  color: '#26A5E4', bg: 'bg-[#E8F6FD]', textColor: 'text-[#1a8fc4]', abbr: 'TG' },
+  { key: 'whatsapp' as const, label: 'WhatsApp',  color: 'var(--chart-2)', abbr: 'WA' },
+  { key: 'instagram' as const, label: 'Instagram', color: 'var(--chart-1)', abbr: 'IG' },
+  { key: 'facebook' as const, label: 'Facebook',  color: 'var(--info)', abbr: 'FB' },
+  { key: 'telegram' as const, label: 'Telegram',  color: 'var(--chart-3)', abbr: 'TG' },
 ]
 
 export default function DashboardPage() {
@@ -209,16 +209,16 @@ export default function DashboardPage() {
           </div>
           {whatsappConnected === false && (
             <Link href="/settings?tab=whatsapp"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-colors">
+              className="inline-flex items-center gap-1.5 rounded-xl border border-warning/30 bg-warning/10 px-3 py-2 text-xs font-semibold text-warning hover:bg-warning/20 transition-colors">
               <WifiOff className="h-3.5 w-3.5" />
               Connect WhatsApp
             </Link>
           )}
           {whatsappConnected && (
-            <span className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
+            <span className="inline-flex items-center gap-1.5 rounded-xl border border-success/30 bg-success/10 px-3 py-2 text-xs font-semibold text-success">
               <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-2 w-2 animate-ping rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                <span className="absolute inline-flex h-2 w-2 animate-ping rounded-full bg-success opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
               </span>
               Connected
             </span>
@@ -236,32 +236,28 @@ export default function DashboardPage() {
               title={t('activeConversations')}
               value={metrics.activeConversations.current.toLocaleString()}
               icon={MessageSquare}
-              cardBg="bg-[#EEF4FF]"
-              iconBg="bg-[#3462EE]/15 text-[#3462EE]"
+              iconBg="ds-metric-blue ds-metric-icon"
               delta={{ sign: metrics.activeConversations.previous, label: t('newTodayVsYesterday') }}
             />
             <MetricCard
               title={t('newContactsToday')}
               value={metrics.newContactsToday.current.toLocaleString()}
               icon={UserPlus}
-              cardBg="bg-[#EDFAF4]"
-              iconBg="bg-[#4A91A8]/15 text-[#4A91A8]"
+              iconBg="ds-metric-green ds-metric-icon"
               delta={{ sign: metrics.newContactsToday.current - metrics.newContactsToday.previous, label: t('vsYesterday') }}
             />
             <MetricCard
               title={t('openDealsValue')}
               value={formatCurrency(metrics.openDealsValue, defaultCurrency)}
               icon={DollarSign}
-              cardBg="bg-[#FFFBEA]"
-              iconBg="bg-[#EFE347]/30 text-[#b89a00]"
+              iconBg="ds-metric-amber ds-metric-icon"
               subtitle={t('openDeals', { count: metrics.openDealsCount })}
             />
             <MetricCard
               title={t('messagesSentToday')}
               value={metrics.messagesSentToday.current.toLocaleString()}
               icon={Send}
-              cardBg="bg-[#F3F0FF]"
-              iconBg="bg-[#7C3AED]/15 text-[#7C3AED]"
+              iconBg="ds-metric-violet ds-metric-icon"
               delta={{ sign: metrics.messagesSentToday.current - metrics.messagesSentToday.previous, label: t('vsYesterday') }}
             />
           </>
@@ -276,7 +272,7 @@ export default function DashboardPage() {
             <Link
               key={p.key}
               href={`/inbox?platform=${p.key}`}
-              className={`group flex items-center gap-3 rounded-2xl border border-border bg-card p-4 transition-all hover:-translate-y-0.5 hover:shadow-md`}
+              className="group flex items-center gap-3 rounded-2xl border border-border bg-card p-4 transition-all hover:-translate-y-0.5 hover:shadow-md"
             >
               <div
                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl shadow-sm"
@@ -289,7 +285,7 @@ export default function DashboardPage() {
                 {platformCounts === null ? (
                   <div className="mt-1 h-5 w-10 animate-pulse rounded bg-muted" />
                 ) : (
-                  <p className={`text-xl font-bold tabular-nums ${p.textColor}`}>
+                  <p className="text-xl font-bold tabular-nums text-foreground">
                     {count.toLocaleString()}
                   </p>
                 )}
@@ -352,17 +348,17 @@ export default function DashboardPage() {
       {/* ── Overview stat mini-cards ── */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <MiniStatCard icon={Users} label={t('totalContacts')} value={totalContacts} loading={metricsLoading} color="text-primary" bg="bg-primary/10" />
-        <MiniStatCard icon={MessageSquare} label={t('totalConversations')} value={totalConversations} loading={metricsLoading} color="text-[#4A91A8]" bg="bg-[#4A91A8]/10" />
-        <MiniStatCard icon={Calendar} label={t('todaysFollowUps')} value={metrics?.followUpsToday.current ?? null} loading={metricsLoading} color="text-amber-600" bg="bg-amber-500/10" />
-        <MiniStatCard icon={TrendingUp} label={t('openDealsCountLabel')} value={metrics?.openDealsCount ?? null} loading={metricsLoading} color="text-violet-600" bg="bg-violet-500/10" />
+        <MiniStatCard icon={MessageSquare} label={t('totalConversations')} value={totalConversations} loading={metricsLoading} color="text-info" bg="bg-info/10" />
+        <MiniStatCard icon={Calendar} label={t('todaysFollowUps')} value={metrics?.followUpsToday.current ?? null} loading={metricsLoading} color="text-warning" bg="bg-warning/10" />
+        <MiniStatCard icon={TrendingUp} label={t('openDealsCountLabel')} value={metrics?.openDealsCount ?? null} loading={metricsLoading} color="text-primary" bg="bg-primary/10" />
       </div>
 
       {/* ── Unassigned + Overdue ── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Link href="/inbox?filter=unassigned"
           className="group flex items-center gap-4 rounded-2xl border border-border bg-card p-5 transition-all hover:shadow-md hover:-translate-y-0.5">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-orange-500/10 transition-transform group-hover:scale-105">
-            <Users className="h-5 w-5 text-orange-500" />
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-warning/10 transition-transform group-hover:scale-105">
+            <Users className="h-5 w-5 text-warning" />
           </div>
           <div>
             <p className="text-xs font-medium text-muted-foreground">{t('unassignedConversations')}</p>
@@ -373,8 +369,8 @@ export default function DashboardPage() {
         </Link>
         <Link href="/inbox?filter=followups"
           className="group flex items-center gap-4 rounded-2xl border border-border bg-card p-5 transition-all hover:shadow-md hover:-translate-y-0.5">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-red-500/10 transition-transform group-hover:scale-105">
-            <Calendar className="h-5 w-5 text-red-500" />
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-destructive/10 transition-transform group-hover:scale-105">
+            <Calendar className="h-5 w-5 text-destructive" />
           </div>
           <div>
             <p className="text-xs font-medium text-muted-foreground">{t('overdueFollowUps')}</p>

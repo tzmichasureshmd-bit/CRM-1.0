@@ -2,8 +2,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { createClient } from "@/lib/supabase/server";
-import { isPlatformRole } from "@/lib/auth/roles";
-import { isAuthorizedSuperAdmin } from "@/lib/auth/super-admin-emails";
+import { assertSuperAdminProfile } from "@/lib/auth/super-admin-policy";
 import { AdminShell } from "@/components/admin/admin-shell";
 
 export const metadata: Metadata = {
@@ -23,7 +22,7 @@ export const metadata: Metadata = {
 /**
  * Server-side authorization gate for the Super Admin dashboard.
  *
- * The middleware ensures:
+ * The proxy ensures:
  *  - Unauthenticated users on /admin (except /admin/login) → /admin/login
  *  - Unauthenticated users on /admin/login → passed through to here
  *  - Authenticated users on /admin/login → /admin
@@ -42,7 +41,7 @@ export default async function AdminLayout({
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Middleware already routed unauthenticated users to /admin/login.
+  // The proxy already routed unauthenticated users to /admin/login.
   // Render children directly (no shell, no auth gate) for the login page.
   if (!user) {
     return <>{children}</>;
@@ -54,13 +53,12 @@ export default async function AdminLayout({
     .eq("user_id", user.id)
     .maybeSingle();
 
-  const platformRole = profile?.platform_role;
-
-  if (!isPlatformRole(platformRole) || platformRole !== "super_admin") {
-    redirect("/dashboard");
-  }
-
-  if (!profile?.email || !isAuthorizedSuperAdmin(profile.email)) {
+  // Identical rule to the /super-admin tree — see
+  // src/lib/auth/super-admin-policy.ts. The two layouts used to
+  // disagree (this one also required the SUPER_ADMIN_EMAILS
+  // allowlist), which made the allowlist trivially bypassable by
+  // switching to the other console.
+  if (!assertSuperAdminProfile(profile).authorized) {
     redirect("/dashboard");
   }
 

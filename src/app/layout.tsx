@@ -123,7 +123,23 @@ const THEME_BOOT_SCRIPT = `
     var MODE_DEFAULT = ${JSON.stringify(DEFAULT_MODE)};
     var MODES = ${JSON.stringify(MODES)};
     var savedMode = localStorage.getItem(MODE_KEY);
-    d.dataset.mode = MODES.indexOf(savedMode) !== -1 ? savedMode : MODE_DEFAULT;
+    // "auto" is a *preference*, not a paintable mode: there is no
+    // [data-mode="auto"] rule in globals.css, and the bare :root
+    // fallback is the dark token set. Writing the literal "auto" here
+    // therefore fell through to :root and made Auto render DARK on
+    // every reload regardless of the OS setting (the provider's
+    // applyMode() resolved it correctly, but only after hydration, and
+    // nothing re-applied it on mount). Resolve it to a concrete
+    // light/dark here, in the boot script, so the first paint is right.
+    if (MODES.indexOf(savedMode) === -1) {
+      savedMode = MODE_DEFAULT;
+    }
+    if (savedMode === 'auto') {
+      savedMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        ? 'dark'
+        : 'light';
+    }
+    d.dataset.mode = savedMode;
   } catch (_e) {
     d.dataset.theme = ${JSON.stringify(DEFAULT_THEME)};
     d.dataset.mode = ${JSON.stringify(DEFAULT_MODE)};

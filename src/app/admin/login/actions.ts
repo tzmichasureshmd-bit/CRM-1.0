@@ -1,12 +1,12 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { isPlatformRole } from "@/lib/auth/roles";
-import { isAuthorizedSuperAdmin } from "@/lib/auth/super-admin-emails";
+import { assertSuperAdminProfile } from "@/lib/auth/super-admin-policy";
 
 /**
  * Server action: verify the current session belongs to an authorized
- * super admin (platform_role = 'super_admin' AND email in SUPER_ADMIN_EMAILS).
+ * super admin (platform_role = 'super_admin', plus the optional
+ * SUPER_ADMIN_EMAILS allowlist when that variable is configured).
  *
  * Called from the /admin/login page after signInWithPassword succeeds.
  */
@@ -45,24 +45,25 @@ export async function verifySuperAdmin(): Promise<{
       return { authorized: false, reason: `Profile error: ${profileError.message}` };
     }
 
-    if (!profile) {
-      console.warn("[SUPER ADMIN] verifySuperAdmin: no profile found for user_id:", user.id);
-      return { authorized: false, reason: "No profile found for this user." };
-    }
+    console.log(
+      "[SUPER ADMIN] verifySuperAdmin: profile found, platform_role:",
+      profile?.platform_role,
+      "email:",
+      profile?.email,
+    );
 
-    console.log("[SUPER ADMIN] verifySuperAdmin: profile found, platform_role:", profile.platform_role, "email:", profile.email);
+    // Shared rule — identical to the /admin and /super-admin layout
+    // gates. This action used to apply the allowlist unconditionally,
+    // which meant that on any deployment without SUPER_ADMIN_EMAILS set
+    // (including self-hosted ones) NO ONE could sign in to /admin even
+    // with platform_role = 'super_admin'. The allowlist is now opt-in.
+    const verdict = assertSuperAdminProfile(profile);
 
-    if (
-      !isPlatformRole(profile?.platform_role) ||
-      profile?.platform_role !== "super_admin"
-    ) {
-      console.warn("[SUPER ADMIN] verifySuperAdmin: user does not have super_admin role, got:", profile?.platform_role);
-      return { authorized: false, reason: "You do not have Super Admin access." };
-    }
-
-    if (!profile?.email || !isAuthorizedSuperAdmin(profile.email)) {
-      console.warn("[SUPER ADMIN] verifySuperAdmin: email not in SUPER_ADMIN_EMAILS:", profile?.email);
-      return { authorized: false, reason: "This email is not authorized for Super Admin access." };
+    if (!verdict.authorized) {
+      console.warn(
+        `[SUPER ADMIN] verifySuperAdmin: denied for ${profile?.email ?? user.id} (${verdict.code})`,
+      );
+      return { authorized: false, reason: verdict.reason };
     }
 
     console.log("[SUPER ADMIN] verifySuperAdmin: authorization successful");

@@ -91,11 +91,13 @@ export async function POST(request: Request) {
     }
   }
 
-  // Fallback: if only one bot is connected and no secret header, use it
-  // (handles cases where secret wasn't stored correctly)
-  if (!matchedBot && bots.length === 1 && !secretHeader) {
-    matchedBot = bots[0]
-  }
+  // NOTE: there is deliberately NO "single connected bot" fallback here.
+  // `processTelegramUpdate` writes contacts/conversations/messages with
+  // the service-role client and then fires the automation engine, so
+  // accepting an update we could not authenticate would let anyone who
+  // can reach this public endpoint inject inbound traffic into the
+  // tenant and drive automations. A bot whose webhook_secret is missing
+  // or unreadable must be re-connected from the UI, not silently trusted.
 
   if (!matchedBot) {
     // Could not identify bot — ack to prevent Telegram retries

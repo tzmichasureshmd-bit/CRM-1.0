@@ -57,7 +57,17 @@ export function ReplyQuote({
          *  layout wider, shoving the contact sidebar off-screen.
          *  `break-words` also wraps long URLs that have no whitespace
          *  to break on. Issue #165. */}
-        <div className="whitespace-pre-wrap break-words text-xs text-foreground/80">
+        {/* The colour must follow `onPrimary` like the label above it.
+         *  Agent bubbles are `bg-primary`; a neutral `--foreground` at
+         *  80% composited over the accent to roughly 2:1 in LIGHT mode,
+         *  which is the mode this app defaults to — every reply quote
+         *  an agent sent was near-unreadable. */}
+        <div
+          className={cn(
+            "whitespace-pre-wrap break-words text-xs",
+            onPrimary ? "text-primary-foreground/85" : "text-foreground/80",
+          )}
+        >
           {preview}
         </div>
       </div>

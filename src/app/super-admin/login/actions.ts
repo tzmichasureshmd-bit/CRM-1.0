@@ -1,11 +1,13 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { assertSuperAdminProfile } from "@/lib/auth/super-admin-policy";
 
 /**
  * Server action: verify the current session belongs to a super admin
- * (profiles.platform_role = 'super_admin', falling back to the legacy
- * role column — the exact rule the /super-admin layout gate applies).
+ * (`profiles.platform_role = 'super_admin'`, plus the optional
+ * SUPER_ADMIN_EMAILS allowlist) — the exact rule the /super-admin
+ * layout gate applies.
  *
  * Called from the /super-admin/login page after signInWithPassword
  * succeeds, so the authorization decision happens server-side before
@@ -35,7 +37,7 @@ export async function verifySuperAdminRole(): Promise<{
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("platform_role, role")
+      .select("platform_role, email")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -44,17 +46,17 @@ export async function verifySuperAdminRole(): Promise<{
       return { authorized: false, reason: `Profile error: ${profileError.message}` };
     }
 
-    if (!profile) {
-      console.warn("[SUPER ADMIN] verifySuperAdminRole: no profile found for user_id:", user.id);
-      return { authorized: false, reason: "No profile found for this user." };
-    }
+    // Shared rule — identical to the /super-admin and /admin layout
+    // gates. Previously this accepted the legacy `role` column as an
+    // alternative to `platform_role`, which no migration ever writes
+    // and which RLS ignores; that was an unintended escalation path.
+    const verdict = assertSuperAdminProfile(profile);
 
-    const platformRole = profile.platform_role as string | undefined;
-    const legacyRole = (profile as Record<string, unknown> | null)?.role as string | undefined;
-
-    if (platformRole !== "super_admin" && legacyRole !== "super_admin") {
-      console.warn("[SUPER ADMIN] verifySuperAdminRole: user does not have super_admin role, got:", platformRole);
-      return { authorized: false, reason: "You do not have Super Admin access." };
+    if (!verdict.authorized) {
+      console.warn(
+        `[SUPER ADMIN] verifySuperAdminRole: denied for ${user.email ?? user.id} (${verdict.code})`,
+      );
+      return { authorized: false, reason: verdict.reason };
     }
 
     return { authorized: true };

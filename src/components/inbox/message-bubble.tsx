@@ -48,10 +48,13 @@ function StatusIcon({
   status,
   platform,
   onClick,
+  onPrimary = false,
 }: {
   status: Message["status"];
   platform?: string;
   onClick?: () => void;
+  /** True when rendered inside the `bg-primary` outbound bubble. */
+  onPrimary?: boolean;
 }) {
   const isTelegram = platform === "telegram";
   // For Telegram: treat delivered/read as sent — Bot API doesn't confirm these
@@ -62,8 +65,13 @@ function StatusIcon({
       case "sending": return <Clock className="h-3 w-3 text-muted-foreground" />;
       case "sent":    return <Check className="h-3 w-3 text-muted-foreground" />;
       case "delivered": return <CheckCheck className="h-3 w-3 text-muted-foreground" />;
-      case "read":    return <CheckCheck className="h-3 w-3 text-blue-400" />;
-      case "failed":  return <XCircle className="h-3 w-3 text-red-400" />;
+      // `read` and `failed` render on the `bg-primary` outbound bubble.
+      // blue-400 / red-400 are light-palette hues that land around
+      // 2.7:1 on the accent and, being fixed hex, ignored the selected
+      // accent entirely. On a light bubble these are near-white anyway,
+      // so branch on the bubble.
+      case "read":    return <CheckCheck className={cn("h-3 w-3", onPrimary ? "text-primary-foreground/80" : "text-sky-500 dark:text-sky-400")} />;
+      case "failed":  return <XCircle className={cn("h-3 w-3", onPrimary ? "text-primary-foreground/80" : "text-destructive")} />;
       default:        return null;
     }
   })();
@@ -241,7 +249,13 @@ function MessageContent({ message, t }: { message: Message, t: ReturnType<typeof
     case "template":
       return (
         <div>
-          <span className="mb-1 inline-flex items-center gap-1 rounded bg-primary/20 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+          {/* Templates are always agent-sent, so this badge lands
+           *  inside the `bg-primary` bubble. `text-primary` on
+           *  `bg-primary/20` over `bg-primary` is the same hue at the
+           *  same lightness — roughly 1:1, i.e. invisible. The AI
+           *  badge below already uses the correct `primary-foreground`
+           *  pair; this one was missed. */}
+          <span className="mb-1 inline-flex items-center gap-1 rounded bg-primary-foreground/20 px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground">
             <LayoutTemplate className="h-3 w-3" />
             {t("template")}
           </span>
@@ -314,7 +328,7 @@ export function MessageBubble({
   const t = useTranslations("Inbox.bubble");
   const [infoOpen, setInfoOpen] = useState(false);
 
-  const isAgent = message.sender_type === "agent" || message.sender_type === "bot";
+  const isAgent = message.sender_type === "agent";
   const time = format(new Date(message.created_at), "HH:mm");
   const isTelegram = platform === "telegram";
 
@@ -369,6 +383,7 @@ export function MessageBubble({
               <StatusIcon
                 status={message.status}
                 platform={platform}
+                onPrimary={isAgent}
                 onClick={isTelegram ? () => setInfoOpen(true) : undefined}
               />
             )}

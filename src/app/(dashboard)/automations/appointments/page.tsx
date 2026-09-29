@@ -551,12 +551,12 @@ export default function AppointmentsPage() {
                           <TableCell className="hidden lg:table-cell">
                             <div className="flex items-center gap-1">
                               {appt.reminder_24h_sent ? (
-                                <Bell className="size-3.5 text-green-500" />
+                                <Bell className="size-3.5 text-green-600 dark:text-green-400" />
                               ) : (
                                 <BellOff className="size-3.5 text-muted-foreground/40" />
                               )}
                               {appt.reminder_1h_sent ? (
-                                <Bell className="size-3.5 text-green-500" />
+                                <Bell className="size-3.5 text-green-600 dark:text-green-400" />
                               ) : (
                                 <BellOff className="size-3.5 text-muted-foreground/40" />
                               )}
@@ -594,7 +594,7 @@ export default function AppointmentsPage() {
                                       onClick={() => updateStatus(appt, "completed")}
                                       className="text-popover-foreground focus:bg-muted focus:text-foreground"
                                     >
-                                      <CheckCircle2 className="size-4 text-emerald-500" />
+                                      <CheckCircle2 className="size-4 text-emerald-600 dark:text-emerald-400" />
                                       {t("actions.complete")}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
@@ -608,7 +608,7 @@ export default function AppointmentsPage() {
                                       onClick={() => updateStatus(appt, "cancelled")}
                                       className="text-popover-foreground focus:bg-muted focus:text-foreground"
                                     >
-                                      <XCircle className="size-4 text-red-500" />
+                                      <XCircle className="size-4 text-red-600 dark:text-red-400" />
                                       {t("actions.cancel")}
                                     </DropdownMenuItem>
                                   </>
@@ -618,7 +618,7 @@ export default function AppointmentsPage() {
                                     onClick={() => updateStatus(appt, "no_show")}
                                     className="text-popover-foreground focus:bg-muted focus:text-foreground"
                                   >
-                                    <XCircle className="size-4 text-orange-500" />
+                                    <XCircle className="size-4 text-orange-600 dark:text-orange-400" />
                                     {t("actions.noShow")}
                                   </DropdownMenuItem>
                                 )}
@@ -899,7 +899,7 @@ export default function AppointmentsPage() {
                   <div className="flex items-center gap-4 text-sm">
                     <div className="flex items-center gap-1.5">
                       {detailAppointment.reminder_24h_sent ? (
-                        <Bell className="size-4 text-green-500" />
+                        <Bell className="size-4 text-green-600 dark:text-green-400" />
                       ) : (
                         <BellOff className="size-4 text-muted-foreground/40" />
                       )}
@@ -907,7 +907,7 @@ export default function AppointmentsPage() {
                     </div>
                     <div className="flex items-center gap-1.5">
                       {detailAppointment.reminder_1h_sent ? (
-                        <Bell className="size-4 text-green-500" />
+                        <Bell className="size-4 text-green-600 dark:text-green-400" />
                       ) : (
                         <BellOff className="size-4 text-muted-foreground/40" />
                       )}

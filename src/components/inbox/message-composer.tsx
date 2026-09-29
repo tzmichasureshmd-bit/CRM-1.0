@@ -653,14 +653,19 @@ export function MessageComposer({
         </div>
       )}
       {sessionExpired && !isTelegram && !isTextOnly && (
-        <div className="mb-2 flex items-center justify-between rounded-lg bg-amber-500/10 px-3 py-2">
-          <p className="text-xs text-amber-400">
+        // The old classes were a light-palette amber (amber-400 /
+        // amber-500/10) with no dark: variants, and light is the default
+        // mode: amber-400 on a 10%-amber wash over white is roughly
+        // 1.9:1, so the hint and the action were effectively invisible
+        // until you already knew the session was stale.
+        <div className="mb-2 flex items-center justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2">
+          <p className="text-xs text-amber-800 dark:text-amber-300">
             {t("sessionExpiredHint")}
           </p>
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 text-xs text-amber-400 hover:text-amber-300"
+            className="h-7 shrink-0 text-xs text-amber-800 hover:text-amber-900 dark:text-amber-300 dark:hover:text-amber-200"
             onClick={onOpenTemplates}
           >
             <LayoutTemplate className="mr-1 h-3 w-3" />

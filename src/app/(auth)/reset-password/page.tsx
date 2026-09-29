@@ -1,19 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { PasswordInput } from "@/components/ui/password-input";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { ShieldCheck, AlertCircle, CheckCircle } from "lucide-react";
+  LoginBrand,
+  LoginCard,
+  LoginError,
+  LoginField,
+  LoginFooter,
+  LoginHeading,
+  LoginHint,
+  LoginPasswordInput,
+  LoginPending,
+  LoginSecondary,
+  LoginShell,
+  LoginStatusPanel,
+  LoginSubmit,
+} from "@/components/auth/login-shell";
 
 /**
  * /reset-password — final step of the password recovery flow.
@@ -83,7 +86,7 @@ export default function ResetPasswordPage() {
 
       // Reset done — end the recovery session so "Back to Login"
       // actually lands on the sign-in form instead of being bounced
-      // to the dashboard by the middleware's logged-in redirect.
+      // to the dashboard by the proxy's logged-in redirect.
       await supabase.auth.signOut();
       setSuccess(true);
     } catch (err) {
@@ -97,145 +100,83 @@ export default function ResetPasswordPage() {
     }
   };
 
-  if (success) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background px-4">
-        <Card className="w-full max-w-md border-border bg-card">
-          <CardHeader className="items-center text-center">
-            <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-              <CheckCircle className="h-6 w-6 text-primary" />
-            </div>
-            <CardTitle className="text-xl text-foreground">
-              Password reset successfully
-            </CardTitle>
-            <CardDescription className="text-muted-foreground">
+  return (
+    <LoginShell imageSrc="/images/3804820b-a1d6-4a83-923c-e509ff58a324.png">
+      <LoginCard>
+        <LoginBrand />
+
+        {success ? (
+          <>
+            <LoginStatusPanel tone="success" title="Password reset successfully">
               Your password has been reset successfully. You can now sign in
               with your new password.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link href="/login">
-              <Button className="h-10 w-full bg-primary text-primary-foreground hover:bg-primary/90">
-                Back to Login
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+            </LoginStatusPanel>
 
-  if (status === "checking") {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background px-4">
-        <Card className="w-full max-w-md border-border bg-card">
-          <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
-            <ShieldCheck className="h-6 w-6 animate-pulse text-primary" />
-            <p className="text-sm text-muted-foreground">
-              Verifying your reset link…
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (status === "invalid") {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background px-4">
-        <Card className="w-full max-w-md border-border bg-card">
-          <CardHeader className="items-center text-center">
-            <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-red-500/10">
-              <AlertCircle className="h-6 w-6 text-red-400" />
-            </div>
-            <CardTitle className="text-xl text-foreground">
-              Invalid reset link
-            </CardTitle>
-            <CardDescription className="text-muted-foreground">
+            <LoginSecondary href="/login" className="mt-6">
+              Back to Login
+            </LoginSecondary>
+          </>
+        ) : status === "checking" ? (
+          <LoginPending>Verifying your reset link…</LoginPending>
+        ) : status === "invalid" ? (
+          <>
+            <LoginStatusPanel tone="error" title="Invalid reset link">
               This password reset link is invalid or has already been used.
               Please request a new one.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link href="/forgot-password">
-              <Button
-                variant="outline"
-                className="w-full border-border text-muted-foreground hover:bg-muted hover:text-foreground"
-              >
-                Request new link
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+            </LoginStatusPanel>
 
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <Card className="w-full max-w-md border-border bg-card">
-        <CardHeader className="items-center text-center">
-          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-            <ShieldCheck className="h-6 w-6 text-primary" />
-          </div>
-          <CardTitle className="text-xl text-foreground">
-            Set a new password
-          </CardTitle>
-          <CardDescription className="text-muted-foreground">
-            Choose a strong new password for your account.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleReset} className="flex flex-col gap-4">
-            {error && (
-              <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
-                {error}
-              </div>
-            )}
+            <LoginSecondary href="/forgot-password" className="mt-6">
+              Request new link
+            </LoginSecondary>
+          </>
+        ) : (
+          <>
+            <LoginHeading as="h1" title="Set a new password">
+              Choose a strong new password for your account.
+            </LoginHeading>
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="newPassword" className="text-muted-foreground">
-                New Password
-              </Label>
-              <PasswordInput
-                id="newPassword"
-                placeholder="Enter your new password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                required
-                autoComplete="new-password"
-                className="border-border bg-muted text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/20"
-              />
-              <p className="text-xs text-muted-foreground">
-                Must be at least 6 characters.
-              </p>
-            </div>
+            <form onSubmit={handleReset} className="mt-1 flex flex-col gap-4">
+              <LoginError>{error}</LoginError>
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="confirmPassword" className="text-muted-foreground">
-                Confirm New Password
-              </Label>
-              <PasswordInput
-                id="confirmPassword"
-                placeholder="Confirm your new password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                autoComplete="new-password"
-                className="border-border bg-muted text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/20"
-              />
-            </div>
+              <LoginField label="New Password" htmlFor="newPassword">
+                <LoginPasswordInput
+                  id="newPassword"
+                  placeholder="Must be at least 6 characters"
+                  autoComplete="new-password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                  showLabel="Show new password"
+                  hideLabel="Hide new password"
+                />
+                <LoginHint>Must be at least 6 characters.</LoginHint>
+              </LoginField>
 
-            <Button
-              type="submit"
-              disabled={loading}
-              className="mt-2 h-10 w-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-            >
-              {loading ? "Resetting…" : "Reset Password"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+              <LoginField label="Confirm New Password" htmlFor="confirmPassword">
+                <LoginPasswordInput
+                  id="confirmPassword"
+                  placeholder="Confirm your new password"
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  showLabel="Show confirmed password"
+                  hideLabel="Hide confirmed password"
+                />
+              </LoginField>
+
+              <LoginSubmit loading={loading} loadingText="Resetting…">
+                Reset Password
+              </LoginSubmit>
+            </form>
+          </>
+        )}
+      </LoginCard>
+
+      <LoginFooter>
+        &copy; {new Date().getFullYear()} TZmicha IT Solutions &middot; WhatsApp
+        CRM
+      </LoginFooter>
+    </LoginShell>
   );
 }
