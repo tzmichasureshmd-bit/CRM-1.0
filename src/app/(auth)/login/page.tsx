@@ -33,16 +33,38 @@ function LoginPageInner() {
     setLoading(true);
     try {
       const supabase = createClient();
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) { setError(error.message); setLoading(false); return; }
+
+      if (inviteToken) {
+        window.location.href = `/join/${encodeURIComponent(inviteToken)}`;
+        return;
+      }
+
+      // Route to correct panel based on role
+      if (data?.user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("platform_role, account_role")
+          .eq("user_id", data.user.id)
+          .maybeSingle();
+
+        if (profile?.platform_role === "super_admin") {
+          window.location.href = "/super-admin";
+          return;
+        }
+        if (profile?.account_role === "owner" || profile?.account_role === "admin") {
+          window.location.href = "/admin";
+          return;
+        }
+      }
+      window.location.href = "/dashboard";
     } catch (err) {
       const isMisconfigured = err instanceof Error && err.message.includes("Supabase is not configured");
       setError(isMisconfigured ? "Supabase is not configured. Please contact the administrator." : "Unable to sign in. Please try again later.");
       setLoading(false);
       return;
     }
-    const destination = inviteToken ? `/join/${encodeURIComponent(inviteToken)}` : "/dashboard";
-    window.location.href = destination;
   };
 
   return (
@@ -92,6 +114,19 @@ function LoginPageInner() {
                 Sign up
               </Link>
             </p>
+
+            <div className="mt-6 flex flex-col gap-2 border-t border-border/40 pt-4">
+              <p className="text-center text-xs text-muted-foreground mb-1">Admin Access</p>
+              <div className="flex gap-2 justify-center">
+                <Link href="/admin" className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                  🏢 Org Admin Panel
+                </Link>
+                <Link href="/super-admin/login" className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                  🔐 Super Admin Login
+                </Link>
+              </div>
+              <p className="text-center text-[10px] text-muted-foreground/60">Org Admin: owner/admin role required &nbsp;·&nbsp; Super Admin: TZMICHA platform only</p>
+            </div>
           </div>
         </div>
 

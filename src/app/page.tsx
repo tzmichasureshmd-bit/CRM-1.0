@@ -784,8 +784,13 @@ export default function LandingPage() {
             </div>
           </div>
 
+          {/* Logo */}
+          <div className="mt-16 flex justify-center">
+            <Image src="/images/logo.png" alt="TZMICHA" width={120} height={40} className="opacity-80" />
+          </div>
+
           {/* Big brand name — Google-style */}
-          <div className="mt-16 select-none overflow-hidden">
+          <div className="mt-4 select-none overflow-hidden">
             <p
               className="whitespace-nowrap text-center font-extrabold leading-none tracking-tighter text-white"
               style={{ fontSize: "clamp(2rem, 9vw, 7rem)" }}

@@ -100,14 +100,12 @@ export async function middleware(request: NextRequest) {
   if (!user) {
     const pathname = request.nextUrl.pathname
     const isProtectedSuperAdmin = pathname.startsWith('/super-admin') && pathname !== '/super-admin/login'
-    const isProtectedAdmin = pathname.startsWith('/admin') && pathname !== '/admin/login'
+    const isProtectedAdmin = pathname.startsWith('/admin')
     const isOtherProtected = ['/dashboard', '/inbox', '/contacts', '/pipelines', '/broadcasts', '/automations', '/save-money', '/settings'].some(path => pathname.startsWith(path))
     if (isProtectedSuperAdmin || isProtectedAdmin || isOtherProtected) {
       const url = request.nextUrl.clone()
       if (isProtectedSuperAdmin) {
         url.pathname = '/super-admin/login'
-      } else if (isProtectedAdmin) {
-        url.pathname = '/admin/login'
       } else {
         url.pathname = '/login'
       }

@@ -71,20 +71,16 @@ export function LandingNav() {
           ))}
         </nav>
 
-        {/* Buttons: always visible, white text over video, normal on scroll */}
+        {/* Buttons: always visible */}
         <div className="hidden items-center gap-2 md:flex">
           <Link href="/login">
-            <Button
-              variant="ghost"
-              size="sm"
-              style={{ color: scrolled ? undefined : "rgba(255,255,255,0.85)" }}
-            >
-              Login
+            <Button variant="ghost" size="sm" style={{ color: scrolled ? undefined : "rgba(255,255,255,0.9)" }}>
+              Sign In
             </Button>
           </Link>
           <Link href="/signup">
-            <Button size="sm" className="landing-btn-lift">
-              Get Started
+            <Button size="sm" style={{ background: "linear-gradient(135deg,#10b981,#047857)", color: "#fff", border: "none" }}>
+              Start Free
               <ArrowRight className="size-3.5" />
             </Button>
           </Link>

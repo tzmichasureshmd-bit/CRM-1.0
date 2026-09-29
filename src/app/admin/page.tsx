@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import Link from "next/link";
 import {
   Card,
   CardContent,
@@ -6,322 +8,117 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import Link from "next/link";
 import {
-  Building2,
   Users,
   MessageSquare,
-  CreditCard,
-  Activity,
-  ScrollText,
-  FileText,
-  ArrowRight,
   Radio,
   Zap,
-  DollarSign,
-  Target,
+  BarChart3,
+  ArrowRight,
+  CheckCircle2,
+  Clock,
+  UserCheck,
 } from "lucide-react";
-import type { PlatformLeadStats } from "@/types";
-import { sourceBadgeInfo } from "@/lib/crm/leads";
 
 export const dynamic = "force-dynamic";
 
-interface AdminDashboardProps {
-  /** Route prefix of the tree rendering this dashboard ("​/admin" or "/super-admin"). */
-  basePath?: string;
-}
-
-/**
- * Platform-wide dashboard. Shared by the /admin and /super-admin trees —
- * every internal link is derived from `basePath` so both trees stay
- * self-contained (no cross-tree bounce on navigation).
- */
-export async function AdminDashboard({ basePath = "/admin" }: AdminDashboardProps) {
+export default async function OrgAdminDashboard() {
   const supabase = await createClient();
-  const isPlatform = basePath === "/super-admin";
 
-  const { data: user } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, email")
-    .eq("user_id", user?.user?.id ?? "")
+    .select("full_name, account_id, account_role")
+    .eq("user_id", user.id)
     .maybeSingle();
 
+  const accountId = profile?.account_id;
+  if (!accountId) redirect("/dashboard");
+
   const [
-    accountsResult,
-    activeAccountsResult,
-    suspendedAccountsResult,
-    usersResult,
+    membersResult,
     contactsResult,
-    messagesResult,
-    inboundMessagesResult,
     conversationsResult,
+    openConversationsResult,
+    resolvedConversationsResult,
     broadcastsResult,
-    sendingBroadcastsResult,
     automationsResult,
     activeAutomationsResult,
-    activeSubscriptionsResult,
-    trialingSubscriptionsResult,
-    pastDueSubscriptionsResult,
-    failedPaymentsResult,
-    revenueResult,
-    recentAccountsResult,
-    recentAuditResult,
+    messagesResult,
   ] = await Promise.all([
-    supabase.from("accounts").select("id", { count: "exact", head: true }),
-    supabase.from("accounts").select("id", { count: "exact", head: true }).eq("status", "active"),
-    supabase.from("accounts").select("id", { count: "exact", head: true }).eq("status", "suspended"),
-    supabase.from("profiles").select("id", { count: "exact", head: true }),
-    supabase.from("contacts").select("id", { count: "exact", head: true }),
-    // Outbound = sent by an agent/bot; inbound = sent by the customer.
-    supabase.from("messages").select("id", { count: "exact", head: true }).in("sender_type", ["agent", "bot"]),
-    supabase.from("messages").select("id", { count: "exact", head: true }).eq("sender_type", "customer"),
-    supabase
-      .from("conversations")
-      .select("id", { count: "exact", head: true }),
-    supabase.from("broadcasts").select("id", { count: "exact", head: true }),
-    supabase.from("broadcasts").select("id", { count: "exact", head: true }).in("status", ["sending", "scheduled"]),
-    supabase.from("automations").select("id", { count: "exact", head: true }),
-    supabase.from("automations").select("id", { count: "exact", head: true }).eq("is_active", true),
-    supabase
-      .from("business_subscriptions")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "active"),
-    supabase
-      .from("business_subscriptions")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "trialing"),
-    supabase
-      .from("business_subscriptions")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "past_due"),
-    supabase.from("payments").select("id", { count: "exact", head: true }).eq("status", "failed"),
-    // Revenue = sum of succeeded payments. Head-count queries can't sum,
-    // so pull just the amount column for succeeded rows.
-    supabase.from("payments").select("amount_cents").eq("status", "succeeded"),
-    supabase
-      .from("accounts")
-      .select("id, name, slug, status, created_at")
-      .order("created_at", { ascending: false })
-      .limit(5),
-    supabase
-      .from("audit_log")
-      .select("id, actor_email, action, resource_type, created_at")
-      .order("created_at", { ascending: false })
-      .limit(5),
+    supabase.from("profiles").select("id", { count: "exact", head: true }).eq("account_id", accountId),
+    supabase.from("contacts").select("id", { count: "exact", head: true }).eq("account_id", accountId),
+    supabase.from("conversations").select("id", { count: "exact", head: true }).eq("account_id", accountId),
+    supabase.from("conversations").select("id", { count: "exact", head: true }).eq("account_id", accountId).eq("status", "open"),
+    supabase.from("conversations").select("id", { count: "exact", head: true }).eq("account_id", accountId).eq("status", "resolved"),
+    supabase.from("broadcasts").select("id", { count: "exact", head: true }).eq("account_id", accountId),
+    supabase.from("automations").select("id", { count: "exact", head: true }).eq("account_id", accountId),
+    supabase.from("automations").select("id", { count: "exact", head: true }).eq("account_id", accountId).eq("is_active", true),
+    supabase.from("messages").select("id", { count: "exact", head: true }).eq("account_id", accountId),
   ]);
 
-  const totalRevenueCents = (revenueResult.data ?? []).reduce(
-    (sum, row) => sum + ((row.amount_cents as number | null) ?? 0),
-    0
-  );
-
-  // Super-admin only: platform-wide lead stats + recently received leads
-  // (cross-tenant via RLS, super admin bypasses account scoping).
-  let leadStats: PlatformLeadStats | undefined;
-  let recentLeads: Array<{
-    id: string;
-    title: string;
-    status: string;
-    created_at: string;
-    contact?: { name?: string | null; phone?: string | null; email?: string | null; source?: string | null; source_platform?: string | null } | null;
-    account?: { name?: string | null } | null;
-    assignee?: { full_name?: string | null } | null;
-  }> = [];
-
-  if (isPlatform) {
-    const [statsRes, recentRes] = await Promise.all([
-      supabase.rpc("get_platform_lead_stats"),
-      supabase
-        .from("deals")
-        .select(
-          "id, title, status, created_at, " +
-            "contact:contacts(name, phone, email, source, source_platform), " +
-            "account:accounts(name), " +
-            "assignee:profiles!deals_assigned_to_fkey(full_name)"
-        )
-        .order("created_at", { ascending: false })
-        .limit(8),
-    ]);
-    if (!statsRes.error) leadStats = statsRes.data as PlatformLeadStats;
-    if (!recentRes.error) recentLeads = (recentRes.data as unknown as typeof recentLeads) ?? [];
-  }
-
-  const formatMoney = (cents: number) =>
-    `$${(cents / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+  // Recent team members
+  const { data: recentMembers } = await supabase
+    .from("profiles")
+    .select("id, full_name, email, account_role, created_at")
+    .eq("account_id", accountId)
+    .order("created_at", { ascending: false })
+    .limit(5);
 
   const stats = [
-    {
-      label: "Total Accounts",
-      value: accountsResult.count ?? 0,
-      icon: Building2,
-      href: `${basePath}/businesses`,
-    },
-    {
-      label: "Active",
-      value: activeAccountsResult.count ?? 0,
-      icon: Building2,
-      href: `${basePath}/businesses`,
-    },
-    {
-      label: "Suspended",
-      value: suspendedAccountsResult.count ?? 0,
-      icon: Building2,
-      href: `${basePath}/businesses`,
-    },
-    {
-      label: "Total Users",
-      value: usersResult.count ?? 0,
-      icon: Users,
-      href: `${basePath}/users`,
-    },
-    {
-      label: "Total Contacts",
-      value: contactsResult.count ?? 0,
-      icon: MessageSquare,
-      href: `${basePath}/usage`,
-    },
-    {
-      label: "Total Conversations",
-      value: conversationsResult.count ?? 0,
-      icon: MessageSquare,
-      href: `${basePath}/usage`,
-    },
-    {
-      label: "Messages Sent",
-      value: messagesResult.count ?? 0,
-      icon: FileText,
-      href: `${basePath}/usage`,
-    },
-    {
-      label: "Messages Received",
-      value: inboundMessagesResult.count ?? 0,
-      icon: FileText,
-      href: `${basePath}/usage`,
-    },
-    {
-      label: "Campaigns (Sending)",
-      value: `${broadcastsResult.count ?? 0} (${sendingBroadcastsResult.count ?? 0})`,
-      icon: Radio,
-      href: `${basePath}/campaigns`,
-    },
-    {
-      label: "Automations (Active)",
-      value: `${automationsResult.count ?? 0} (${activeAutomationsResult.count ?? 0})`,
-      icon: Zap,
-      href: `${basePath}/automations`,
-    },
-    {
-      label: "Active Subscriptions",
-      value: activeSubscriptionsResult.count ?? 0,
-      icon: CreditCard,
-      href: `${basePath}/subscriptions`,
-    },
-    {
-      label: "Trials",
-      value: trialingSubscriptionsResult.count ?? 0,
-      icon: CreditCard,
-      href: `${basePath}/subscriptions?status=trialing`,
-    },
-    {
-      label: "Past Due",
-      value: pastDueSubscriptionsResult.count ?? 0,
-      icon: CreditCard,
-      href: `${basePath}/subscriptions?status=past_due`,
-    },
-    {
-      label: "Failed Payments",
-      value: failedPaymentsResult.count ?? 0,
-      icon: DollarSign,
-      href: `${basePath}/payments?status=failed`,
-    },
-    {
-      label: "Revenue",
-      value: formatMoney(totalRevenueCents),
-      icon: DollarSign,
-      href: `${basePath}/payments`,
-    },
+    { label: "Team Members", value: membersResult.count ?? 0, icon: Users, href: "/admin/team", color: "text-blue-500 bg-blue-500/10" },
+    { label: "Total Contacts", value: contactsResult.count ?? 0, icon: UserCheck, href: "/contacts", color: "text-emerald-500 bg-emerald-500/10" },
+    { label: "Total Conversations", value: conversationsResult.count ?? 0, icon: MessageSquare, href: "/inbox", color: "text-violet-500 bg-violet-500/10" },
+    { label: "Open Conversations", value: openConversationsResult.count ?? 0, icon: Clock, href: "/inbox", color: "text-amber-500 bg-amber-500/10" },
+    { label: "Resolved", value: resolvedConversationsResult.count ?? 0, icon: CheckCircle2, href: "/inbox", color: "text-emerald-500 bg-emerald-500/10" },
+    { label: "Broadcasts", value: broadcastsResult.count ?? 0, icon: Radio, href: "/broadcasts", color: "text-pink-500 bg-pink-500/10" },
+    { label: "Automations (Active)", value: `${automationsResult.count ?? 0} (${activeAutomationsResult.count ?? 0})`, icon: Zap, href: "/automations", color: "text-orange-500 bg-orange-500/10" },
+    { label: "Total Messages", value: messagesResult.count ?? 0, icon: BarChart3, href: "/admin/analytics", color: "text-primary bg-primary/10" },
   ];
 
-  if (isPlatform) {
-    stats.push(
-      {
-        label: "New Leads Today",
-        value: leadStats?.new_today ?? 0,
-        icon: Target,
-        href: `${basePath}/leads`,
-      },
-      {
-        label: "New This Week",
-        value: leadStats?.new_week ?? 0,
-        icon: Target,
-        href: `${basePath}/leads`,
-      },
-      {
-        label: "Qualified Leads",
-        value: leadStats?.qualified ?? 0,
-        icon: Target,
-        href: `${basePath}/leads`,
-      },
-      {
-        label: "Follow-up Required",
-        value: leadStats?.follow_up_required ?? 0,
-        icon: Target,
-        href: `${basePath}/leads`,
-      },
-      {
-        label: "Alerts Sent",
-        value: leadStats?.alert_sent ?? 0,
-        icon: Zap,
-        href: `${basePath}/leads/alerts`,
-      },
-    );
-  }
+  const roleColor: Record<string, string> = {
+    owner: "bg-amber-500/10 text-amber-600",
+    admin: "bg-primary/10 text-primary",
+    agent: "bg-emerald-500/10 text-emerald-600",
+    viewer: "bg-muted text-muted-foreground",
+  };
 
   const quickLinks = [
-    { label: "Businesses", href: `${basePath}/businesses`, icon: Building2 },
-    { label: "Users", href: `${basePath}/users`, icon: Users },
-    { label: "Plans", href: `${basePath}/plans`, icon: FileText },
-    { label: "Payments", href: `${basePath}/payments`, icon: DollarSign },
-    { label: "WhatsApp Monitor", href: `${basePath}/whatsapp`, icon: Activity },
-    { label: "Audit Logs", href: `${basePath}/audit`, icon: ScrollText },
-    { label: "Platform Health", href: `${basePath}/health`, icon: Activity },
-    { label: "Subscriptions", href: `${basePath}/subscriptions`, icon: CreditCard },
+    { label: "Manage Team", href: "/admin/team", icon: Users, desc: "Invite, remove and manage roles" },
+    { label: "Analytics", href: "/admin/analytics", icon: BarChart3, desc: "Conversations & message stats" },
+    { label: "Broadcasts", href: "/broadcasts", icon: Radio, desc: "Send bulk WhatsApp messages" },
+    { label: "Automations", href: "/automations", icon: Zap, desc: "Manage active automations" },
+    { label: "Billing", href: "/admin/billing", icon: BarChart3, desc: "Subscription & payment info" },
+    { label: "Settings", href: "/admin/settings", icon: BarChart3, desc: "Account & WhatsApp config" },
   ];
-
-  const statusColor: Record<string, string> = {
-    active: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-    suspended: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-    deleted: "bg-destructive/10 text-destructive",
-  };
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-foreground">Dashboard</h2>
+        <h2 className="text-2xl font-bold text-foreground">Organisation Dashboard</h2>
         <p className="text-muted-foreground">
-          Welcome{profile?.full_name ? `, ${profile.full_name}` : ""}. Platform
-          overview and management.
+          Welcome{profile?.full_name ? `, ${profile.full_name}` : ""}. Here&apos;s your organisation overview.
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      {/* Stats */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
           <Link key={stat.label} href={stat.href}>
             <Card className="border-border bg-card transition-colors hover:bg-muted/50">
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    {stat.label}
-                  </CardTitle>
-                  <stat.icon className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-medium text-muted-foreground">{stat.label}</CardTitle>
+                  <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${stat.color}`}>
+                    <stat.icon className="h-4 w-4" />
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
                 <p className="text-2xl font-bold text-foreground">
-                  {typeof stat.value === "number"
-                    ? stat.value.toLocaleString()
-                    : stat.value}
+                  {typeof stat.value === "number" ? stat.value.toLocaleString() : stat.value}
                 </p>
               </CardContent>
             </Card>
@@ -329,22 +126,20 @@ export async function AdminDashboard({ basePath = "/admin" }: AdminDashboardProp
         ))}
       </div>
 
+      {/* Quick Links */}
       <div>
-        <h3 className="mb-3 text-lg font-semibold text-foreground">
-          Quick Links
-        </h3>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <h3 className="mb-3 text-lg font-semibold text-foreground">Quick Actions</h3>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {quickLinks.map((link) => (
-            <Link key={link.href + link.label} href={link.href}>
+            <Link key={link.href} href={link.href}>
               <Card className="border-border bg-card transition-colors hover:bg-muted/50">
                 <CardContent className="flex items-center gap-3 py-3">
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                     <link.icon className="h-4 w-4" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-foreground">
-                      {link.label}
-                    </p>
+                    <p className="text-sm font-medium text-foreground">{link.label}</p>
+                    <p className="text-xs text-muted-foreground">{link.desc}</p>
                   </div>
                   <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                 </CardContent>
@@ -354,153 +149,37 @@ export async function AdminDashboard({ basePath = "/admin" }: AdminDashboardProp
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="border-border bg-card">
-          <CardHeader>
-            <CardTitle>Recent Accounts</CardTitle>
-            <CardDescription>Last 5 registered businesses</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {recentAccountsResult.data && recentAccountsResult.data.length > 0 ? (
-              <div className="space-y-3">
-                {recentAccountsResult.data.map((account) => (
-                  <Link
-                    key={account.id}
-                    href={`${basePath}/businesses/${account.id}`}
-                    className="flex items-center justify-between rounded-lg border border-border p-3 transition-colors hover:bg-muted/50"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">
-                        {account.name}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {account.slug ? `@${account.slug}` : "No slug"} &middot;{" "}
-                        {new Date(account.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <span
-                      className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                        statusColor[account.status ?? "active"] ?? statusColor.active
-                      }`}
-                    >
-                      {account.status ?? "active"}
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <p className="py-4 text-center text-sm text-muted-foreground">
-                No accounts yet.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="border-border bg-card">
-          <CardHeader>
-            <CardTitle>Recent Audit Logs</CardTitle>
-            <CardDescription>Latest platform activity</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {recentAuditResult.data && recentAuditResult.data.length > 0 ? (
-              <div className="space-y-3">
-                {recentAuditResult.data.map((entry) => (
-                  <div
-                    key={entry.id}
-                    className="flex items-start gap-3 rounded-lg border border-border p-3"
-                  >
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                      <ScrollText className="h-4 w-4" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm text-foreground">
-                        <span className="font-medium">
-                          {entry.actor_email ?? "System"}
-                        </span>{" "}
-                        {entry.action}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {entry.resource_type} &middot;{" "}
-                        {new Date(entry.created_at).toLocaleString()}
-                      </p>
-                    </div>
+      {/* Recent Team Members */}
+      <Card className="border-border bg-card">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <div>
+            <CardTitle>Team Members</CardTitle>
+            <CardDescription>Recent members in your organisation</CardDescription>
+          </div>
+          <Link href="/admin/team" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+            View All <ArrowRight className="h-4 w-4" />
+          </Link>
+        </CardHeader>
+        <CardContent>
+          {recentMembers && recentMembers.length > 0 ? (
+            <div className="space-y-3">
+              {recentMembers.map((member) => (
+                <div key={member.id} className="flex items-center justify-between rounded-lg border border-border p-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{member.full_name ?? "—"}</p>
+                    <p className="text-xs text-muted-foreground truncate">{member.email}</p>
                   </div>
-                ))}
-              </div>
-) : (
-                <p className="py-4 text-center text-sm text-muted-foreground">
-                  No audit log entries yet.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-      {isPlatform && (
-        <Card className="border-border bg-card">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0">
-            <div>
-              <CardTitle>Recent Leads</CardTitle>
-              <CardDescription>Newest leads received across all customer accounts</CardDescription>
+                  <span className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${roleColor[member.account_role ?? "viewer"] ?? roleColor.viewer}`}>
+                    {member.account_role ?? "viewer"}
+                  </span>
+                </div>
+              ))}
             </div>
-            <Link href={`${basePath}/leads`} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-              Lead Monitoring
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          </CardHeader>
-          <CardContent>
-            {recentLeads.length > 0 ? (
-              <div className="space-y-3">
-                {recentLeads.map((lead) => {
-                  const info = sourceBadgeInfo(lead.contact?.source ?? null, lead.contact?.source_platform ?? null);
-                  return (
-                    <Link
-                      key={lead.id}
-                      href={`${basePath}/leads?lead=${lead.id}`}
-                      className="flex items-center justify-between gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-muted/50"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-foreground">
-                          {lead.contact?.name ?? lead.title}
-                        </p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {lead.account?.name ?? "—"}
-                          {info ? ` · ${info.label}` : ""}
-                          {lead.assignee?.full_name ? ` · ${lead.assignee.full_name}` : ""}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-2">
-                        <span
-                          className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                            lead.status === "won"
-                              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                              : lead.status === "lost"
-                                ? "bg-destructive/10 text-destructive"
-                                : "bg-sky-500/10 text-sky-600 dark:text-sky-400"
-                          }`}
-                        >
-                          {lead.status}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(lead.created_at).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="py-4 text-center text-sm text-muted-foreground">
-                No leads received yet.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      )}
+          ) : (
+            <p className="py-4 text-center text-sm text-muted-foreground">No team members yet.</p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
-}
-
-export default function AdminPage() {
-  return <AdminDashboard basePath="/admin" />;
 }

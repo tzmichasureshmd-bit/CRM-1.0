@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { notFound } from "next/navigation";
 import { SuspendAccountButton } from "./suspend-button";
+import { Eye } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -181,10 +182,23 @@ export async function AdminBusinessDetailPage({
             details and management
           </p>
         </div>
-        <SuspendAccountButton
-          accountId={account.id}
-          currentStatus={account.status ?? "active"}
-        />
+        <div className="flex items-center gap-2">
+          {basePath === "/super-admin" && (
+            <Link href={`${basePath}/businesses/${account.id}/view-as-admin`}>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <Eye className="h-4 w-4" />
+                View as Admin
+              </button>
+            </Link>
+          )}
+          <SuspendAccountButton
+            accountId={account.id}
+            currentStatus={account.status ?? "active"}
+          />
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">

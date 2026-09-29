@@ -19,11 +19,7 @@ export function LandingHero() {
     if (!v) return;
     v.muted = true;
     v.play().catch(() => {});
-    return () => {
-      v.pause();
-      v.src = "";
-      v.load();
-    };
+    return () => { v.pause(); v.src = ""; v.load(); };
   }, []);
 
   function enableSound() {
@@ -42,10 +38,7 @@ export function LandingHero() {
         ref={videoRef}
         style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", zIndex: 1 }}
         src="/Man_sleeping_and_automated_deals_20260924142125.mp4"
-        autoPlay
-        muted
-        loop
-        playsInline
+        autoPlay muted loop playsInline
       />
 
       <div style={{ position: "absolute", inset: 0, background: "rgba(4,6,14,0.52)", zIndex: 2 }} />
@@ -54,6 +47,7 @@ export function LandingHero() {
       <div style={{ position: "absolute", inset: 0, zIndex: 3, background: "linear-gradient(to bottom, rgba(4,6,14,0.45) 0%, transparent 18%)" }} />
       <div style={{ position: "absolute", bottom: 0, left: 0, width: "700px", height: "500px", background: "radial-gradient(ellipse at 20% 100%, rgba(16,185,129,0.12) 0%, transparent 65%)", zIndex: 3, pointerEvents: "none" }} />
 
+      {/* Hero content */}
       <div style={{ position: "absolute", inset: 0, zIndex: 10, display: "flex", flexDirection: "column", justifyContent: "flex-end", paddingBottom: "108px", paddingLeft: "64px", paddingRight: "40%" }}>
 
         <div className="aurora-badge" style={{ display: "inline-flex", alignItems: "center", gap: "10px", borderRadius: "999px", padding: "6px 16px 6px 6px", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.18)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", width: "fit-content", marginBottom: "22px" }}>
@@ -79,13 +73,14 @@ export function LandingHero() {
           Manage WhatsApp conversations, leads, campaigns and automation from one powerful CRM.
         </p>
 
+        {/* CTA — Get Started + Login only */}
         <div className="aurora-cta" style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
           <Link href="/signup" style={{ padding: "15px 30px", borderRadius: "999px", background: "#fff", color: "#0a0f1a", fontSize: "14px", fontWeight: 700, fontFamily: "'Inter', sans-serif", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "8px", boxShadow: "0 4px 24px rgba(0,0,0,0.4)" }}>
             Get Started <ArrowRight size={14} />
           </Link>
-          <a href="#product" style={{ padding: "15px 28px", borderRadius: "999px", background: "rgba(255,255,255,0.1)", color: "#fff", fontSize: "14px", fontWeight: 600, fontFamily: "'Inter', sans-serif", textDecoration: "none", border: "1px solid rgba(255,255,255,0.28)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)" }}>
-            See the Product
-          </a>
+          <Link href="/login" style={{ padding: "15px 28px", borderRadius: "999px", background: "rgba(255,255,255,0.1)", color: "#fff", fontSize: "14px", fontWeight: 600, fontFamily: "'Inter', sans-serif", textDecoration: "none", border: "1px solid rgba(255,255,255,0.28)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)" }}>
+            Login
+          </Link>
         </div>
       </div>
 
@@ -98,13 +93,13 @@ export function LandingHero() {
         ))}
       </div>
 
-      {/* Sound toggle — always visible */}
+      {/* Sound toggle */}
       <button
         onClick={enableSound}
         aria-label={soundOn ? "Mute video" : "Unmute video"}
         style={{ position: "absolute", bottom: "36px", right: "52px", zIndex: 10, display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", background: "none", border: "none", cursor: "pointer", padding: 0 }}
       >
-        <div style={{ width: "42px", height: "42px", borderRadius: "999px", border: `1px solid ${soundOn ? "rgba(16,185,129,0.5)" : "rgba(255,255,255,0.25)"}`, background: soundOn ? "rgba(16,185,129,0.15)" : "rgba(255,255,255,0.08)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", display: "flex", alignItems: "center", justifyContent: "center", color: soundOn ? "#10b981" : "rgba(255,255,255,0.6)", animation: soundOn ? "none" : "aurora-pulse 2s ease-in-out infinite", transition: "all 0.25s ease" }}>
+        <div style={{ width: "42px", height: "42px", borderRadius: "999px", border: `1px solid ${soundOn ? "rgba(16,185,129,0.5)" : "rgba(255,255,255,0.25)"}`, background: soundOn ? "rgba(16,185,129,0.15)" : "rgba(255,255,255,0.08)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", display: "flex", alignItems: "center", justifyContent: "center", color: soundOn ? "#10b981" : "rgba(255,255,255,0.6)", transition: "all 0.25s ease" }}>
           {soundOn ? <Volume2 size={16} /> : <VolumeX size={16} />}
         </div>
         <span style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.15em", color: soundOn ? "rgba(16,185,129,0.8)" : "rgba(255,255,255,0.4)", textTransform: "uppercase", fontFamily: "'Inter', sans-serif", transition: "color 0.25s ease" }}>

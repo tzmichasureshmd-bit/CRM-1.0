@@ -2,67 +2,48 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { createClient } from "@/lib/supabase/server";
-import { isPlatformRole } from "@/lib/auth/roles";
-import { isAuthorizedSuperAdmin } from "@/lib/auth/super-admin-emails";
-import { AdminShell } from "@/components/admin/admin-shell";
+import { OrgAdminShell } from "@/components/admin/org-admin-shell";
+import { OrgAdminDenied } from "@/components/admin/org-admin-denied";
 
 export const metadata: Metadata = {
-  title: "Super Admin",
-  robots: {
-    index: false,
-    follow: false,
-    nocache: true,
-    googleBot: {
-      index: false,
-      follow: false,
-      noimageindex: true,
-    },
-  },
+  title: "Organisation Admin",
+  robots: { index: false, follow: false, nocache: true },
 };
 
-/**
- * Server-side authorization gate for the Super Admin dashboard.
- *
- * The middleware ensures:
- *  - Unauthenticated users on /admin (except /admin/login) → /admin/login
- *  - Unauthenticated users on /admin/login → passed through to here
- *  - Authenticated users on /admin/login → /admin
- *
- * So the only unauthenticated users reaching this layout are on /admin/login.
- * We render children without the AdminShell for that page.
- */
-export default async function AdminLayout({
-  children,
-}: {
-  children: ReactNode;
-}) {
+export default async function AdminLayout({ children }: { children: ReactNode }) {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  // Middleware already routed unauthenticated users to /admin/login.
-  // Render children directly (no shell, no auth gate) for the login page.
-  if (!user) {
-    return <>{children}</>;
-  }
+  // Not logged in → go to login
+  if (!user) redirect("/login");
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("platform_role, email")
+    .select("account_role, platform_role, full_name, email")
     .eq("user_id", user.id)
     .maybeSingle();
 
-  const platformRole = profile?.platform_role;
-
-  if (!isPlatformRole(platformRole) || platformRole !== "super_admin") {
-    redirect("/dashboard");
+  // Super admin → show clear message (they use /super-admin, not /admin)
+  if (profile?.platform_role === "super_admin") {
+    return (
+      <OrgAdminDenied
+        reason="super_admin"
+        email={profile.email ?? user.email}
+      />
+    );
   }
 
-  if (!profile?.email || !isAuthorizedSuperAdmin(profile.email)) {
-    redirect("/dashboard");
+  // Only owner or admin can access org admin panel
+  if (profile?.account_role !== "owner" && profile?.account_role !== "admin") {
+    return (
+      <OrgAdminDenied
+        reason="insufficient_role"
+        currentRole={profile?.account_role ?? "unknown"}
+        email={profile?.email ?? user.email}
+      />
+    );
   }
 
-  return <AdminShell>{children}</AdminShell>;
+  return <OrgAdminShell>{children}</OrgAdminShell>;
 }

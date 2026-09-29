@@ -307,6 +307,9 @@ export function Sidebar({ open = false, onClose, collapsed = false, onToggleColl
     return () => { document.body.style.overflow = prev; window.removeEventListener("keydown", onKey); };
   }, [open, onClose]);
 
+  const { isOwner, isAdmin } = useAuth();
+  const canAccessOrgAdmin = isOwner || isAdmin;
+
   const allSectionItems = navSections.flatMap((s) => s.items);
 
   return (

@@ -100,8 +100,9 @@ function buildNavSections(basePath: string): NavSection[] {
   // under the /super-admin tree (the pages are not part of /admin).
   if (basePath === "/super-admin") {
     sections.splice(1, 0, {
-      title: "Leads",
+      title: "Leads & Employees",
       items: [
+        { href: `${basePath}/employees`, label: "Employee Monitoring", icon: Users },
         { href: `${basePath}/leads`, label: "Lead Monitoring", icon: Target },
         { href: `${basePath}/leads/alerts`, label: "Lead Alerts", icon: BellRing },
       ],
