@@ -16,8 +16,24 @@ import {
   THEME_IDS,
 } from "@/lib/themes";
 
+// The variable is NOT `--font-sans`. `next/font` only emits the
+// declaration that feeds it from a separate production stylesheet, so a
+// deployment that serves the HTML but misses that chunk leaves
+// `--font-sans` empty and the whole app falls back to the browser
+// default serif — which is exactly the difference `next dev` hides,
+// because dev injects the same declaration inline. Keeping the font's
+// own variable under its own name lets `globals.css` give the
+// `--font-sans` token a real stack to fall back to, so a missing chunk
+// (stale CDN copy, a standalone image built without `.next/static`, a
+// blocked request) degrades to the platform UI font instead.
+//
+// The `inter_...__variable` class only sets a custom property, so it
+// cannot fight the token. The `__className` variant is deliberately not
+// applied: it sets `font-family` outright, in an unlayered rule that
+// outranks any `@layer` override, which would put the guarantee back in
+// the hands of the chunk.
 const inter = Inter({
-  variable: "--font-sans",
+  variable: "--app-font-sans",
   subsets: ["latin"],
 });
 
@@ -107,7 +123,23 @@ const THEME_BOOT_SCRIPT = `
     var MODE_DEFAULT = ${JSON.stringify(DEFAULT_MODE)};
     var MODES = ${JSON.stringify(MODES)};
     var savedMode = localStorage.getItem(MODE_KEY);
-    d.dataset.mode = MODES.indexOf(savedMode) !== -1 ? savedMode : MODE_DEFAULT;
+    // "auto" is a *preference*, not a paintable mode: there is no
+    // [data-mode="auto"] rule in globals.css, and the bare :root
+    // fallback is the dark token set. Writing the literal "auto" here
+    // therefore fell through to :root and made Auto render DARK on
+    // every reload regardless of the OS setting (the provider's
+    // applyMode() resolved it correctly, but only after hydration, and
+    // nothing re-applied it on mount). Resolve it to a concrete
+    // light/dark here, in the boot script, so the first paint is right.
+    if (MODES.indexOf(savedMode) === -1) {
+      savedMode = MODE_DEFAULT;
+    }
+    if (savedMode === 'auto') {
+      savedMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        ? 'dark'
+        : 'light';
+    }
+    d.dataset.mode = savedMode;
   } catch (_e) {
     d.dataset.theme = ${JSON.stringify(DEFAULT_THEME)};
     d.dataset.mode = ${JSON.stringify(DEFAULT_MODE)};

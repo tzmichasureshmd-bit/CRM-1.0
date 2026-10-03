@@ -41,18 +41,26 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-interface NavItem {
+export interface NavItem {
   href: string;
   label: string;
   icon: typeof LayoutDashboard;
 }
 
-interface NavSection {
+export interface NavSection {
   title: string;
   items: NavItem[];
 }
 
-function buildNavSections(basePath: string): NavSection[] {
+/**
+ * Navigation model for both admin consoles.
+ *
+ * Exported so `admin-shell.nav.test.ts` can assert every href maps to a
+ * real page. Four items (Wallets, Pricing Rules, Automation Mgmt, System
+ * Health) previously used `${basePath}/…`, which 404'd for the whole
+ * /admin tree because those pages only exist under /super-admin.
+ */
+export function buildNavSections(basePath: string): NavSection[] {
   const sections: NavSection[] = [
     {
       title: "Platform",
@@ -86,10 +94,26 @@ function buildNavSections(basePath: string): NavSection[] {
       title: "Administration",
       items: [
         { href: `${basePath}/audit`, label: "Audit Logs", icon: ScrollText },
-        { href: `${basePath}/wallets`, label: "Wallets", icon: DollarSign },
-        { href: `${basePath}/pricing-rules`, label: "Pricing Rules", icon: DollarSign },
-        { href: `${basePath}/automation-management`, label: "Automation Mgmt", icon: Zap },
-        { href: `${basePath}/system-health`, label: "System Health", icon: Activity },
+        // The four items below only exist as pages under
+        // /super-admin. Rendering them as `${basePath}/…` produced a
+        // guaranteed 404 for anyone signed into the /admin tree, so
+        // they are listed with their real, absolute path instead.
+        { href: "/super-admin/wallets", label: "Wallets", icon: DollarSign },
+        {
+          href: "/super-admin/pricing-rules",
+          label: "Pricing Rules",
+          icon: DollarSign,
+        },
+        {
+          href: "/super-admin/automation-management",
+          label: "Automation Mgmt",
+          icon: Zap,
+        },
+        {
+          href: "/super-admin/system-health",
+          label: "System Health",
+          icon: Activity,
+        },
         { href: `${basePath}/support`, label: "Support", icon: LifeBuoy },
         { href: `${basePath}/settings`, label: "Settings", icon: Settings },
       ],

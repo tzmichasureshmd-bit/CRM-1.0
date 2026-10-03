@@ -255,7 +255,7 @@ function TemplatesTab({
       {rejected.length > 0 && (
         <Card className="border-amber-500/30 bg-amber-500/5">
           <CardContent className="flex items-center gap-3 py-3">
-            <AlertCircle className="h-4 w-4 text-amber-500" />
+            <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
             <p className="text-sm text-amber-600 dark:text-amber-400">
               {t("templates.rejectedBanner", { count: rejected.length })}
             </p>
@@ -1033,7 +1033,7 @@ function SavingsAnalyticsTab({
             <div className="flex items-center justify-between">
               <p className="text-xs text-muted-foreground">{t("savings.budgetRemaining")}</p>
               {budgetRemaining >= 0 ? (
-                <TrendingUp className="h-4 w-4 text-emerald-500" />
+                <TrendingUp className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
               ) : (
                 <TrendingDown className="h-4 w-4 text-destructive" />
               )}
@@ -1071,7 +1071,7 @@ function SavingsAnalyticsTab({
           <CardContent className="space-y-3">
             {potentialSaving > 0 && (
               <div className="flex items-start gap-2 rounded-lg bg-emerald-500/5 p-3 text-sm">
-                <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+                <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
                 <p>
                   {t.rich("savings.tipUtility", {
                     utility: (chunks) => <strong>{chunks}</strong>,
@@ -1083,7 +1083,7 @@ function SavingsAnalyticsTab({
             )}
             {approvalRate < 80 && templates.length > 0 && (
               <div className="flex items-start gap-2 rounded-lg bg-amber-500/5 p-3 text-sm">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
                 <p>
                   {t("savings.tipApproval", { percent: approvalRate.toFixed(0) })}
                 </p>
@@ -1091,7 +1091,7 @@ function SavingsAnalyticsTab({
             )}
             {avgDeliveryRate < 0.9 && broadcasts.length > 0 && (
               <div className="flex items-start gap-2 rounded-lg bg-amber-500/5 p-3 text-sm">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
                 <p>
                   {t("savings.tipDelivery", { percent: (avgDeliveryRate * 100).toFixed(0) })}
                 </p>

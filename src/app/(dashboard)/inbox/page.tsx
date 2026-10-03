@@ -615,7 +615,24 @@ function InboxPageInner() {
   const hasActiveConv = !!activeConversation;
 
   return (
-    <div className="crm-protected -m-4 flex h-[calc(100vh-3.5rem)] flex-col overflow-hidden sm:-m-6">
+    // Two deliberate details in this one class list.
+    //
+    // 1. `100dvh` instead of `100vh`. This container is the height of
+    //    the whole inbox workspace, and it is `overflow-hidden`. With
+    //    `100vh` (the large viewport) on a phone the box was taller than
+    //    the visible area, so its bottom edge — and the composer pinned
+    //    to that bottom edge — was pushed off screen and clipped. `dvh`
+    //    is the height actually visible, so the composer is always
+    //    reachable. Identical to `100vh` on desktop.
+    //
+    // 2. `var(--app-header-h)` instead of a literal `3.5rem`. That
+    //    variable is defined by DashboardShell on the column that
+    //    renders the `h-14` header, so the subtraction cannot drift out
+    //    of sync with the header the way a repeated magic number does.
+    //
+    // The negative margins cancel `<main>`'s `p-4 sm:p-6` so the inbox
+    //    fills the workspace edge to edge like the rest of the app.
+    <div className="crm-protected -m-4 flex h-[calc(100dvh-var(--app-header-h))] flex-col overflow-hidden sm:-m-6">
       <ConfidentialWatermark
         identifier={profile?.full_name || account?.name || undefined}
       />

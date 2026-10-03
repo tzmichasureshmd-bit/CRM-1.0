@@ -113,8 +113,19 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
   }, [applyMode]);
 
-  // Keep auto mode in sync with system preference changes
+  // Keep auto mode in sync with system preference changes, and make
+  // sure the attribute is actually applied on mount.
+  //
+  // The listener alone is not enough: `readInitialMode` can return
+  // "auto" (it accepts any entry in MODES), and on the very first
+  // render nothing had written a concrete value — the OS would have
+  // to change before the attribute updated. This effect applies the
+  // current mode on mount and on every change, which is a no-op for
+  // light/dark (applyMode writes the same string back) and the actual
+  // fix for auto.
   useEffect(() => {
+    applyMode(mode);
+
     if (mode !== "auto") return;
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const handler = () => applyMode("auto");
@@ -140,13 +151,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       if (e.key === MODE_STORAGE_KEY) {
         if (isMode(e.newValue) && e.newValue !== mode) {
           setModeState(e.newValue);
-          document.documentElement.dataset.mode = e.newValue;
+          // Resolve "auto" instead of writing it verbatim — the raw
+          // value matches no CSS block, so the receiving tab would
+          // silently drop to the dark :root fallback.
+          applyMode(e.newValue);
         }
       }
     }
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
-  }, [theme, mode]);
+  }, [theme, mode, applyMode]);
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme, mode, setMode, toggleMode }}>

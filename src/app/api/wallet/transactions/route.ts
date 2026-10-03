@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getCurrentAccount, toErrorResponse } from '@/lib/auth/account'
+import { getCurrentAccount, requireRole, toErrorResponse } from '@/lib/auth/account'
 
 export async function GET() {
   try {
@@ -35,7 +35,13 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { supabase, accountId, userId } = await getCurrentAccount()
+    // Crediting a wallet is a billing action, not a self-service one.
+    // `getCurrentAccount()` accepted every member including `viewer`,
+    // and `update_wallet_balance` is SECURITY DEFINER with no role
+    // check of its own, so RLS could not backstop this route. A
+    // read-only user could otherwise inflate the balance that gates
+    // AI, voice and campaign usage.
+    const { supabase, accountId, userId } = await requireRole('admin')
 
     const body = await request.json().catch(() => null)
     if (!body) {

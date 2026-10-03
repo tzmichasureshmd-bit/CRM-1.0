@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { assertSuperAdminProfile } from "@/lib/auth/super-admin-policy";
 import { AdminShell } from "@/components/admin/admin-shell";
 import { UnauthorizedAccess } from "@/components/admin/unauthorized-access";
 
@@ -48,10 +49,11 @@ export default async function SuperAdminLayout({
     return <>{children}</>;
   }
 
-  // Select both platform_role (proper column) and legacy role (fallback)
+  // Select platform_role (the real column, used by the is_super_admin()
+  // SQL helper) plus email for the optional SUPER_ADMIN_EMAILS gate.
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("platform_role, role")
+    .select("platform_role, email")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -60,10 +62,16 @@ export default async function SuperAdminLayout({
     redirect("/super-admin/login");
   }
 
-  const platformRole = profile?.platform_role as string | undefined;
-  const legacyRole = (profile as Record<string, unknown> | null)?.role as string | undefined;
+  // The same rule the login server action and the /admin tree apply —
+  // see src/lib/auth/super-admin-policy.ts for why it is shared.
+  const verdict = assertSuperAdminProfile(profile);
 
-  if (platformRole !== "super_admin" && legacyRole !== "super_admin") {
+  if (!verdict.authorized) {
+    if (verdict.code === "not-allowlisted") {
+      console.error(
+        `[SUPER ADMIN LAYOUT] ${user.email ?? user.id} has platform_role=super_admin but is not in SUPER_ADMIN_EMAILS`,
+      );
+    }
     // Authenticated but NOT authorized — show error page, don't redirect to login
     return <UnauthorizedAccess />;
   }

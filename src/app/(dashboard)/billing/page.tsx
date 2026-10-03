@@ -467,20 +467,23 @@ export default function BillingPage() {
                 </CardHeader>
                 <CardContent>
                   <ul className="space-y-2 text-sm text-muted-foreground mb-4">
+                    {/* emerald-500 on white is ~2.2:1. These ticks are the
+                     *  only visual signal for "included in this plan", so
+                     *  they carry meaning rather than decorating. */}
                     <li className="flex items-center gap-2">
-                      <Check className="h-4 w-4 text-emerald-500" />
+                      <Check className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
                       {plan.max_contacts.toLocaleString()} contacts
                     </li>
                     <li className="flex items-center gap-2">
-                      <Check className="h-4 w-4 text-emerald-500" />
+                      <Check className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
                       {plan.max_team_members} team members
                     </li>
                     <li className="flex items-center gap-2">
-                      <Check className="h-4 w-4 text-emerald-500" />
+                      <Check className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
                       {plan.max_whatsapp_numbers} WhatsApp number
                     </li>
                     <li className="flex items-center gap-2">
-                      <Check className="h-4 w-4 text-emerald-500" />
+                      <Check className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
                       {plan.max_monthly_messages.toLocaleString()} messages/month
                     </li>
                   </ul>

@@ -1,7 +1,18 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import {
+  isWhatsAppApiRequiringSession,
+  protectedLoginFor,
+} from '@/lib/auth/protected-routes'
 
-export async function middleware(request: NextRequest) {
+/**
+ * Next 16 renamed the `middleware` file convention to `proxy` (the
+ * convention is deprecated as of v16.0.0 — it still runs, but warns on
+ * every build and will be removed). Behaviour is unchanged: this runs
+ * on the network boundary before the route renders, and is where
+ * session refresh + protected-route redirects happen.
+ */
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -9,7 +20,7 @@ export async function middleware(request: NextRequest) {
 
   if (!supabaseUrl || !supabaseKey) {
     console.error(
-      '[MIDDLEWARE] Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY. Auth middleware is non-functional.',
+      '[PROXY] Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY. Auth proxy is non-functional.',
     )
     return supabaseResponse
   }
@@ -95,28 +106,28 @@ export async function middleware(request: NextRequest) {
   }
 
   // Protected pages - redirect to login if not authenticated.
-  // /admin/* (except /admin/login) redirects to /admin/login.
-  // /super-admin/* (except /super-admin/login) redirects to /super-admin/login.
+  //
+  // The route inventory lives in @/lib/auth/protected-routes so the
+  // proxy and its drift-guard test read the same list. `/admin/*`
+  // and `/super-admin/*` are separate consoles; each bounces to its own
+  // login page, and both login pages stay reachable while logged out.
   if (!user) {
-    const pathname = request.nextUrl.pathname
-    const isProtectedSuperAdmin = pathname.startsWith('/super-admin') && pathname !== '/super-admin/login'
-    const isProtectedAdmin = pathname.startsWith('/admin')
-    const isOtherProtected = ['/dashboard', '/inbox', '/contacts', '/pipelines', '/broadcasts', '/automations', '/save-money', '/settings'].some(path => pathname.startsWith(path))
-    if (isProtectedSuperAdmin || isProtectedAdmin || isOtherProtected) {
+    const loginPath = protectedLoginFor(request.nextUrl.pathname)
+    if (loginPath) {
       const url = request.nextUrl.clone()
-      if (isProtectedSuperAdmin) {
-        url.pathname = '/super-admin/login'
-      } else {
-        url.pathname = '/login'
-      }
+      url.pathname = loginPath
       url.search = ''
       return withRefreshedCookies(NextResponse.redirect(url))
     }
   }
 
-  // API routes that need auth (not webhooks)
-  if (!user && request.nextUrl.pathname.startsWith('/api/whatsapp/') &&
-      !request.nextUrl.pathname.includes('/webhook')) {
+  // API routes that need auth. The webhook and the cron scheduler are
+  // called by Meta / the scheduler with their own credentials, so they
+  // are exempt — the cron path used to be caught by the old
+  // `.includes('/webhook')` check, which made it unreachable in
+  // practice: the proxy rejected it with 401 before the handler could
+  // ever compare `x-cron-secret`.
+  if (!user && isWhatsAppApiRequiringSession(request.nextUrl.pathname)) {
     return withRefreshedCookies(
       NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     )

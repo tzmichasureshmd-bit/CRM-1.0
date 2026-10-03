@@ -23,7 +23,7 @@ interface Props {
   searchParams?: SearchParams;
 }
 
-/** Shared by /admin and /super-admin � links derive from `basePath`. */
+/** Shared by /admin and /super-admin — links derive from `basePath`. */
 export async function AdminAuditPage({
   basePath = "/admin",
   searchParams,

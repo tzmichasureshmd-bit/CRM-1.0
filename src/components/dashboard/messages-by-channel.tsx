@@ -12,12 +12,12 @@ interface ChannelSlice {
 }
 
 const CHANNEL_META: Record<string, { color: string; label: string }> = {
-  whatsapp:  { color: '#25D366', label: 'WhatsApp' },
-  instagram: { color: '#E1306C', label: 'Instagram' },
-  facebook:  { color: '#1877F2', label: 'Facebook' },
-  telegram:  { color: '#26A5E4', label: 'Telegram' },
-  threads:   { color: '#000000', label: 'Threads' },
-  x:         { color: '#172033', label: 'Twitter/X' },
+  whatsapp:  { color: 'var(--chart-2)', label: 'WhatsApp' },
+  instagram: { color: 'var(--chart-1)', label: 'Instagram' },
+  facebook:  { color: 'var(--info)', label: 'Facebook' },
+  telegram:  { color: 'var(--chart-3)', label: 'Telegram' },
+  threads:   { color: 'var(--foreground)', label: 'Threads' },
+  x:         { color: 'var(--muted-foreground)', label: 'Twitter/X' },
 }
 
 export function MessagesByChannel() {
@@ -44,7 +44,7 @@ export function MessagesByChannel() {
             .map(([platform, count]) => ({
               platform,
               count,
-              color: CHANNEL_META[platform]?.color ?? '#94a3b8',
+              color: CHANNEL_META[platform]?.color ?? 'var(--muted-foreground)',
               label: CHANNEL_META[platform]?.label ?? platform,
             }))
         )

@@ -22,7 +22,7 @@ interface AdminSupportPageProps {
   basePath?: string;
 }
 
-/** Shared by /admin and /super-admin � links derive from `basePath`. */
+/** Shared by /admin and /super-admin — links derive from `basePath`. */
 export async function AdminSupportPage({
   basePath = "/admin",
 }: AdminSupportPageProps = {}) {

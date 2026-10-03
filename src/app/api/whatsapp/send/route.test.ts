@@ -35,7 +35,15 @@ function makeSupabaseMock() {
     const selectResult = () => {
       switch (table) {
         case 'profiles':
-          return { data: { account_id: 'acct-1' }, error: null }
+          // The route now gates on requireRole('agent'), which reads
+          // `account_role` (not `role`) off the profile and rejects a
+          // profile that has no role at all. Model an ordinary agent so
+          // these cases exercise the template/validation paths rather
+          // than short-circuiting on auth.
+          return {
+            data: { account_id: 'acct-1', account_role: 'agent', platform_role: 'user' },
+            error: null,
+          }
         case 'contacts':
           return { data: contactRow, error: null }
         case 'conversations':
@@ -52,6 +60,12 @@ function makeSupabaseMock() {
             },
             error: null,
           }
+        case 'accounts':
+          // getCurrentAccount() does a plain point lookup on the account
+          // (issue #294) after resolving the profile. Without this row
+          // the helper treats the profile as orphaned and throws 403,
+          // short-circuiting every case below.
+          return { data: { id: 'acct-1', name: 'Test Account' }, error: null }
         case 'message_templates':
           return { data: null, error: null }
         default:

@@ -503,8 +503,11 @@ export default function TicketsPage() {
                                     ? agents.find((a) => a.user_id === comment.user_id)?.full_name ?? "Agent"
                                     : "System"}
                                 </span>
+                                {/* 10px text on a transparent background:
+                                 *  yellow-700 is only ~3.4:1 on white, under
+                                 *  the 4.5:1 small-text floor. */}
                                 {comment.is_internal && (
-                                  <Badge variant="outline" className="text-[10px] border-yellow-300 text-yellow-700">
+                                  <Badge variant="outline" className="border-yellow-400 text-[10px] text-yellow-800 dark:border-yellow-600 dark:text-yellow-300">
                                     Internal Note
                                   </Badge>
                                 )}
@@ -998,11 +1001,11 @@ export default function TicketsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground">Open</p>
-                  <p className="text-2xl font-bold text-blue-600">
+                  <p className="text-2xl font-bold text-blue-700 dark:text-blue-400">
                     {tickets.filter((tk) => tk.status === "open").length}
                   </p>
                 </div>
-                <CircleDot className="h-5 w-5 text-blue-500" />
+                <CircleDot className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               </div>
             </CardContent>
           </Card>
@@ -1011,11 +1014,15 @@ export default function TicketsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground">In Progress</p>
-                  <p className="text-2xl font-bold text-yellow-600">
+                  {/* yellow-600 on white is ~2.4:1 and yellow-500 ~1.9:1 —
+                   *  below the 3:1 floor for large text and for the icon,
+                   *  so "In Progress" was washed out in light mode (the
+                   *  default). Darken for light, lighten for dark. */}
+                  <p className="text-2xl font-bold text-yellow-700 dark:text-yellow-400">
                     {tickets.filter((tk) => tk.status === "in_progress").length}
                   </p>
                 </div>
-                <Timer className="h-5 w-5 text-yellow-500" />
+                <Timer className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
               </div>
             </CardContent>
           </Card>
@@ -1024,11 +1031,11 @@ export default function TicketsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground">Urgent</p>
-                  <p className="text-2xl font-bold text-red-600">
+                  <p className="text-2xl font-bold text-red-700 dark:text-red-400">
                     {tickets.filter((tk) => tk.priority === "urgent").length}
                   </p>
                 </div>
-                <AlertCircle className="h-5 w-5 text-red-500" />
+                <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
               </div>
             </CardContent>
           </Card>

@@ -196,7 +196,7 @@ function SourceBadge({
 }
 
 function LeadStatusBadge({ status }: { status?: string | null }) {
-  if (!status) return <span className="text-[#667085]">—</span>;
+  if (!status) return <span className="text-muted-foreground">—</span>;
   const map: Record<string, string> = {
     new:         'bg-[#EEF4FF] text-[#3462EE] border-[#3462EE]/30',
     contacted:   'bg-[#E8F6FD] text-[#1a8fc4] border-[#26A5E4]/30',
@@ -1798,15 +1798,15 @@ function StatCard({
     <div
       className={`flex flex-col justify-center rounded-xl border px-3 py-2.5 ${
         highlight
-          ? 'border-[#3462EE]/30 bg-[#EEF4FF]'
-          : 'border-[#E4E8EF] bg-white'
+          ? 'border-primary/30 bg-primary/10'
+          : 'border-border bg-card'
       }`}
     >
-      <span className="text-[10px] font-semibold uppercase tracking-wide text-[#667085]">
+      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
         {label}
       </span>
       <span className={`text-xl font-bold tabular-nums ${
-        highlight ? 'text-[#3462EE]' : 'text-[#172033]'
+        highlight ? 'text-primary' : 'text-foreground'
       }`}>
         {value.toLocaleString()}
       </span>
