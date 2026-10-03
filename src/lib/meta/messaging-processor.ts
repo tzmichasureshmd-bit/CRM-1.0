@@ -103,7 +103,7 @@ async function processMessagingEvent(event: MessengerWebhookMessagingEvent) {
     return;
   }
 
-  console.log('[messaging] recipient id', recipientId);
+  console.log('[messaging] RECEIVED platform=unknown sender=', senderId, 'recipient=', recipientId, 'mid=', mid);
 
   const admin = supabaseAdmin();
 
@@ -114,7 +114,7 @@ async function processMessagingEvent(event: MessengerWebhookMessagingEvent) {
     .eq('status', 'active');
 
   if (connError || !conns || conns.length === 0) {
-    console.error(`[messaging] CONNECTION_NOT_FOUND platform=unknown recipientId=${recipientId}`);
+    console.error(`[messaging] CONNECTION_NOT_FOUND: no active meta_page_connections exist. recipientId=${recipientId}`);
     return;
   }
 
@@ -132,8 +132,12 @@ async function processMessagingEvent(event: MessengerWebhookMessagingEvent) {
   const conn: ChannelConnection | null = fbConn ?? igConn ?? null;
 
   if (!conn) {
+    // Log all active connections to help diagnose mismatches
+    const connSummary = (conns as ChannelConnection[]).map(
+      (c) => `{platform=${c.platform} page_id=${c.page_id ?? 'null'} ig_account_id=${c.instagram_account_id ?? 'null'} account=${c.account_id}}`
+    ).join(', ');
     console.error(
-      `[messaging] CONNECTION_NOT_FOUND platform=unknown recipientId=${recipientId}`,
+      `[messaging] CONNECTION_NOT_FOUND recipientId=${recipientId} — active connections: [${connSummary}]`,
     );
     return;
   }
@@ -141,11 +145,11 @@ async function processMessagingEvent(event: MessengerWebhookMessagingEvent) {
   const platform: 'facebook' | 'instagram' =
     conn.platform === 'instagram' ? 'instagram' : 'facebook';
 
-  console.log('[messaging] platform detected', platform);
-  console.log('[messaging] connection matched id=', conn.id);
-  console.log('[messaging] connection platform', conn.platform);
+  console.log('[messaging] MATCHED platform=', platform, 'account_id=', conn.account_id, 'connection_id=', conn.id);
   if (platform === 'instagram') {
-    console.log('[messaging] instagram_account_id', conn.instagram_account_id);
+    console.log('[messaging] instagram_account_id=', conn.instagram_account_id);
+  } else {
+    console.log('[messaging] page_id=', conn.page_id);
   }
   const accountId = conn.account_id;
   const userId = conn.user_id;
@@ -275,11 +279,11 @@ async function processMessagingEvent(event: MessengerWebhookMessagingEvent) {
   });
 
   if (msgError) {
-    console.error('[messaging] error inserting message:', msgError);
+    console.error('[messaging] ERROR inserting message mid=', mid, 'error=', msgError.message);
     return;
   }
 
-  console.log('[messaging] message persisted mid=', mid);
+  console.log('[messaging] PERSISTED platform=', platform, 'mid=', mid, 'conversation_id=', conversation.id, 'contact_id=', contact.id, 'account_id=', accountId);
 
   // Contact recency + conversation state (lifted from broadcast/lead
   // scoring signals — same updates the WhatsApp webhook makes).

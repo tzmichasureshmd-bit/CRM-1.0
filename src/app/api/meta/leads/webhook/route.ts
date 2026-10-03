@@ -21,12 +21,26 @@ interface LeadgenChangeValue {
   created_time?: string;
 }
 
+/**
+ * Shape of `entry[].changes[].value` when `field === "messages"` on an
+ * Instagram webhook subscription (`object: "instagram"`). Meta delivers
+ * Instagram DM events here instead of in `entry[].messaging[]` when the
+ * app is subscribed via the Instagram product (not the Page product).
+ */
+interface InstagramMessagesChangeValue {
+  messaging?: MessengerWebhookMessagingEvent[];
+  sender?: { id?: string };
+  recipient?: { id?: string };
+  timestamp?: number;
+  message?: { mid?: string; text?: string; is_echo?: boolean };
+}
+
 interface LeadgenEntry {
   id?: string;
   time?: number;
   changes?: Array<{
     field?: string;
-    value?: LeadgenChangeValue;
+    value?: LeadgenChangeValue | InstagramMessagesChangeValue;
   }>;
   /** Messenger / Instagram DM events (`object: "page"`, field messages). */
   messaging?: MessengerWebhookMessagingEvent[];
@@ -149,22 +163,64 @@ export async function POST(request: Request) {
 }
 
 /**
- * Ingest Messenger / Instagram DM events (the standard `page` object
- * `entry[].messaging[]` shape) after acking Meta.
+ * Ingest Messenger / Instagram DM events after acking Meta.
+ *
+ * Meta delivers messaging events in two shapes depending on the
+ * webhook subscription type:
+ *
+ *   1. Page subscription (`object: "page"` or `object: "instagram"` via
+ *      Page product): events in `entry[].messaging[]`.
+ *
+ *   2. Instagram subscription (`object: "instagram"` via Instagram
+ *      product): events in `entry[].changes[]` where `field === "messages"`
+ *      and `value.messaging[]` carries the same event shape.
+ *
+ * Both shapes are collected here so no DM is silently dropped.
  */
 async function processMessaging(body: LeadgenBody): Promise<void> {
   const entries = body.entry ?? [];
   const events: MessengerWebhookMessagingEvent[] = [];
+
   for (const entry of entries) {
+    // Shape 1: entry.messaging[] (Page subscription / Messenger)
     if (entry.messaging && entry.messaging.length > 0) {
       for (const ev of entry.messaging) {
         if (ev.message) {
-          console.log("[meta/webhook] event field=messages");
+          console.log("[meta/webhook] event field=messages (entry.messaging)");
         }
       }
       events.push(...entry.messaging);
     }
+
+    // Shape 2: entry.changes[].value.messaging[] (Instagram subscription)
+    // Meta uses this shape when the app is subscribed to the Instagram
+    // product's `messages` field rather than the Page product.
+    for (const change of entry.changes ?? []) {
+      if (change.field !== "messages") continue;
+      const val = change.value as InstagramMessagesChangeValue | undefined;
+      if (!val) continue;
+
+      if (val.messaging && val.messaging.length > 0) {
+        // Nested messaging array (most common Instagram subscription shape)
+        for (const ev of val.messaging) {
+          if (ev.message) {
+            console.log("[meta/webhook] event field=messages (changes.value.messaging)");
+          }
+        }
+        events.push(...val.messaging);
+      } else if (val.sender?.id && val.recipient?.id && val.message?.mid) {
+        // Flat shape: the change value itself is the messaging event
+        console.log("[meta/webhook] event field=messages (changes.value flat)");
+        events.push({
+          sender: val.sender,
+          recipient: val.recipient,
+          timestamp: val.timestamp,
+          message: val.message,
+        });
+      }
+    }
   }
+
   if (events.length === 0) return;
   const sanitized = sanitizeMessagingEvents(events);
   console.log("[meta/webhook] event count", sanitized.length);
@@ -199,7 +255,7 @@ async function processLeadgen(body: LeadgenBody): Promise<void> {
   for (const entry of entries) {
     for (const change of entry.changes ?? []) {
       if (change.field !== "leadgen" || !change.value) continue;
-      await handleLeadgen(admin, change.value);
+      await handleLeadgen(admin, change.value as LeadgenChangeValue);
     }
   }
 }
