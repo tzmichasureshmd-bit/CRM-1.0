@@ -61,8 +61,10 @@ function OrgAdminShellInner({ children }: { children: React.ReactNode }) {
 
   const prevPathnameRef = useRef(pathname);
   useEffect(() => {
-    if (prevPathnameRef.current !== pathname) closeSidebar();
+    const changed = prevPathnameRef.current !== pathname;
     prevPathnameRef.current = pathname;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (changed) closeSidebar();
   }, [pathname, closeSidebar]);
 
   useEffect(() => {

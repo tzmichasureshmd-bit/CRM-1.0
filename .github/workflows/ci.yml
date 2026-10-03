@@ -20,6 +20,7 @@ jobs:
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-dummy-anon-key
       ENCRYPTION_KEY: '0000000000000000000000000000000000000000000000000000'
       META_APP_SECRET: 'ci-dummy-meta-secret'
+      META_VERIFY_TOKEN: 'tzmicha_verify_2024'
     steps:
       - uses: actions/checkout@v4
 
@@ -59,6 +60,19 @@ jobs:
           script: |
             cd ${{ secrets.VPS_PROJECT_PATH }}
             git pull origin main
+
+            # Ensure META_VERIFY_TOKEN is present in the host .env so the
+            # /api/meta/leads/webhook GET verification challenge succeeds.
+            # Uses the value from the GitHub secret if set, otherwise keeps
+            # whatever is already in .env (idempotent).
+            if [ -n "${{ secrets.META_VERIFY_TOKEN }}" ]; then
+              if grep -q '^META_VERIFY_TOKEN=' .env 2>/dev/null; then
+                sed -i 's|^META_VERIFY_TOKEN=.*|META_VERIFY_TOKEN=${{ secrets.META_VERIFY_TOKEN }}|' .env
+              else
+                echo 'META_VERIFY_TOKEN=${{ secrets.META_VERIFY_TOKEN }}' >> .env
+              fi
+            fi
+
             export NEXT_PUBLIC_GIT_COMMIT="$(git rev-parse --short HEAD)"
             export NEXT_PUBLIC_APP_VERSION="$(git describe --tags --always 2>/dev/null || echo dev)"
             docker compose down tzmicha-crm
