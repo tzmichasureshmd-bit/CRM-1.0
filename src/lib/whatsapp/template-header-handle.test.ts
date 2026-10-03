@@ -8,7 +8,7 @@ vi.mock('./meta-api', () => ({
 // The SSRF guard does a real DNS lookup, so stub it — the fixtures below use
 // a `.test` hostname that would never resolve. Each test sets the verdict.
 vi.mock('@/lib/webhooks/ssrf', () => ({
-  isDeliverableUrl: vi.fn(async () => true),
+  isDeliverableUrl: vi.fn(),
 }));
 
 import { ensureImageHeaderHandle } from './template-header-handle';

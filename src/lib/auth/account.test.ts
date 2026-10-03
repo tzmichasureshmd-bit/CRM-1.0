@@ -66,9 +66,7 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: () => createClient(),
 }));
 
-const { getCurrentAccount, UnauthorizedError, ForbiddenError } = await import(
-  "./account"
-);
+import { getCurrentAccount, UnauthorizedError, ForbiddenError } from "./account";
 
 afterEach(() => {
   vi.clearAllMocks();

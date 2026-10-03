@@ -8,7 +8,7 @@ vi.mock('@/lib/whatsapp/encryption', () => ({
 
 // Control the SSRF guard per-test.
 vi.mock('@/lib/webhooks/ssrf', () => ({
-  isDeliverableUrl: vi.fn(async () => true),
+  isDeliverableUrl: vi.fn(),
 }));
 
 import { dispatchWebhookEvent, MAX_CONSECUTIVE_FAILURES } from './deliver';
