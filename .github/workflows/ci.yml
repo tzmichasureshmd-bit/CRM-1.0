@@ -75,6 +75,7 @@ jobs:
 
             export NEXT_PUBLIC_GIT_COMMIT="$(git rev-parse --short HEAD)"
             export NEXT_PUBLIC_APP_VERSION="$(git describe --tags --always 2>/dev/null || echo dev)"
+            export NEXT_PUBLIC_SITE_URL="${{ secrets.NEXT_PUBLIC_SITE_URL }}"
             docker compose down tzmicha-crm
             docker compose build --no-cache tzmicha-crm
             docker compose up -d tzmicha-crm
