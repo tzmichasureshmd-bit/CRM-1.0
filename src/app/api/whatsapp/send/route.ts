@@ -98,7 +98,7 @@ export async function POST(request: Request) {
     if (conversationIdInput) {
       const { data, error: convError } = await supabase
         .from('conversations')
-        .select('id')
+        .select('id, platform')
         .eq('id', conversationIdInput)
         .eq('account_id', accountId)
         .single()
@@ -204,6 +204,10 @@ type SendSupabase = Awaited<ReturnType<typeof createClient>>
  * inbound-then-outbound (or outbound-first) sequence converges on a single
  * thread per contact. Runs under the caller's RLS — the conversations_insert
  * policy requires account agent membership, which the caller already is.
+ *
+ * For Instagram/Facebook contacts (identified by messenger_psid or
+ * instagram_user_id), creates a conversation with the correct platform.
+ * For all other contacts, defaults to WhatsApp.
  */
 async function findOrCreateConversation(
   supabase: SendSupabase,
@@ -211,12 +215,31 @@ async function findOrCreateConversation(
   userId: string,
   contactId: string,
 ): Promise<string | null> {
+  // First determine the contact's platform by checking which channel ID is set
+  const { data: contact, error: contactFetchErr } = await supabase
+    .from('contacts')
+    .select('messenger_psid, instagram_user_id')
+    .eq('id', contactId)
+    .single()
+
+  if (contactFetchErr || !contact) {
+    console.error('Failed to fetch contact for platform detection:', contactFetchErr?.message)
+    return null
+  }
+
+  let platform: 'whatsapp' | 'facebook' | 'instagram' = 'whatsapp'
+  if (contact.instagram_user_id) {
+    platform = 'instagram'
+  } else if (contact.messenger_psid) {
+    platform = 'facebook'
+  }
+
   const { data: existing } = await supabase
     .from('conversations')
     .select('id')
     .eq('account_id', accountId)
     .eq('contact_id', contactId)
-    .eq('platform', 'whatsapp')
+    .eq('platform', platform)
     .maybeSingle()
 
   if (existing) return existing.id
@@ -227,7 +250,7 @@ async function findOrCreateConversation(
       account_id: accountId,
       user_id: userId,
       contact_id: contactId,
-      platform: 'whatsapp',
+      platform,
     })
     .select('id')
     .single()
