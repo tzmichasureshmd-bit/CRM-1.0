@@ -13,6 +13,7 @@ import {
 import { useTranslations } from "next-intl"
 
 import { createClient } from "@/lib/supabase/client"
+import { hasColumn } from "@/lib/db/schema"
 import type {
   Automation,
   AutomationLog,
@@ -35,12 +36,13 @@ export default function AutomationLogsPage({
   const [logs, setLogs] = useState<AutomationLog[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [openLogId, setOpenLogId] = useState<string | null>(null)
+  const [hasDuration, setHasDuration] = useState(false)
 
   useEffect(() => {
     async function load() {
       try {
         const supabase = createClient()
-        const [autRes, logRes] = await Promise.all([
+        const [autRes, logRes, durationOk] = await Promise.all([
           supabase
             .from("automations")
             .select("*")
@@ -52,11 +54,13 @@ export default function AutomationLogsPage({
             .eq("automation_id", id)
             .order("created_at", { ascending: false })
             .limit(100),
+          hasColumn(supabase, "automation_logs", "duration_ms"),
         ])
         if (autRes.error) throw autRes.error
         if (logRes.error) throw logRes.error
         setAutomation(autRes.data as Automation | null)
         setLogs((logRes.data ?? []) as AutomationLog[])
+        setHasDuration(durationOk)
       } catch (err) {
         setError(err instanceof Error ? err.message : t("loadError"))
       }
@@ -142,6 +146,18 @@ export default function AutomationLogsPage({
                 </button>
                 {isOpen && (
                   <div className="border-t border-border px-4 py-3">
+                    <div className="mb-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                      <span>{new Date(log.created_at).toLocaleString()}</span>
+                      {hasDuration &&
+                        typeof (log as { duration_ms?: unknown }).duration_ms ===
+                          "number" && (
+                          <span>
+                            {formatDuration(
+                              (log as { duration_ms?: number }).duration_ms ?? 0,
+                            )}
+                          </span>
+                        )}
+                    </div>
                     {log.error_message && (
                       <p className="mb-3 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
                         {log.error_message}
@@ -164,6 +180,12 @@ export default function AutomationLogsPage({
       )}
     </div>
   )
+}
+
+/** Render `duration_ms` only when the column exists; never invent one. */
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms} ms`
+  return `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)} s`
 }
 
 function StatusBadge({ status, t }: { status: AutomationLog["status"], t: ReturnType<typeof useTranslations> }) {

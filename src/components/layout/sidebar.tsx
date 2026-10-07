@@ -57,9 +57,6 @@ function IconBot({ className }: { className?: string }) {
 function IconFollowups({ className }: { className?: string }) {
   return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/><path d="M8 10h8"/><path d="M8 14h5"/></svg>;
 }
-function IconCalls({ className }: { className?: string }) {
-  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.01 1.18 2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>;
-}
 function IconQuickReplies({ className }: { className?: string }) {
   return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/><path d="M13 8l-3 4h5l-3 4"/></svg>;
 }
@@ -184,6 +181,14 @@ const navSections: NavSection[] = [
     defaultOpen: true,
   },
   {
+    labelKey: "sectionGrowth",
+    items: [
+      { href: "/pipelines", labelKey: "pipelines", icon: IconPipelines },
+      { href: "/crm", labelKey: "crm", icon: IconCRM },
+      { href: "/save-money", labelKey: "saveMoney", icon: IconSaveMoney },
+    ],
+  },
+  {
     labelKey: "sectionMarketing",
     items: [
       { href: "/campaigns", labelKey: "campaigns", icon: IconCampaigns },
@@ -200,7 +205,6 @@ const navSections: NavSection[] = [
       { href: "/automations/flows", labelKey: "automationFlows", icon: IconFlows },
       { href: "/automations/bot-builder", labelKey: "botFlowBuilder", icon: IconBot, beta: true },
       { href: "/automations/followups", labelKey: "aiFollowups", icon: IconFollowups },
-      { href: "/automations/calls", labelKey: "bulkAiCalls", icon: IconCalls },
       { href: "/automations/quick-replies", labelKey: "quickReplies", icon: IconQuickReplies },
       { href: "/automations/keyboard-triggers", labelKey: "keyboardTriggers", icon: IconKeyboard },
       { href: "/automations/appointments", labelKey: "appointments", icon: IconAppointments },
@@ -208,21 +212,12 @@ const navSections: NavSection[] = [
     defaultOpen: true,
   },
   {
-    labelKey: "sectionGrowth",
-    items: [
-      { href: "/crm", labelKey: "crm", icon: IconCRM },
-      { href: "/pipelines", labelKey: "pipelines", icon: IconPipelines },
-      { href: "/reports", labelKey: "reports", icon: IconReports },
-      { href: "/save-money", labelKey: "saveMoney", icon: IconSaveMoney },
-    ],
-  },
-  {
     labelKey: "sectionSystem",
     items: [
-      { href: "/notifications", labelKey: "notifications", icon: IconNotifications },
+      { href: "/reports", labelKey: "reports", icon: IconReports },
       { href: "/media-library", labelKey: "mediaLibrary", icon: IconMedia },
+      { href: "/notifications", labelKey: "notifications", icon: IconNotifications },
       { href: "/api", labelKey: "apiDeveloper", icon: IconAPI },
-      { href: "/guide", labelKey: "userGuide", icon: IconGuide },
     ],
   },
 ];
@@ -230,6 +225,7 @@ const navSections: NavSection[] = [
 const bottomNavItems = [
   { href: "/billing", labelKey: "billing", icon: IconBilling },
   { href: "/settings", labelKey: "settings", icon: IconSettings },
+  { href: "/guide", labelKey: "userGuide", icon: IconGuide },
 ];
 
 const SECTION_STORAGE_KEY = "wacrm-sidebar-sections";

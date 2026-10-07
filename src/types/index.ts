@@ -1,5 +1,6 @@
 import type { AccountRole, PlatformRole } from "@/lib/auth/roles";
 import type { InteractiveMessagePayload } from "@/lib/whatsapp/interactive";
+import type { LeadStatus } from "@/lib/crm/lead-status";
 
 export type {
   InteractiveMessagePayload,
@@ -239,7 +240,7 @@ export interface FollowUp {
 
 export type ConversationStatus = 'open' | 'pending' | 'closed';
 export type ConversationPlatform = 'whatsapp' | 'facebook' | 'instagram' | 'telegram' | 'threads' | 'x';
-export type LeadStatus = 'new' | 'contacted' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost';
+export type { LeadStatus };
 
 export interface Conversation {
   id: string;
@@ -979,6 +980,7 @@ export interface Appointment {
   duration_minutes: number;
   status: AppointmentStatus;
   notes?: string;
+  appointment_type?: string;
   reminder_sent: boolean;
   reminder_24h_sent: boolean;
   reminder_1h_sent: boolean;

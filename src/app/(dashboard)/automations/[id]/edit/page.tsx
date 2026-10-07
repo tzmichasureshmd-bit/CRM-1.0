@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Loader2 } from "lucide-react"
+import { Loader2, Play } from "lucide-react"
 import { useTranslations } from "next-intl"
 
 import {
@@ -11,7 +11,9 @@ import {
   type BuilderInitial,
   type ServerStepNode,
 } from "@/components/automations/automation-builder"
+import { Button } from "@/components/ui/button"
 import type { AutomationTriggerType } from "@/types"
+import { TestRunDialog } from "../test-run-dialog"
 
 export default function EditAutomationPage({
   params,
@@ -23,6 +25,7 @@ export default function EditAutomationPage({
   const t = useTranslations("Automations.edit")
   const [initial, setInitial] = useState<BuilderInitial | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [testOpen, setTestOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -72,5 +75,29 @@ export default function EditAutomationPage({
     )
   }
 
-  return <AutomationBuilder initial={initial} />
+  return (
+    <>
+      <AutomationBuilder initial={initial} />
+
+      {/* Floating above the builder's fixed inset-0 shell (which carries
+          no z-index of its own), tucked bottom-left away from the docked
+          config panel on the right. */}
+      <div className="fixed bottom-4 left-4 z-50">
+        <Button
+          variant="secondary"
+          onClick={() => setTestOpen(true)}
+          className="rounded-full shadow-lg"
+        >
+          <Play className="h-4 w-4" aria-hidden />
+          Run test
+        </Button>
+      </div>
+
+      <TestRunDialog
+        automationId={id}
+        open={testOpen}
+        onOpenChange={setTestOpen}
+      />
+    </>
+  )
 }

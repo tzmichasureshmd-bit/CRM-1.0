@@ -30,6 +30,11 @@ import { useCan } from "@/hooks/use-can";
 import { useAuth } from "@/hooks/use-auth";
 import { GatedButton } from "@/components/ui/gated-button";
 import { useTranslations } from "next-intl";
+import {
+  leadStatusLabel,
+  setContactLeadStatus,
+  type LeadStatus,
+} from "@/lib/crm/lead-status";
 
 // Pipeline creation is admin-class (settings-tier write under
 // the new RLS); deal creation is operational and only requires
@@ -58,6 +63,7 @@ export default function PipelinesPage() {
   const [stages, setStages] = useState<PipelineStage[]>([]);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncingDealId, setSyncingDealId] = useState<string | null>(null);
 
   // Dialog / sheet state
   const [newPipelineOpen, setNewPipelineOpen] = useState(false);
@@ -248,6 +254,32 @@ export default function PipelinesPage() {
     setDealFormOpen(true);
   }, []);
 
+  const handleSyncContactStatus = useCallback(
+    async (deal: Deal, status: LeadStatus) => {
+      if (!deal.contact_id || syncingDealId) return;
+      setSyncingDealId(deal.id);
+      const result = await setContactLeadStatus(
+        supabase,
+        deal.contact_id,
+        status,
+      );
+      if (result.ok) {
+        setDeals((prev) =>
+          prev.map((d) =>
+            d.id === deal.id && d.contact
+              ? { ...d, contact: { ...d.contact, lead_status: result.status } }
+              : d,
+          ),
+        );
+        toast.success(`Lead status → ${leadStatusLabel(result.status)}`);
+      } else {
+        toast.error(result.error);
+      }
+      setSyncingDealId(null);
+    },
+    [supabase, syncingDealId],
+  );
+
   async function handleCreatePipeline() {
     const name = newPipelineName.trim();
     if (!name) return;
@@ -420,6 +452,8 @@ export default function PipelinesPage() {
             onDealMoved={handleDealMoved}
             onAddDeal={handleAddDeal}
             onEditDeal={handleEditDeal}
+            onSyncStatus={handleSyncContactStatus}
+            syncingDealId={syncingDealId}
           />
         </>
       )}

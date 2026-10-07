@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { requireRole, toErrorResponse } from '@/lib/auth/account'
+import {
+  getCurrentAccount,
+  requireRole,
+  toErrorResponse,
+  type AccountContext,
+} from '@/lib/auth/account'
 import { supabaseAdmin } from '@/lib/automations/admin-client'
 import {
   loadStepsTree,
@@ -12,31 +16,17 @@ import {
   validateTriggerForActivation,
 } from '@/lib/automations/validate'
 
-async function requireUser() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  return user
-}
-
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params
-  const user = await requireUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const supabase = await createClient()
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('account_id')
-    .eq('user_id', user.id)
-    .maybeSingle()
-  const accountId = profile?.account_id as string | undefined
-  if (!accountId) {
-    return NextResponse.json({ error: 'No account' }, { status: 403 })
+  let ctx: AccountContext
+  try {
+    ctx = await getCurrentAccount()
+  } catch (err) {
+    return toErrorResponse(err)
   }
 
   const admin = supabaseAdmin()
@@ -44,7 +34,7 @@ export async function GET(
     .from('automations')
     .select('*')
     .eq('id', id)
-    .eq('account_id', accountId)
+    .eq('account_id', ctx.accountId)
     .maybeSingle()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -54,7 +44,27 @@ export async function GET(
   return NextResponse.json({ automation, steps })
 }
 
+/**
+ * Update an automation. PATCH and PUT accept the same body (any subset
+ * of name / description / trigger_type / trigger_config / is_active /
+ * steps) and merge it into the row — the builder sends PATCH, PUT is
+ * provided for clients that prefer a full-method name.
+ */
 export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  return applyUpdate(request, { params })
+}
+
+export async function PUT(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  return applyUpdate(request, { params })
+}
+
+async function applyUpdate(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -63,28 +73,29 @@ export async function PATCH(
   // Editing an automation is a write — the RLS automations_update policy
   // requires `agent`, but this route mutates via the service-role client
   // which bypasses RLS, so enforce the role here.
+  let ctx: AccountContext
   try {
-    await requireRole('agent')
+    ctx = await requireRole('agent')
   } catch (err) {
     return toErrorResponse(err)
   }
-
-  const user = await requireUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await request.json().catch(() => null)
   if (!body) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
 
   const admin = supabaseAdmin()
 
-  // Ownership check before we touch anything. Load the fields we need
-  // to compute the post-patch "effective" state for validation.
+  // Tenant check before we touch anything: the row must live in the
+  // caller's account (previously this compared `user_id`, which hid
+  // teammates' automations from each other and, worse, let an author
+  // edit rows outside any account scope once sharing shipped). Load the
+  // fields needed to compute the post-patch "effective" state too.
   const { data: existing } = await admin
     .from('automations')
-    .select('id, user_id, is_active, trigger_type, trigger_config')
+    .select('id, account_id, is_active, trigger_type, trigger_config')
     .eq('id', id)
     .maybeSingle()
-  if (!existing || existing.user_id !== user.id) {
+  if (!existing || existing.account_id !== ctx.accountId) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 
@@ -99,7 +110,7 @@ export async function PATCH(
     if (k in body) update[k] = body[k]
   }
 
-  // If this PATCH leaves the automation active (either explicitly
+  // If this update leaves the automation active (either explicitly
   // activating it OR editing an already-active one), validate the
   // merged configuration first. Activation is the natural gate — drafts
   // are still allowed to be incomplete.
@@ -131,6 +142,7 @@ export async function PATCH(
       .from('automations')
       .update(update)
       .eq('id', id)
+      .eq('account_id', ctx.accountId)
     if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 })
   }
 
@@ -150,31 +162,18 @@ export async function DELETE(
 
   // Deleting an automation is a write — enforce `agent` (the service-role
   // client below bypasses the agent-gated automations_delete RLS).
+  let ctx: AccountContext
   try {
-    await requireRole('agent')
+    ctx = await requireRole('agent')
   } catch (err) {
     return toErrorResponse(err)
-  }
-
-  const user = await requireUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const supabase = await createClient()
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('account_id')
-    .eq('user_id', user.id)
-    .maybeSingle()
-  const accountId = profile?.account_id as string | undefined
-  if (!accountId) {
-    return NextResponse.json({ error: 'No account' }, { status: 403 })
   }
 
   const { error } = await supabaseAdmin()
     .from('automations')
     .delete()
     .eq('id', id)
-    .eq('account_id', accountId)
+    .eq('account_id', ctx.accountId)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
 }

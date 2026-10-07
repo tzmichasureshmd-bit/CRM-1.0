@@ -264,6 +264,14 @@
       "noMessagesYet": "No messages yet",
       "newTodayVsYesterday": "new today vs yesterday",
       "vsYesterday": "vs yesterday",
+      "newConversationsLine": "{today} new today · {yesterday} yesterday",
+      "periodSummaryTitle": "Selected period",
+      "vsPreviousPeriod": "vs previous period",
+      "periodMessages": "Messages",
+      "periodContacts": "New contacts",
+      "periodConversations": "New conversations",
+      "periodDeals": "New deals",
+      "periodDealValue": "Deal value",
       "openDeals": "{count} open {count, plural, =1 {deal} other {deals}}",
       "noChange": "No change {suffix}",
       "overview": "Overview",
@@ -559,6 +567,7 @@
       "assignedTo": "Assigned to",
       "addNotePlaceholder": "Add a note...",
       "leadStatus": "Lead status",
+      "crmStatus": "CRM STATUS",
       "followUps": "Follow-ups",
       "noFollowUps": "No follow-ups scheduled",
       "addFollowUpPlaceholder": "Add a follow-up...",
@@ -860,12 +869,15 @@
     },
     "board": {
       "dropDealHere": "Drop a deal here",
-      "addDeal": "Add Deal"
+      "addDeal": "Add Deal",
+      "crmStatus": "CRM STATUS"
     },
     "card": {
       "noContact": "No contact",
       "won": "Won",
-      "lost": "Lost"
+      "lost": "Lost",
+      "statusMismatch": "Contact is {current}, this stage expects {expected}",
+      "syncContactStatus": "Sync contact status"
     },
     "form": {
       "editDeal": "Edit Deal",
@@ -1572,6 +1584,8 @@
         "title": "Title",
         "message": "Message",
         "category": "Category",
+        "channel": "Channel",
+        "status": "Status",
         "global": "Global"
       },
       "badge": {
@@ -1588,6 +1602,20 @@
         "message": "Message",
         "messagePlaceholder": "Write the reply text...",
         "category": "Category",
+        "kind": "Type",
+        "kindText": "Text",
+        "kindInteractive": "Interactive",
+        "interactiveHint": "Build a buttons or list reply — agents send it exactly as previewed.",
+        "channel": "Channel",
+        "channelAny": "Any channel",
+        "channelWhatsapp": "WhatsApp",
+        "channelInstagram": "Instagram",
+        "channelFacebook": "Facebook",
+        "channelEmail": "Email",
+        "language": "Language",
+        "status": "Status",
+        "statusActive": "Active",
+        "statusInactive": "Inactive",
         "globalLabel": "Share with the whole team",
         "globalHint": "Global replies are visible to every agent in the account.",
         "cancel": "Cancel",
@@ -1691,6 +1719,7 @@
     "stats": {
       "total": "Total",
       "active": "Active",
+      "paused": "Paused",
       "executions": "Total Executions"
     },
     "tabs": {
@@ -1714,6 +1743,11 @@
       "runs": "{count} run",
       "runsPlural": "{count} runs",
       "updated": "Updated {date}"
+    },
+    "delay": {
+      "hoursShort": "{hours} hours",
+      "daysShort": "{days} days",
+      "daysHours": "{days} days {hours} hours"
     },
     "actions": {
       "start": "Start",
@@ -1751,7 +1785,9 @@
       "tag_added": "Tag Added",
       "deal_created": "Deal Created",
       "no_response": "No Response",
-      "keyword": "Keyword"
+      "keyword": "Keyword",
+      "webhook": "Webhook",
+      "scheduled": "Scheduled"
     },
     "dialog": {
       "createTitle": "Create Follow-up",
@@ -1762,7 +1798,10 @@
         "trigger": "Trigger",
         "settings": "Settings",
         "template": "Message Template",
-        "ai": "AI Settings"
+        "ai": "AI Settings",
+        "audience": "Audience",
+        "message": "Message",
+        "schedule": "Schedule"
       },
       "name": "Name",
       "namePlaceholder": "e.g. Abandoned cart follow-up",
@@ -1785,6 +1824,35 @@
       "systemPromptPlaceholder": "Instructions for generating follow-up messages",
       "temperature": "Temperature",
       "maxTokens": "Max tokens",
+      "status": "Status",
+      "audienceType": "Who receives this",
+      "audienceAll": "All contacts",
+      "audienceTags": "Contacts with tags",
+      "audienceCustomField": "Custom field match",
+      "selectTags": "Tags",
+      "noTags": "No tags found.",
+      "customFieldLabel": "Field",
+      "customFieldValue": "Value",
+      "operatorIs": "is",
+      "operatorIsNot": "is not",
+      "operatorContains": "contains",
+      "channel": "Channel",
+      "channelAny": "Any channel",
+      "channelWhatsapp": "WhatsApp",
+      "channelInstagram": "Instagram",
+      "channelFacebook": "Facebook",
+      "channelEmail": "Email",
+      "message": "Message",
+      "messagePlaceholder": "Write the follow-up message...",
+      "aiToggle": "Generate with AI",
+      "aiHint": "The text above is the AI's instruction for writing each follow-up.",
+      "conditions": "Conditions",
+      "conditionsPlaceholder": "e.g. Skip contacts who already replied",
+      "scheduleStart": "Start date",
+      "scheduleEnd": "End date",
+      "quietHours": "Quiet hours",
+      "quietStart": "Do not send before",
+      "quietEnd": "Do not send after",
       "cancel": "Cancel",
       "save": "Save Changes",
       "create": "Create"
@@ -1801,13 +1869,19 @@
       "saveError": "Failed to save follow-up",
       "deleted": "Follow-up deleted",
       "deleteError": "Failed to delete follow-up",
+      "loadError": "Follow-ups could not be loaded",
+      "updateError": "Follow-up status could not be updated",
+      "historyError": "Execution history could not be loaded",
       "draft": "Saved as draft",
       "active": "Follow-up activated",
       "paused": "Follow-up paused",
       "archived": "Follow-up archived"
     },
     "validation": {
-      "nameRequired": "Name is required"
+      "nameRequired": "Name is required",
+      "messageRequired": "Message is required",
+      "tagsRequired": "Pick at least one tag for this audience.",
+      "customFieldRequired": "Choose a field and a value for this audience."
     }
   },
   "Appointments": {
@@ -1877,7 +1951,27 @@
         "service": "Service",
         "servicePlaceholder": "e.g. Consultation",
         "notes": "Notes",
-        "notesPlaceholder": "Additional notes..."
+        "notesPlaceholder": "Additional notes...",
+        "appointmentType": "Appointment type",
+        "types": {
+          "consultation": "Consultation",
+          "demo": "Demo",
+          "follow_up": "Follow-up",
+          "site_visit": "Site visit",
+          "other": "Other"
+        }
+      },
+      "toast": {
+        "loadError": "Appointments could not be loaded",
+        "saveError": "Appointment could not be saved",
+        "created": "Appointment created",
+        "updated": "Appointment updated",
+        "statusUpdated": "Status updated",
+        "statusError": "Status could not be updated",
+        "rescheduled": "Appointment rescheduled",
+        "rescheduleError": "Appointment could not be rescheduled",
+        "deleteError": "Appointment could not be deleted",
+        "deleted": "Appointment deleted"
       },
       "cancel": "Cancel",
       "saveChanges": "Save Changes",

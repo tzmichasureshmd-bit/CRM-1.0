@@ -200,8 +200,8 @@ export default function NewBroadcastPage() {
         },
         scheduledAtISO,
       );
-      toast.success('Campaign scheduled');
-      router.push(`/campaigns/${broadcastId}`);
+      toast.success('Broadcast scheduled');
+      router.push(`/broadcasts/${broadcastId}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to schedule';
       console.error('Schedule failed:', err);

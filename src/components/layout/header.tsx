@@ -32,7 +32,10 @@ const pageTitles: Record<string, string> = {
   '/contacts': 'contacts',
   '/crm': 'crm',
   '/pipelines': 'pipelines',
+  '/campaigns': 'campaigns',
   '/broadcasts': 'broadcasts',
+  '/templates': 'templates',
+  '/presets': 'presetCampaigns',
   '/automations': 'automations',
   '/automations/flows': 'automationFlows',
   '/automations/bot-builder': 'botFlowBuilder',
@@ -44,8 +47,6 @@ const pageTitles: Record<string, string> = {
   '/automations/tickets': 'tickets',
   '/flows': 'flows',
   '/agents': 'aiAgents',
-  '/campaigns': 'campaigns',
-  '/templates': 'templates',
   '/reports': 'reports',
   '/billing': 'billing',
   '/settings': 'settings',
@@ -53,14 +54,50 @@ const pageTitles: Record<string, string> = {
   '/api': 'apiDeveloper',
   '/save-money': 'saveMoney',
   '/integrations': 'integrations',
+  '/tickets': 'tickets',
+  '/social-media': 'socialMedia',
+  '/guide': 'userGuide',
 };
 
-function getPageTitleKey(pathname: string): string {
-  if (pageTitles[pathname]) return pageTitles[pathname];
-  const match = Object.entries(pageTitles).find(([path]) =>
-    pathname.startsWith(path)
-  );
-  return match ? match[1] : 'dashboard';
+const sidebarScopedTitleKeys = new Set([
+  'presetCampaigns',
+  'automationFlows',
+  'botFlowBuilder',
+  'aiFollowups',
+  'bulkAiCalls',
+  'quickReplies',
+  'keyboardTriggers',
+  'appointments',
+  'tickets',
+  'saveMoney',
+  'userGuide',
+]);
+
+type ResolvedPageTitle = { key: string } | { text: string };
+
+function humanizePathname(pathname: string): string {
+  const segment = pathname.split('/').filter(Boolean).pop();
+  if (!segment) return 'Dashboard';
+  return segment
+    .split(/[-_]+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+function resolvePageTitle(pathname: string): ResolvedPageTitle {
+  const exact = pageTitles[pathname];
+  if (exact) return { key: exact };
+  let bestKey = '';
+  let bestLength = -1;
+  for (const [path, key] of Object.entries(pageTitles)) {
+    if (pathname.startsWith(`${path}/`) && path.length > bestLength) {
+      bestKey = key;
+      bestLength = path.length;
+    }
+  }
+  if (bestKey) return { key: bestKey };
+  return { text: humanizePathname(pathname) };
 }
 
 interface HeaderProps {
@@ -73,10 +110,17 @@ import { useTranslations } from 'next-intl';
 
 export function Header({ onOpenSidebar }: HeaderProps) {
   const t = useTranslations('Header');
+  const tSidebar = useTranslations('Sidebar');
   const pathname = usePathname();
   const { profile, signOut } = useAuth();
   const { canInstall, isStandalone, install } = usePwaInstall();
-  const titleKey = getPageTitleKey(pathname);
+  const resolvedTitle = resolvePageTitle(pathname);
+  const title =
+    'text' in resolvedTitle
+      ? resolvedTitle.text
+      : sidebarScopedTitleKeys.has(resolvedTitle.key)
+        ? tSidebar(resolvedTitle.key)
+        : t(resolvedTitle.key);
   const [themePanelOpen, setThemePanelOpen] = useState(false);
 
   const initial =
@@ -97,7 +141,7 @@ export function Header({ onOpenSidebar }: HeaderProps) {
           <Menu className="h-5 w-5" />
         </button>
         <h1 className="text-foreground truncate text-base font-semibold sm:text-lg">
-          {t(titleKey as string)}
+          {title}
         </h1>
       </div>
 

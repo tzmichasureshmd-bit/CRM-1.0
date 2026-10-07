@@ -701,7 +701,16 @@ function InboxPageInner() {
         {contactPanelOpen && (
           <div className="hidden lg:flex h-full py-2 pr-2">
             <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
-              <ContactSidebar contact={activeContact} conversation={activeConversation} onContactUpdated={() => setResyncToken((n) => n + 1)} />
+              <ContactSidebar
+                contact={activeContact}
+                conversation={activeConversation}
+                onContactUpdated={() => setResyncToken((n) => n + 1)}
+                onLeadStatusChange={(status) =>
+                  setActiveContact((prev) =>
+                    prev ? { ...prev, lead_status: status } : prev,
+                  )
+                }
+              />
             </div>
           </div>
         )}

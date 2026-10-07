@@ -41,6 +41,31 @@ export function lastNDayKeys(n: number): string[] {
 }
 
 /**
+ * Inclusive list of local-day keys between two `YYYY-MM-DD` keys, in
+ * chronological order. Returns an empty array when either bound is invalid
+ * or the span exceeds 366 days (a guard against a runaway custom range
+ * allocating one bucket per missing day).
+ */
+export function dayKeysInclusive(fromKey: string, toKey: string): string[] {
+  const parse = (key: string) => {
+    const [y, m, d] = key.split('-').map(Number)
+    if (!y || !m || !d) return null
+    const date = new Date(y, m - 1, d)
+    return Number.isNaN(date.getTime()) ? null : date
+  }
+  const start = parse(fromKey)
+  const end = parse(toKey)
+  if (!start || !end || start > end) return []
+  const keys: string[] = []
+  const cursor = new Date(start)
+  while (cursor <= end && keys.length <= 366) {
+    keys.push(localDayKey(cursor))
+    cursor.setDate(cursor.getDate() + 1)
+  }
+  return keys
+}
+
+/**
  * ISO day-of-week where 0 = Monday … 6 = Sunday. JavaScript's native
  * getDay() uses 0 = Sunday which is awkward for most business charts.
  */

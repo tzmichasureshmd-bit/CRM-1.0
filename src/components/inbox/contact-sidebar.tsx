@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import type { Contact, Deal, ContactNote, Tag, Conversation, FollowUp, LeadStatus } from "@/types";
+import type { Contact, Deal, ContactNote, Tag, Conversation, FollowUp } from "@/types";
 import {
   Phone,
   Mail,
@@ -31,36 +31,23 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 import { addContactTag, deleteContactTag } from "@/lib/contacts/tag-api";
+import { LeadStatusSelect } from "@/components/inbox/lead-status-select";
+import { LeadScoreBadge } from "@/components/contacts/lead-score-badge";
+import type { LeadStatus } from "@/lib/crm/lead-status";
 
 interface ContactSidebarProps {
   contact: Contact | null;
   /** The active conversation, used to look up the assigned agent. */
   conversation: Conversation | null;
   onContactUpdated?: () => void;
+  /**
+   * Called after a CRM STATUS write lands so the parent's copy of the
+   * contact never drifts from `contacts.lead_status`.
+   */
+  onLeadStatusChange?: (status: LeadStatus) => void;
 }
 
-function leadStatusColor(status: LeadStatus): { bg: string; text: string } {
-  switch (status) {
-    case "new":
-      return { bg: "#e5e7eb20", text: "#6b7280" };
-    case "contacted":
-      return { bg: "#dbeafe20", text: "#3b82f6" };
-    case "qualified":
-      return { bg: "#d1fae520", text: "#10b981" };
-    case "proposal":
-      return { bg: "#fef3c720", text: "#d97706" };
-    case "negotiation":
-      return { bg: "#f3e8ff20", text: "#8b5cf6" };
-    case "won":
-      return { bg: "#dcfce720", text: "#16a34a" };
-    case "lost":
-      return { bg: "#fee2e220", text: "#dc2626" };
-    default:
-      return { bg: "#e5e7eb20", text: "#6b7280" };
-  }
-}
-
-export function ContactSidebar({ contact, conversation, onContactUpdated }: ContactSidebarProps) {
+export function ContactSidebar({ contact, conversation, onContactUpdated, onLeadStatusChange }: ContactSidebarProps) {
   const tSidebar = useTranslations("Inbox.sidebar");
   const tThread = useTranslations("Inbox.messageThread");
 
@@ -592,23 +579,31 @@ export function ContactSidebar({ contact, conversation, onContactUpdated }: Cont
             </>
           )}
 
-          {/* Lead Status */}
-          {contact.lead_status && (
-            <>
-              <div className="my-2 border-t border-border" />
-              <div className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm">
-                <Flag className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">{tSidebar("leadStatus")}</span>
-                <span className="ml-auto rounded-full px-2 py-0.5 text-[10px] font-medium capitalize"
-                  style={{
-                    backgroundColor: leadStatusColor(contact.lead_status).bg,
-                    color: leadStatusColor(contact.lead_status).text,
-                  }}
-                >
-                  {contact.lead_status}
-                </span>
-              </div>
-            </>
+          {/* Lead Status — shared CRM STATUS control (spec §23–§27) */}
+          <div className="my-2 border-t border-border" />
+          <div className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm">
+            <Flag className="h-4 w-4 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">{tSidebar("crmStatus")}</span>
+            <LeadStatusSelect
+              key={contact.id}
+              contactId={contact.id}
+              value={contact.lead_status ?? null}
+              onChange={(status) => {
+                onLeadStatusChange?.(status);
+                onContactUpdated?.();
+              }}
+              className="ml-auto"
+              triggerClassName="bg-muted border-border h-7 text-sm"
+            />
+          </div>
+          {contact.lead_score != null && (
+            <div className="flex justify-end px-3">
+              <LeadScoreBadge
+                score={contact.lead_score}
+                tier={contact.lead_score_tier}
+                className="text-[10px]"
+              />
+            </div>
           )}
 
           {/* Divider */}

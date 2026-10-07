@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { requireRole, toErrorResponse } from '@/lib/auth/account'
+import {
+  getCurrentAccount,
+  requireRole,
+  toErrorResponse,
+  type AccountContext,
+} from '@/lib/auth/account'
 import { supabaseAdmin } from '@/lib/automations/admin-client'
 import { getTemplate } from '@/lib/automations/templates'
 import { insertSteps, type BuilderStepInput } from '@/lib/automations/steps-tree'
@@ -9,14 +13,19 @@ import {
   validateTriggerForActivation,
 } from '@/lib/automations/validate'
 
+/**
+ * List the caller's account automations. RLS scopes the table to
+ * account members, so the plain client query is already tenant-safe.
+ */
 export async function GET() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  let ctx: AccountContext
+  try {
+    ctx = await getCurrentAccount()
+  } catch (err) {
+    return toErrorResponse(err)
+  }
 
-  const { data, error } = await supabase
+  const { data, error } = await ctx.supabase
     .from('automations')
     .select('*')
     .order('created_at', { ascending: false })
@@ -27,33 +36,15 @@ export async function GET() {
 export async function POST(request: Request) {
   // Creating an automation is a write — the RLS automations_insert policy
   // requires `agent`, but this route inserts via the service-role client
-  // which bypasses RLS, so the role must be enforced here.
-  try {
-    await requireRole('agent')
-  } catch (err) {
-    return toErrorResponse(err)
-  }
-
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  // Resolve the caller's account_id — `automations.account_id` is NOT
+  // which bypasses RLS, so the role must be enforced here. The account
+  // id comes from the same context: `automations.account_id` is NOT
   // NULL post-017, so an INSERT without it trips the not-null constraint
   // even though the admin client bypasses RLS.
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('account_id')
-    .eq('user_id', user.id)
-    .single()
-  const accountId = profile?.account_id as string | undefined
-  if (!accountId) {
-    return NextResponse.json(
-      { error: 'Your profile is not linked to an account.' },
-      { status: 403 },
-    )
+  let ctx: AccountContext
+  try {
+    ctx = await requireRole('agent')
+  } catch (err) {
+    return toErrorResponse(err)
   }
 
   const body = await request.json().catch(() => null)
@@ -108,8 +99,8 @@ export async function POST(request: Request) {
   const { data: automation, error: insertErr } = await admin
     .from('automations')
     .insert({
-      user_id: user.id,
-      account_id: accountId,
+      user_id: ctx.userId,
+      account_id: ctx.accountId,
       name: effectiveName,
       description: effectiveDescription ?? null,
       trigger_type: effectiveTriggerType,

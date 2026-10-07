@@ -5,16 +5,13 @@ import { MessageSquare } from 'lucide-react'
 import type { ConversationsSeriesPoint } from '@/lib/dashboard/types'
 import { EmptyState } from './empty-state'
 import { Skeleton } from './skeleton'
-import { cn } from '@/lib/utils'
-
-type RangeDays = 7 | 30 | 90
 
 interface ConversationsChartProps {
-  /** Per-range data, so switching tabs never re-fetches. */
-  series: Record<RangeDays, ConversationsSeriesPoint[] | null>
+  /** Buckets for the page-level date range; `null` while loading. */
+  data: ConversationsSeriesPoint[] | null
+  /** Label for the active range, e.g. "Apr 1 – Apr 30, 2026". */
+  rangeLabel: string
   loading: boolean
-  range: RangeDays
-  onRangeChange: (r: RangeDays) => void
 }
 
 // ------------------------------------------------------------
@@ -29,9 +26,8 @@ const PADDING = { top: 16, right: 16, bottom: 28, left: 40 }
 
 import { useTranslations } from 'next-intl'
 
-export function ConversationsChart({ series, loading, range, onRangeChange }: ConversationsChartProps) {
+export function ConversationsChart({ data, rangeLabel, loading }: ConversationsChartProps) {
   const t = useTranslations('Dashboard.conversationsChart')
-  const data = series[range]
 
   // Memoise the max so per-day hover math doesn't recompute it.
   const { maxY, niceTicks } = useMemo(() => {
@@ -55,23 +51,9 @@ export function ConversationsChart({ series, loading, range, onRangeChange }: Co
           <h2 className="text-[15px] font-semibold text-foreground">{t('title')}</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">{t('description')}</p>
         </div>
-        <div className="flex items-center gap-1 rounded-xl bg-muted p-1">
-          {[7, 30, 90].map((r) => (
-            <button
-              key={r}
-              type="button"
-              onClick={() => onRangeChange(r as RangeDays)}
-              className={cn(
-                'rounded-lg px-3 py-1 text-xs font-semibold transition-colors',
-                range === r
-                  ? 'bg-card text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              {t('days', { count: r })}
-            </button>
-          ))}
-        </div>
+        <span className="rounded-xl border border-border bg-muted/60 px-3 py-1.5 text-xs font-semibold text-muted-foreground tabular-nums">
+          {rangeLabel}
+        </span>
       </header>
 
       <div className="p-5">

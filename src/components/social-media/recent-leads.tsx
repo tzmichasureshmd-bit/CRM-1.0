@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { Loader2 } from "lucide-react";
+import { leadStatusBadgeClassName, leadStatusLabel } from "@/lib/crm/lead-status";
 
 export interface RecentLead {
   id: string;
@@ -42,22 +43,11 @@ function SourceBadge({ platform }: { platform?: string | null }) {
   )
 }
 
-const STATUS_STYLES: Record<string, string> = {
-  new:         'bg-[#EEF4FF] text-[#3462EE] border-[#3462EE]/30',
-  contacted:   'bg-[#E8F6FD] text-[#1a8fc4] border-[#26A5E4]/30',
-  qualified:   'bg-[#F3F0FF] text-[#6d28d9] border-[#7C3AED]/30',
-  proposal:    'bg-[#FDF4FF] text-[#9333ea] border-[#a855f7]/30',
-  negotiation: 'bg-[#FFFBEA] text-[#b45309] border-[#f59e0b]/30',
-  won:         'bg-[#EDFAF4] text-[#1a9e4e] border-[#25D366]/30',
-  lost:        'bg-[#FEF2F2] text-[#dc2626] border-[#ef4444]/30',
-}
-
 function StatusBadge({ status }: { status?: string | null }) {
   if (!status) return null;
-  const cls = STATUS_STYLES[status.toLowerCase()] ?? 'bg-[#F1F5F9] text-[#475569] border-[#94a3b8]/30'
   return (
-    <span className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium capitalize ${cls}`}>
-      {status}
+    <span className={leadStatusBadgeClassName(status)}>
+      {leadStatusLabel(status)}
     </span>
   );
 }

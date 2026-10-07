@@ -68,6 +68,21 @@ export async function PATCH(
     }
   }
 
+  // Optional organisation columns (added by migration 077) — only written
+  // when the caller supplies them, so deployments without 077 keep working.
+  if (typeof body.shortcut === 'string') {
+    const shortcut = body.shortcut.trim()
+    update.shortcut = shortcut ? (shortcut.startsWith('/') ? shortcut : `/${shortcut}`) : null
+  }
+  if (typeof body.channel === 'string') update.channel = body.channel.trim() || null
+  if (typeof body.language === 'string') update.language = body.language.trim() || null
+  if (typeof body.category === 'string') update.category = body.category.trim() || null
+  if (typeof body.status === 'string') {
+    const status = body.status.trim()
+    if (!status) return NextResponse.json({ error: 'status cannot be empty' }, { status: 400 })
+    update.status = status
+  }
+
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ ok: true })
   }
@@ -77,7 +92,7 @@ export async function PATCH(
     .update(update)
     .eq('id', id)
     .eq('account_id', ctx.accountId)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json({ error: error.message, code: error.code }, { status: 500 })
   return NextResponse.json({ ok: true })
 }
 
@@ -98,6 +113,6 @@ export async function DELETE(
     .delete()
     .eq('id', id)
     .eq('account_id', ctx.accountId)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json({ error: error.message, code: error.code }, { status: 500 })
   return NextResponse.json({ ok: true })
 }

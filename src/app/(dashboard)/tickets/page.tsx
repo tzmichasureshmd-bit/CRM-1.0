@@ -23,6 +23,8 @@ import {
 
 import { createClient } from "@/lib/supabase/client"
 import { useAuth } from "@/hooks/use-auth"
+import { describeError } from "@/lib/errors"
+import { hasColumn } from "@/lib/db/schema"
 import type { Ticket, TicketStatus, TicketPriority, TicketCategory, TicketComment, Profile, Contact } from "@/types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -149,6 +151,15 @@ export default function TicketsPage() {
   const [agents, setAgents] = useState<Profile[]>([])
   const [contacts, setContacts] = useState<Contact[]>([])
 
+  // True only when the `tickets.category` column (migration 066) exists.
+  // When false the Category control is disabled with an explanation
+  // instead of the insert silently failing.
+  const [categorySupported, setCategorySupported] = useState(true)
+
+  // Per-action busy flags so every button can show a real state.
+  const [savingField, setSavingField] = useState<string | null>(null)
+  const [savingComment, setSavingComment] = useState(false)
+
   const supabase = createClient()
 
   const loadAgents = useCallback(async () => {
@@ -187,7 +198,7 @@ export default function TicketsPage() {
       if (priorityFilter !== "all") {
         query = query.eq("priority", priorityFilter)
       }
-      if (categoryFilter !== "all") {
+      if (categoryFilter !== "all" && categorySupported) {
         query = query.eq("category", categoryFilter)
       }
       if (agentFilter !== "all") {
@@ -203,12 +214,13 @@ export default function TicketsPage() {
       setTickets((data ?? []) as TicketWithRelations[])
       setTotal(count ?? 0)
     } catch (err) {
-      console.error("[TicketsPage] loadTickets:", err)
-      toast.error("Failed to load tickets")
+      toast.error("Tickets could not be loaded", {
+        description: describeError(err, "The ticket list request failed."),
+      })
     } finally {
       setLoading(false)
     }
-  }, [accountId, supabase, statusFilter, priorityFilter, categoryFilter, agentFilter, search, page, pageSize])
+  }, [accountId, supabase, statusFilter, priorityFilter, categoryFilter, categorySupported, agentFilter, search, page, pageSize])
 
   const loadComments = useCallback(async (ticketId: string) => {
     setLoadingComments(true)
@@ -230,7 +242,14 @@ export default function TicketsPage() {
   useEffect(() => {
     loadAgents()
     loadContacts()
-  }, [loadAgents, loadContacts])
+    let cancelled = false
+    hasColumn(supabase, "tickets", "category").then((ok) => {
+      if (!cancelled) setCategorySupported(ok)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [loadAgents, loadContacts, supabase])
 
   useEffect(() => {
     loadTickets()
@@ -249,59 +268,82 @@ export default function TicketsPage() {
   async function handleCreate() {
     if (!accountId || !user) return
     if (!form.subject.trim()) {
-      toast.error("Subject is required")
+      toast.error("Subject is required", {
+        description: "Enter a short ticket title before saving.",
+      })
       return
     }
     setCreating(true)
     try {
-      const { data: nextNumberData, error: nextError } = await supabase
-        .rpc("next_ticket_number", { p_account_id: accountId })
-      if (nextError) throw nextError
-
-      const fallbackNumber = (() => {
-        const max = tickets.reduce((m, tk) => Math.max(m, tk.ticket_number), 0)
-        return max + 1
-      })()
-
       const tags = form.tags
         ? form.tags.split(",").map((t) => t.trim()).filter(Boolean)
         : []
 
+      const payload: Record<string, unknown> = {
+        account_id: accountId,
+        subject: form.subject.trim(),
+        description: form.description.trim() || null,
+        priority: form.priority,
+        status: "open" as TicketStatus,
+        assigned_agent_id: form.assigned_agent_id || null,
+        contact_id: form.contact_id || null,
+        tags,
+        created_by: user.id,
+      }
+      if (categorySupported) payload.category = form.category
+
+      // Preferred: the atomic per-account number generator (migration
+      // 066). If that function is not installed we do NOT fail the
+      // save — the SERIAL column still hands out a unique number.
+      const { data: nextNumber, error: nextError } = await supabase
+        .rpc("next_ticket_number", { p_account_id: accountId })
+      if (!nextError && typeof nextNumber === "number") {
+        payload.ticket_number = nextNumber
+      } else if (nextError) {
+        console.warn("[TicketsPage] next_ticket_number unavailable:", nextError.message)
+      }
+
       const { data, error } = await supabase
         .from("tickets")
-        .insert({
-          account_id: accountId,
-          ticket_number: (nextNumberData as number) ?? fallbackNumber,
-          subject: form.subject.trim(),
-          description: form.description.trim() || null,
-          priority: form.priority,
-          category: form.category,
-          status: "open" as TicketStatus,
-          assigned_agent_id: form.assigned_agent_id || null,
-          contact_id: form.contact_id || null,
-          tags,
-          created_by: user.id,
-        })
+        .insert(payload)
         .select("*, contact:contacts(id, name, phone, email)")
         .single()
 
       if (error) throw error
-      setTickets((prev) => [data as TicketWithRelations, ...prev])
+
+      const created = data as TicketWithRelations
+      setTickets((prev) => [created, ...prev])
       setTotal((prev) => prev + 1)
       setCreateOpen(false)
       setForm({ subject: "", description: "", priority: "medium", category: "general", assigned_agent_id: "", contact_id: "", tags: "" })
-      toast.success("Ticket created")
+
+      const agentName = getAgentName(created.assigned_agent_id)
+      toast.success("Ticket created successfully", {
+        description: [
+          `Ticket #${created.ticket_number}`,
+          STATUS_OPTIONS.find((s) => s.value === created.status)?.label ?? created.status,
+          PRIORITY_OPTIONS.find((p) => p.value === created.priority)?.label ?? created.priority,
+          agentName ? `Assigned to ${agentName}` : "Unassigned",
+          new Date(created.created_at).toLocaleString(),
+        ].join("  ·  "),
+        duration: 8000,
+      })
     } catch (err) {
-      console.error("[TicketsPage] handleCreate:", err)
-      toast.error("Failed to create ticket")
+      toast.error("Could not save ticket", {
+        description: describeError(err, "The ticket could not be created."),
+      })
     } finally {
       setCreating(false)
     }
   }
 
   async function handleStatusChange(ticketId: string, newStatus: TicketStatus) {
+    setSavingField(`status:${ticketId}`)
     try {
-      const update: Record<string, unknown> = { status: newStatus }
+      const update: Record<string, unknown> = {
+        status: newStatus,
+        updated_at: new Date().toISOString(),
+      }
       if (newStatus === "resolved") update.resolved_at = new Date().toISOString()
       if (newStatus === "closed") update.closed_at = new Date().toISOString()
 
@@ -321,14 +363,19 @@ export default function TicketsPage() {
           prev ? { ...prev, ...update } as TicketWithRelations : null
         )
       }
-      toast.success(`Ticket ${newStatus.replace("_", " ")}`)
+      toast.success(`Ticket ${newStatus.replace("_", " ")} — updated successfully`)
     } catch (err) {
-      console.error("[TicketsPage] handleStatusChange:", err)
-      toast.error("Failed to update status")
+      toast.error("Could not update status", {
+        description: describeError(err, "The status change was rejected."),
+      })
+    } finally {
+      setSavingField(null)
     }
   }
 
   async function handleFieldChange(ticketId: string, field: "priority" | "category", value: string) {
+    if (field === "category" && !categorySupported) return
+    setSavingField(`${field}:${ticketId}`)
     try {
       const { error } = await supabase
         .from("tickets")
@@ -344,15 +391,19 @@ export default function TicketsPage() {
       if (selectedTicket?.id === ticketId) {
         setSelectedTicket((prev) => prev ? { ...prev, [field]: value } as TicketWithRelations : null)
       }
-      toast.success("Ticket updated")
+      toast.success("Ticket updated successfully")
     } catch (err) {
-      console.error("[TicketsPage] handleFieldChange:", err)
-      toast.error("Failed to update ticket")
+      toast.error("Could not save ticket", {
+        description: describeError(err, "The change was rejected."),
+      })
+    } finally {
+      setSavingField(null)
     }
   }
 
   async function handleAddComment() {
     if (!selectedTicket || !user || !newComment.trim()) return
+    setSavingComment(true)
     try {
       const { data, error } = await supabase
         .from("ticket_comments")
@@ -369,17 +420,22 @@ export default function TicketsPage() {
       setComments((prev) => [...prev, data as TicketComment])
       setNewComment("")
       setIsInternalNote(false)
+      toast.success(isInternalNote ? "Internal note added" : "Reply sent")
     } catch (err) {
-      console.error("[TicketsPage] handleAddComment:", err)
-      toast.error("Failed to add comment")
+      toast.error("Could not save comment", {
+        description: describeError(err, "The comment was rejected."),
+      })
+    } finally {
+      setSavingComment(false)
     }
   }
 
   async function handleAssignAgent(ticketId: string, agentId: string | null) {
+    setSavingField(`assign:${ticketId}`)
     try {
       const { error } = await supabase
         .from("tickets")
-        .update({ assigned_agent_id: agentId })
+        .update({ assigned_agent_id: agentId, updated_at: new Date().toISOString() })
         .eq("id", ticketId)
       if (error) throw error
 
@@ -391,10 +447,13 @@ export default function TicketsPage() {
       if (selectedTicket?.id === ticketId) {
         setSelectedTicket((prev) => prev ? { ...prev, assigned_agent_id: agentId } as TicketWithRelations : null)
       }
-      toast.success("Agent assigned")
+      toast.success(agentId ? `Assigned to ${getAgentName(agentId) ?? "agent"}` : "Agent removed")
     } catch (err) {
-      console.error("[TicketsPage] handleAssignAgent:", err)
-      toast.error("Failed to assign agent")
+      toast.error("Could not assign agent", {
+        description: describeError(err, "The assignment was rejected."),
+      })
+    } finally {
+      setSavingField(null)
     }
   }
 
@@ -417,7 +476,9 @@ export default function TicketsPage() {
 
   function getAgentName(agentId: string | undefined) {
     if (!agentId) return "Unassigned"
-    const agent = agents.find((a) => a.id === agentId)
+    // assigned_agent_id references auth.users(id), which is
+    // profiles.user_id — NOT profiles.id.
+    const agent = agents.find((a) => a.user_id === agentId) ?? agents.find((a) => a.id === agentId)
     return agent?.full_name ?? "Unknown"
   }
 
@@ -594,6 +655,7 @@ export default function TicketsPage() {
                     <span className="text-xs text-muted-foreground">Priority</span>
                     <Select
                       value={selectedTicket.priority}
+                      disabled={savingField !== null}
                       onValueChange={(v) => handleFieldChange(selectedTicket.id, "priority", v ?? "")}
                     >
                       <SelectTrigger className="w-full">
@@ -615,7 +677,8 @@ export default function TicketsPage() {
                   <div className="flex flex-col gap-1.5">
                     <span className="text-xs text-muted-foreground">Category</span>
                     <Select
-                      value={selectedTicket.category}
+                      value={selectedTicket.category ?? "general"}
+                      disabled={!categorySupported}
                       onValueChange={(v) => handleFieldChange(selectedTicket.id, "category", v ?? "")}
                     >
                       <SelectTrigger className="w-full">
@@ -629,12 +692,19 @@ export default function TicketsPage() {
                         ))}
                       </SelectContent>
                     </Select>
+                    {!categorySupported && (
+                      <p className="text-[11px] leading-snug text-amber-600 dark:text-amber-400">
+                        Category needs the <code>tickets.category</code> column — run{" "}
+                        <code>supabase/migrations/066_upgrade_features.sql</code>.
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex flex-col gap-1.5">
                     <span className="text-xs text-muted-foreground">Assigned Agent</span>
                     <Select
                       value={selectedTicket.assigned_agent_id ?? "__none__"}
+                      disabled={savingField !== null}
                       onValueChange={(v) =>
                         handleAssignAgent(selectedTicket.id, v === "__none__" ? null : v)
                       }
@@ -645,7 +715,7 @@ export default function TicketsPage() {
                       <SelectContent>
                         <SelectItem value="__none__">Unassigned</SelectItem>
                         {agents.map((agent) => (
-                          <SelectItem key={agent.id} value={agent.id}>
+                          <SelectItem key={agent.user_id} value={agent.user_id}>
                             {agent.full_name}
                           </SelectItem>
                         ))}
@@ -812,7 +882,7 @@ export default function TicketsPage() {
                   <SelectContent>
                     <SelectItem value="all">All Agents</SelectItem>
                     {agents.map((agent) => (
-                      <SelectItem key={agent.id} value={agent.id}>
+                      <SelectItem key={agent.user_id} value={agent.user_id}>
                         {agent.full_name}
                       </SelectItem>
                     ))}
@@ -875,7 +945,10 @@ export default function TicketsPage() {
                         <TableCell>{getStatusBadge(ticket.status)}</TableCell>
                         <TableCell>{getPriorityBadge(ticket.priority)}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">
-                          {CATEGORY_OPTIONS.find((c) => c.value === ticket.category)?.label ?? ticket.category}
+                          {ticket.category
+                            ? CATEGORY_OPTIONS.find((c) => c.value === ticket.category)?.label ??
+                              ticket.category
+                            : "—"}
                         </TableCell>
                         <TableCell className="text-sm">
                           {getAgentName(ticket.assigned_agent_id)}
@@ -1094,6 +1167,7 @@ export default function TicketsPage() {
                   <Label>Category</Label>
                   <Select
                     value={form.category}
+                    disabled={!categorySupported}
                     onValueChange={(v) => setForm((f) => ({ ...f, category: v as TicketCategory }))}
                   >
                     <SelectTrigger className="w-full">
@@ -1107,6 +1181,12 @@ export default function TicketsPage() {
                       ))}
                     </SelectContent>
                   </Select>
+                  {!categorySupported && (
+                    <p className="text-[11px] leading-snug text-amber-600 dark:text-amber-400">
+                      Category needs the <code>tickets.category</code> column — run{" "}
+                      <code>supabase/migrations/066_upgrade_features.sql</code>.
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -1122,7 +1202,7 @@ export default function TicketsPage() {
                     <SelectContent>
                       <SelectItem value="__none__">Unassigned</SelectItem>
                       {agents.map((agent) => (
-                        <SelectItem key={agent.id} value={agent.id}>
+                        <SelectItem key={agent.user_id} value={agent.user_id}>
                           {agent.full_name}
                         </SelectItem>
                       ))}
@@ -1164,7 +1244,7 @@ export default function TicketsPage() {
               </Button>
               <Button onClick={handleCreate} disabled={creating}>
                 {creating && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-                Create Ticket
+                {creating ? "Saving…" : "Create Ticket"}
               </Button>
             </DialogFooter>
           </DialogContent>

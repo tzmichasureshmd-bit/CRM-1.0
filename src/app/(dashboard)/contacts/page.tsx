@@ -94,7 +94,6 @@ import {
   DEFAULT_VISIBLE_COLUMNS,
   OPERATOR_LABELS,
   operatorsForType,
-  leadStatusLabel,
   filtersToGroups,
   TV_LOCALSTORAGE_KEY,
   parseColumnVisibility,
@@ -102,6 +101,8 @@ import {
   type ContactFilter,
   type FilterOperator,
 } from '@/lib/contacts/contact-fields';
+import { LEAD_STATUSES } from '@/lib/crm/lead-status';
+import { LeadStatusBadge } from '@/components/crm/lead-status-badge';
 
 const PAGE_SIZE = 25;
 type OrderKey = 'name' | 'created_at' | 'updated_at' | 'rating' | 'review_count' | 'lead_status' | 'location' | 'category';
@@ -191,28 +192,6 @@ function SourceBadge({
       className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium capitalize ${SOURCE_BADGE_STYLES[key] ?? SOURCE_BADGE_STYLES.meta}`}
     >
       {label}
-    </span>
-  );
-}
-
-function LeadStatusBadge({ status }: { status?: string | null }) {
-  if (!status) return <span className="text-muted-foreground">—</span>;
-  const map: Record<string, string> = {
-    new:         'bg-[#EEF4FF] text-[#3462EE] border-[#3462EE]/30',
-    contacted:   'bg-[#E8F6FD] text-[#1a8fc4] border-[#26A5E4]/30',
-    qualified:   'bg-[#F3F0FF] text-[#6d28d9] border-[#7C3AED]/30',
-    proposal:    'bg-[#FDF4FF] text-[#9333ea] border-[#a855f7]/30',
-    negotiation: 'bg-[#FFFBEA] text-[#b45309] border-[#f59e0b]/30',
-    won:         'bg-[#EDFAF4] text-[#1a9e4e] border-[#25D366]/30',
-    lost:        'bg-[#FEF2F2] text-[#dc2626] border-[#ef4444]/30',
-  };
-  return (
-    <span
-      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium capitalize ${
-        map[status] ?? 'bg-muted text-muted-foreground border-border'
-      }`}
-    >
-      {leadStatusLabel(status)}
     </span>
   );
 }
@@ -475,9 +454,7 @@ function ContactsPageInner() {
     );
     const validStatus =
       typeof statusParam === 'string' &&
-      ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost'].includes(
-        statusParam,
-      );
+      (LEAD_STATUSES as readonly string[]).includes(statusParam);
     setDeepStatus(validStatus ? statusParam : null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabParam, createdParam, sourceParam, statusParam]);

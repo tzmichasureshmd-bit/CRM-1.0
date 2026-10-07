@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { LeadScoreBadge } from './lead-score-badge';
+import { leadStatusBadgeClassName, leadStatusLabel } from '@/lib/crm/lead-status';
 import type { Contact } from '@/types';
 
 interface LeadScoreResult {
@@ -180,8 +181,8 @@ export function Contact360Panel({
         <Separator className="my-3" />
         <p className="text-xs text-muted-foreground">
           {tz('leadStatusLabel')}:{' '}
-          <span className="font-medium text-foreground">
-            {contact.lead_status ?? 'new'}
+          <span className={leadStatusBadgeClassName(contact.lead_status)}>
+            {leadStatusLabel(contact.lead_status)}
           </span>
         </p>
       </div>

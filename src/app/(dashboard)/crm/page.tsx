@@ -19,6 +19,7 @@ import {
   waLink,
   type LeadProgression,
 } from "@/lib/crm/leads";
+import { setContactLeadStatus } from "@/lib/crm/lead-status";
 import {
   CrmPipelineBoard,
 } from "@/components/crm/crm-pipeline-board";
@@ -523,17 +524,23 @@ export default function CrmPage() {
         return;
       }
       // Keep the linked contact's lead_status in sync with the stage when
-      // the stage maps cleanly to a lead-status milestone.
+      // the stage maps cleanly to a lead-status milestone. One write path
+      // (`setContactLeadStatus`) is shared with Inbox/Contacts/Pipeline.
       const stage = sortedStages.find((s) => s.id === newStageId);
       const milestone = stage ? stageMilestone(stage) : null;
       const leadStatus = milestone ? leadStatusForMilestone(milestone) : null;
       if (leadStatus && prev?.contact_id) {
-        const { error: contactError } = await supabase
-          .from("contacts")
-          .update({ lead_status: leadStatus, updated_at: new Date().toISOString() })
-          .eq("id", prev.contact_id);
-        if (contactError) {
-          console.warn("Failed to sync contact lead_status:", contactError.message);
+        const sync = await setContactLeadStatus(supabase, prev.contact_id, leadStatus);
+        if (sync.ok) {
+          setDeals((prevList) =>
+            prevList.map((d) =>
+              d.id === dealId && d.contact
+                ? { ...d, contact: { ...d.contact, lead_status: sync.status } }
+                : d,
+            ),
+          );
+        } else {
+          console.warn("Failed to sync contact lead_status:", sync.error);
         }
       }
     },

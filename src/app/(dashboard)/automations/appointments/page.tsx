@@ -2,12 +2,16 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
+import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
+import { hasColumn } from "@/lib/db/schema";
+import { describeError } from "@/lib/errors";
 import { useAuth } from "@/hooks/use-auth";
 import type { Appointment, AppointmentStatus, Contact, AccountMember } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { SetupRequired } from "@/components/shared";
 import {
   Table,
   TableBody,
@@ -71,6 +75,8 @@ const STATUS_KEYS: AppointmentStatus[] = ["scheduled", "confirmed", "completed",
 
 const DURATION_OPTIONS = [15, 30, 45, 60, 90, 120];
 
+const APPOINTMENT_TYPES = ["consultation", "demo", "follow_up", "site_visit", "other"];
+
 interface AppointmentForm {
   title: string;
   description: string;
@@ -80,6 +86,7 @@ interface AppointmentForm {
   appointment_time: string;
   duration_minutes: number;
   service: string;
+  appointment_type: string;
   notes: string;
 }
 
@@ -92,6 +99,7 @@ const EMPTY_FORM: AppointmentForm = {
   appointment_time: "",
   duration_minutes: 60,
   service: "",
+  appointment_type: "consultation",
   notes: "",
 };
 
@@ -129,6 +137,8 @@ export default function AppointmentsPage() {
   const [loading, setLoading] = useState(true);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [members, setMembers] = useState<AccountMember[]>([]);
+  const [typeSupported, setTypeSupported] = useState<boolean | null>(null);
+  const [statusBusyId, setStatusBusyId] = useState<string | null>(null);
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
@@ -174,9 +184,16 @@ export default function AppointmentsPage() {
     }
 
     const { data, error } = await query;
-    if (!error) setAppointments((data as Appointment[]) ?? []);
+    if (error) {
+      toast.error(t("toast.loadError"), {
+        description: describeError(error, t("toast.loadError")),
+      });
+      setAppointments([]);
+    } else {
+      setAppointments((data as Appointment[]) ?? []);
+    }
     setLoading(false);
-  }, [accountId, statusFilter, dateFrom, dateTo, supabase]);
+  }, [accountId, statusFilter, dateFrom, dateTo, supabase, t]);
 
   const fetchResources = useCallback(async () => {
     if (!accountId) return;
@@ -197,12 +214,20 @@ export default function AppointmentsPage() {
   }, [accountId, supabase]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchResources();
   }, [fetchResources]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    let cancelled = false;
+    hasColumn(supabase, "appointments", "appointment_type").then((ok) => {
+      if (!cancelled) setTypeSupported(ok);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase]);
+
+  useEffect(() => {
     fetchAppointments();
   }, [fetchAppointments]);
 
@@ -223,6 +248,7 @@ export default function AppointmentsPage() {
       appointment_time: appt.appointment_time,
       duration_minutes: appt.duration_minutes,
       service: appt.service ?? "",
+      appointment_type: appt.appointment_type ?? "consultation",
       notes: appt.notes ?? "",
     });
     setFormOpen(true);
@@ -232,7 +258,7 @@ export default function AppointmentsPage() {
     if (!accountId || !form.title || !form.appointment_date || !form.appointment_time) return;
     setSaving(true);
 
-    const payload = {
+    const payload: Record<string, unknown> = {
       title: form.title,
       description: form.description || null,
       contact_id: form.contact_id || null,
@@ -243,35 +269,43 @@ export default function AppointmentsPage() {
       service: form.service || null,
       notes: form.notes || null,
     };
+    if (typeSupported) payload.appointment_type = form.appointment_type || "consultation";
 
-    if (editingAppointment) {
-      const { error } = await supabase
-        .from("appointments")
-        .update({ ...payload, updated_at: new Date().toISOString() })
-        .eq("id", editingAppointment.id);
-      if (!error) {
-        setFormOpen(false);
-        fetchAppointments();
+    try {
+      if (editingAppointment) {
+        const { error } = await supabase
+          .from("appointments")
+          .update({ ...payload, updated_at: new Date().toISOString() })
+          .eq("id", editingAppointment.id);
+        if (error) throw error;
+        toast.success(t("toast.updated"));
+      } else {
+        const { error } = await supabase.from("appointments").insert({
+          ...payload,
+          account_id: accountId,
+          status: "scheduled",
+          reminder_sent: false,
+          reminder_24h_sent: false,
+          reminder_1h_sent: false,
+          created_by: user?.id ?? null,
+        });
+        if (error) throw error;
+        toast.success(t("toast.created"));
       }
-    } else {
-      const { error } = await supabase.from("appointments").insert({
-        ...payload,
-        account_id: accountId,
-        status: "scheduled",
-        reminder_sent: false,
-        reminder_24h_sent: false,
-        reminder_1h_sent: false,
-        created_by: user?.id ?? null,
+      setFormOpen(false);
+      void fetchAppointments();
+    } catch (error) {
+      toast.error(t("toast.saveError"), {
+        description: describeError(error, t("toast.saveError")),
       });
-      if (!error) {
-        setFormOpen(false);
-        fetchAppointments();
-      }
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   }
 
   async function updateStatus(appt: Appointment, status: AppointmentStatus) {
+    if (statusBusyId) return;
+    setStatusBusyId(appt.id);
     const updates: Record<string, unknown> = {
       status,
       updated_at: new Date().toISOString(),
@@ -279,15 +313,23 @@ export default function AppointmentsPage() {
     if (status === "completed") updates.completed_at = new Date().toISOString();
     if (status === "cancelled") updates.cancelled_at = new Date().toISOString();
 
-    const { error } = await supabase
-      .from("appointments")
-      .update(updates)
-      .eq("id", appt.id);
-    if (!error) {
-      fetchAppointments();
+    try {
+      const { error } = await supabase
+        .from("appointments")
+        .update(updates)
+        .eq("id", appt.id);
+      if (error) throw error;
+      toast.success(t("toast.statusUpdated"));
+      void fetchAppointments();
       if (detailAppointment?.id === appt.id) {
         setDetailAppointment({ ...detailAppointment, ...updates } as Appointment);
       }
+    } catch (error) {
+      toast.error(t("toast.statusError"), {
+        description: describeError(error, t("toast.statusError")),
+      });
+    } finally {
+      setStatusBusyId(null);
     }
   }
 
@@ -295,39 +337,52 @@ export default function AppointmentsPage() {
     if (!rescheduleTarget || !rescheduleDate || !rescheduleTime) return;
     setRescheduling(true);
 
-    const { error } = await supabase
-      .from("appointments")
-      .update({
-        appointment_date: rescheduleDate,
-        appointment_time: rescheduleTime,
-        status: "rescheduled",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", rescheduleTarget.id);
-
-    if (!error) {
+    try {
+      const { error } = await supabase
+        .from("appointments")
+        .update({
+          appointment_date: rescheduleDate,
+          appointment_time: rescheduleTime,
+          status: "rescheduled",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", rescheduleTarget.id);
+      if (error) throw error;
+      toast.success(t("toast.rescheduled"));
       setRescheduleOpen(false);
       setRescheduleTarget(null);
-      fetchAppointments();
+      void fetchAppointments();
+    } catch (error) {
+      toast.error(t("toast.rescheduleError"), {
+        description: describeError(error, t("toast.rescheduleError")),
+      });
+    } finally {
+      setRescheduling(false);
     }
-    setRescheduling(false);
   }
 
   async function handleDelete() {
     if (!deleteTarget) return;
     setDeleting(true);
-    const { error } = await supabase
-      .from("appointments")
-      .delete()
-      .eq("id", deleteTarget.id);
-    if (!error) {
+    try {
+      const { error } = await supabase
+        .from("appointments")
+        .delete()
+        .eq("id", deleteTarget.id);
+      if (error) throw error;
+      toast.success(t("toast.deleted"));
       setDeleteOpen(false);
       setDeleteTarget(null);
       setDetailOpen(false);
       setDetailAppointment(null);
-      fetchAppointments();
+      void fetchAppointments();
+    } catch (error) {
+      toast.error(t("toast.deleteError"), {
+        description: describeError(error, t("toast.deleteError")),
+      });
+    } finally {
+      setDeleting(false);
     }
-    setDeleting(false);
   }
 
   function openReschedule(appt: Appointment) {
@@ -375,6 +430,14 @@ export default function AppointmentsPage() {
           {t("newAppointment")}
         </Button>
       </div>
+
+      {typeSupported === false && (
+        <SetupRequired
+          feature="Appointments"
+          migration="068_sales_crm_upgrade.sql"
+          missing="Column public.appointments.appointment_type is missing."
+        />
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="bg-card border-border">
@@ -822,6 +885,26 @@ export default function AppointmentsPage() {
                 />
               </div>
             </div>
+            {typeSupported !== false && (
+              <div className="space-y-2">
+                <Label className="text-foreground">{t("form.appointmentType")}</Label>
+                <Select
+                  value={form.appointment_type || "consultation"}
+                  onValueChange={(v) => setForm({ ...form, appointment_type: v ?? "consultation" })}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {APPOINTMENT_TYPES.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {t(`form.types.${type}`)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="space-y-2">
               <Label className="text-foreground">{t("form.notes")}</Label>
               <Textarea
@@ -869,6 +952,12 @@ export default function AppointmentsPage() {
                   {detailAppointment.service && (
                     <Badge variant="secondary" className="text-xs">{detailAppointment.service}</Badge>
                   )}
+                  {detailAppointment.appointment_type &&
+                    APPOINTMENT_TYPES.includes(detailAppointment.appointment_type) && (
+                      <Badge variant="outline" className="text-xs">
+                        {t(`form.types.${detailAppointment.appointment_type}`)}
+                      </Badge>
+                    )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 text-sm">
@@ -925,29 +1014,59 @@ export default function AppointmentsPage() {
 
                 <div className="border-t border-border pt-3 flex flex-wrap gap-2">
                   {detailAppointment.status === "scheduled" && (
-                    <Button size="sm" onClick={() => updateStatus(detailAppointment, "confirmed")} className="bg-green-600 hover:bg-green-700 text-white">
-                      <CheckCircle2 className="size-3.5" />
+                    <Button
+                      size="sm"
+                      onClick={() => updateStatus(detailAppointment, "confirmed")}
+                      disabled={statusBusyId === detailAppointment.id}
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      {statusBusyId === detailAppointment.id ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="size-3.5" />
+                      )}
                       {t("actions.confirm")}
                     </Button>
                   )}
                   {(detailAppointment.status === "scheduled" || detailAppointment.status === "confirmed") && (
                     <>
-                      <Button size="sm" onClick={() => updateStatus(detailAppointment, "completed")} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-                        <CheckCircle2 className="size-3.5" />
+                      <Button
+                        size="sm"
+                        onClick={() => updateStatus(detailAppointment, "completed")}
+                        disabled={statusBusyId === detailAppointment.id}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                      >
+                        {statusBusyId === detailAppointment.id ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="size-3.5" />
+                        )}
                         {t("actions.complete")}
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => { setDetailOpen(false); openReschedule(detailAppointment); }} className="border-border text-muted-foreground hover:bg-muted">
                         <RotateCcw className="size-3.5" />
                         {t("actions.reschedule")}
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => updateStatus(detailAppointment, "cancelled")} className="border-border text-red-500 hover:bg-red-50 dark:hover:bg-red-950">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => updateStatus(detailAppointment, "cancelled")}
+                        disabled={statusBusyId === detailAppointment.id}
+                        className="border-border text-red-500 hover:bg-red-50 dark:hover:bg-red-950"
+                      >
                         <XCircle className="size-3.5" />
                         {t("actions.cancel")}
                       </Button>
                     </>
                   )}
                   {detailAppointment.status === "confirmed" && (
-                    <Button size="sm" variant="outline" onClick={() => updateStatus(detailAppointment, "no_show")} className="border-border text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-950">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => updateStatus(detailAppointment, "no_show")}
+                      disabled={statusBusyId === detailAppointment.id}
+                      className="border-border text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-950"
+                    >
                       <XCircle className="size-3.5" />
                       {t("actions.noShow")}
                     </Button>

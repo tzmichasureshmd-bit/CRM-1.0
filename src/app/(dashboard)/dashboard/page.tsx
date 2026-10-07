@@ -1,11 +1,21 @@
 "use client"
 
 import Link from 'next/link'
-import { useCallback, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useState } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { formatCurrency } from '@/lib/currency'
 import { OnboardingBanner } from '@/components/onboarding/onboarding-banner'
+import {
+  endExclusiveISO,
+  formatRangeLabel,
+  previousPeriod,
+  rangeFromSearchParams,
+  resolvePreset,
+  startISO,
+  type RangeState,
+} from '@/lib/date-range'
 import {
   MessageSquare,
   UserPlus,
@@ -20,18 +30,21 @@ import {
 
 import {
   loadActivity,
-  loadConversationsSeries,
+  loadConversationsSeriesRange,
   loadMetrics,
   loadPipelineDonut,
   loadRecentConversations,
   loadResponseTime,
   loadPlatformCounts,
+  loadRangeSummary,
+  type RangeBounds,
 } from '@/lib/dashboard/queries'
 import type {
   ActivityItem,
   ConversationsSeriesPoint,
   MetricsBundle,
   PipelineDonutData,
+  RangeSummary,
   ResponseTimeSummary,
   RecentConversation,
   PlatformChannelCounts,
@@ -48,10 +61,9 @@ import { RecentConversationsCard } from '@/components/dashboard/recent-conversat
 import { LeadStatCards, type LeadStats } from '@/components/social-media/lead-stat-cards'
 import { RecentLeads, type RecentLead } from '@/components/social-media/recent-leads'
 import { MessagesByChannel } from '@/components/dashboard/messages-by-channel'
+import { DateRangeSelect, DeltaBadge } from '@/components/reports/date-range-select'
 
 import { useTranslations } from 'next-intl'
-
-type RangeDays = 7 | 30 | 90
 
 // ── Platform brand icons (inline SVG, full HD crisp) ──────────
 function PlatformBrandIcon({ platform, size = 22 }: { platform: string; size?: number }) {
@@ -94,17 +106,42 @@ const PLATFORM_CARDS = [
   { key: 'telegram' as const, label: 'Telegram',  color: 'var(--chart-3)', abbr: 'TG' },
 ]
 
+// `useSearchParams` (the `?from=&to=&compare=` range below) needs a
+// Suspense boundary or the production build bails to CSR and errors out.
 export default function DashboardPage() {
+  return (
+    <Suspense fallback={null}>
+      <DashboardPageInner />
+    </Suspense>
+  )
+}
+
+function DashboardPageInner() {
   const t = useTranslations('Dashboard.page')
   const { defaultCurrency, accountId, profile } = useAuth()
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [metrics, setMetrics] = useState<MetricsBundle | null>(null)
   const [metricsLoading, setMetricsLoading] = useState(true)
 
-  const [range, setRange] = useState<RangeDays>(30)
-  const [series, setSeries] = useState<Record<RangeDays, ConversationsSeriesPoint[] | null>>({
-    7: null, 30: null, 90: null,
-  })
-  const [seriesLoading, setSeriesLoading] = useState(true)
+  const [rangeState, setRangeState] = useState<RangeState>(
+    () =>
+      rangeFromSearchParams(new URLSearchParams(searchParams.toString())) ?? {
+        range: resolvePreset('last30'),
+        preset: 'last30',
+        compare: false,
+      },
+  )
+  const [seriesState, setSeriesState] = useState<{
+    key: string
+    data: ConversationsSeriesPoint[]
+  } | null>(null)
+  const [summaryState, setSummaryState] = useState<{
+    key: string
+    current: RangeSummary
+    previous: RangeSummary | null
+  } | null>(null)
   const [pipeline, setPipeline] = useState<PipelineDonutData | null>(null)
   const [pipelineLoading, setPipelineLoading] = useState(true)
   const [responseTime, setResponseTime] = useState<ResponseTimeSummary | null>(null)
@@ -136,7 +173,6 @@ export default function DashboardPage() {
     const db = createClient()
     void loadPlatformCounts(db).then(setPlatformCounts).catch(console.error)
     void loadMetrics(db).then((m) => setMetrics(m)).catch(console.error).finally(() => setMetricsLoading(false))
-    void loadConversationsSeries(db, 30).then((s) => setSeries((p) => ({ ...p, 30: s }))).catch(console.error).finally(() => setSeriesLoading(false))
     void loadPipelineDonut(db).then((p) => setPipeline(p)).catch(console.error).finally(() => setPipelineLoading(false))
     void loadResponseTime(db).then((r) => setResponseTime(r)).catch(console.error).finally(() => setResponseTimeLoading(false))
     void loadActivity(db, 50).then((a) => setActivity(a)).catch(console.error).finally(() => setActivityLoading(false))
@@ -160,16 +196,59 @@ export default function DashboardPage() {
     void check()
   }, [accountId])
 
-  const handleRangeChange = useCallback((r: RangeDays) => {
-    setRange(r)
-    if (series[r] !== null) return
-    setSeriesLoading(true)
+  const { range, compare } = rangeState
+
+  useEffect(() => {
+    const params = new URLSearchParams()
+    params.set('from', range.from)
+    params.set('to', range.to)
+    if (compare) params.set('compare', '1')
+    router.replace(`${pathname}?${params.toString()}`)
+  }, [range, compare, pathname, router])
+
+  const seriesKey = `${range.from}|${range.to}`
+  const summaryKey = `${seriesKey}|${compare ? '1' : '0'}`
+  const series = seriesState?.key === seriesKey ? seriesState.data : null
+  const seriesLoading = series === null
+  const rangeSummary = summaryState?.key === summaryKey ? summaryState : null
+  const rangeSummaryLoading = rangeSummary === null
+
+  useEffect(() => {
     const db = createClient()
-    loadConversationsSeries(db, r)
-      .then((s) => setSeries((p) => ({ ...p, [r]: s })))
-      .catch(console.error)
-      .finally(() => setSeriesLoading(false))
-  }, [series])
+    const start = startISO(range)
+    const end = endExclusiveISO(range)
+    if (!start || !end) return
+
+    loadConversationsSeriesRange(db, range.from, range.to)
+      .then((data) => setSeriesState({ key: seriesKey, data }))
+      .catch((err) => {
+        console.error('[dashboard] conversations series failed:', err)
+        setSeriesState({ key: seriesKey, data: [] })
+      })
+
+    const prev = previousPeriod(range)
+    const prevStart = startISO(prev)
+    const prevEnd = endExclusiveISO(prev)
+    const previousBounds: RangeBounds | null =
+      compare && prevStart && prevEnd ? { start: prevStart, end: prevEnd } : null
+
+    loadRangeSummary(db, { start, end }, previousBounds)
+      .then((summary) => setSummaryState({ key: summaryKey, ...summary }))
+      .catch((err) => {
+        console.error('[dashboard] range summary failed:', err)
+        setSummaryState({
+          key: summaryKey,
+          current: {
+            messages: 0,
+            newContacts: 0,
+            newConversations: 0,
+            newDeals: 0,
+            dealValue: 0,
+          },
+          previous: null,
+        })
+      })
+  }, [range, compare, seriesKey, summaryKey])
 
   const firstName = profile?.full_name?.split(' ')[0] ?? t('there')
 
@@ -226,6 +305,11 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* ── Date range + comparison ── */}
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+        <DateRangeSelect value={rangeState} onChange={setRangeState} />
+      </div>
+
       {/* ── 4 KPI Cards ── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {metricsLoading || !metrics ? (
@@ -234,17 +318,24 @@ export default function DashboardPage() {
           <>
             <MetricCard
               title={t('activeConversations')}
-              value={metrics.activeConversations.current.toLocaleString()}
+              value={metrics.activeConversations.toLocaleString()}
               icon={MessageSquare}
               iconBg="ds-metric-blue ds-metric-icon"
-              delta={{ sign: metrics.activeConversations.previous, label: t('newTodayVsYesterday') }}
+              subtitle={t('newConversationsLine', {
+                today: metrics.newConversations.current,
+                yesterday: metrics.newConversations.previous,
+              })}
             />
             <MetricCard
               title={t('newContactsToday')}
               value={metrics.newContactsToday.current.toLocaleString()}
               icon={UserPlus}
               iconBg="ds-metric-green ds-metric-icon"
-              delta={{ sign: metrics.newContactsToday.current - metrics.newContactsToday.previous, label: t('vsYesterday') }}
+              delta={{
+                current: metrics.newContactsToday.current,
+                previous: metrics.newContactsToday.previous,
+                label: t('vsYesterday'),
+              }}
             />
             <MetricCard
               title={t('openDealsValue')}
@@ -258,7 +349,11 @@ export default function DashboardPage() {
               value={metrics.messagesSentToday.current.toLocaleString()}
               icon={Send}
               iconBg="ds-metric-violet ds-metric-icon"
-              delta={{ sign: metrics.messagesSentToday.current - metrics.messagesSentToday.previous, label: t('vsYesterday') }}
+              delta={{
+                current: metrics.messagesSentToday.current,
+                previous: metrics.messagesSentToday.previous,
+                label: t('vsYesterday'),
+              }}
             />
           </>
         )}
@@ -296,14 +391,67 @@ export default function DashboardPage() {
         })}
       </div>
 
+      {/* ── Selected period summary (range-scoped, optional comparison) ── */}
+      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-[15px] font-semibold text-foreground">{t('periodSummaryTitle')}</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {formatRangeLabel(range)}
+              {compare && rangeSummary?.previous
+                ? ` · ${t('vsPreviousPeriod')}`
+                : ''}
+            </p>
+          </div>
+        </div>
+        {rangeSummaryLoading || !rangeSummary ? (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} />)}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            <PeriodStat
+              icon={Send}
+              label={t('periodMessages')}
+              value={rangeSummary.current.messages}
+              previous={compare ? (rangeSummary.previous?.messages ?? null) : null}
+            />
+            <PeriodStat
+              icon={UserPlus}
+              label={t('periodContacts')}
+              value={rangeSummary.current.newContacts}
+              previous={compare ? (rangeSummary.previous?.newContacts ?? null) : null}
+            />
+            <PeriodStat
+              icon={MessageSquare}
+              label={t('periodConversations')}
+              value={rangeSummary.current.newConversations}
+              previous={compare ? (rangeSummary.previous?.newConversations ?? null) : null}
+            />
+            <PeriodStat
+              icon={TrendingUp}
+              label={t('periodDeals')}
+              value={rangeSummary.current.newDeals}
+              previous={compare ? (rangeSummary.previous?.newDeals ?? null) : null}
+            />
+            <PeriodStat
+              icon={DollarSign}
+              label={t('periodDealValue')}
+              value={rangeSummary.current.dealValue}
+              previous={compare ? (rangeSummary.previous?.dealValue ?? null) : null}
+              format={(v) => formatCurrency(v, defaultCurrency)}
+            />
+          </div>
+        )}
+      </section>
+
       {/* ── Main 3-column grid ── */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <ConversationsChart
-            series={series}
+            data={series}
+            rangeLabel={formatRangeLabel(range)}
             loading={seriesLoading}
-            range={range}
-            onRangeChange={handleRangeChange}
           />
         </div>
         <div className="lg:col-span-1 rounded-2xl border border-border bg-card p-5 shadow-sm">
@@ -436,6 +584,36 @@ function MiniStatCard({
           </p>
         )}
       </div>
+    </div>
+  )
+}
+
+// ── Range-scoped stat with an optional previous-period delta ────
+function PeriodStat({
+  icon: Icon,
+  label,
+  value,
+  previous,
+  format,
+}: {
+  icon: React.ComponentType<{ className?: string }>
+  label: string
+  value: number
+  previous: number | null
+  format?: (v: number) => string
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-muted/20 p-3">
+      <div className="flex items-center gap-1.5 text-muted-foreground">
+        <Icon className="h-3.5 w-3.5 shrink-0" />
+        <p className="truncate text-[11px] font-medium">{label}</p>
+      </div>
+      <p className="mt-1 text-lg font-bold tabular-nums text-foreground">
+        {format ? format(value) : value.toLocaleString()}
+      </p>
+      {previous !== null ? (
+        <DeltaBadge current={value} previous={previous} label="vs previous" />
+      ) : null}
     </div>
   )
 }

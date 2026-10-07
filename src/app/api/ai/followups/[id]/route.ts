@@ -33,8 +33,9 @@ export async function GET(
 /**
  * PUT /api/ai/followups/[id]  (agent+)
  *
- * Updates an AI follow-up recipe. Only real columns from migration 051
- * are accepted — no contact_id, sequence, or config.
+ * Updates an AI follow-up recipe. Only columns that exist on the live
+ * `ai_followups` table are accepted — no description, working-hours,
+ * AI provider, or use_template fields (they are not in the schema).
  */
 export async function PUT(
   request: NextRequest,
@@ -51,12 +52,8 @@ export async function PUT(
 
     const updates: Record<string, unknown> = {};
     const allowedFields = [
-      "name", "description", "status", "trigger_type", "trigger_config",
-      "max_followups", "delay_hours",
-      "working_hours_only", "working_hours_start", "working_hours_end",
-      "stop_on_reply", "stop_on_opt_out",
-      "ai_provider", "ai_model", "ai_system_prompt", "ai_temperature", "ai_max_tokens",
-      "template_id", "use_template",
+      "name", "status", "trigger_type", "trigger_config",
+      "max_followups", "delay_hours", "ai_system_prompt", "template_id",
     ];
     for (const field of allowedFields) {
       if (field in body) {
@@ -66,6 +63,14 @@ export async function PUT(
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
+    }
+
+    const STATUSES = ["draft", "active", "paused", "archived"];
+    if ("status" in updates && !STATUSES.includes(updates.status as string)) {
+      return NextResponse.json(
+        { error: `Invalid status. Must be one of: ${STATUSES.join(", ")}` },
+        { status: 400 },
+      );
     }
 
     updates.updated_at = new Date().toISOString();
@@ -80,7 +85,10 @@ export async function PUT(
 
     if (error) {
       console.error("Failed to update AI follow-up:", error);
-      return NextResponse.json({ error: "Failed to update AI follow-up" }, { status: 500 });
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({ followup: data });
@@ -114,7 +122,10 @@ export async function DELETE(
 
     if (error) {
       console.error("Failed to delete AI follow-up:", error);
-      return NextResponse.json({ error: "Failed to delete AI follow-up" }, { status: 500 });
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({ ok: true });
@@ -188,14 +199,11 @@ export async function POST(
       return NextResponse.json({ error: "Failed to create executions" }, { status: 500 });
     }
 
-    // Bump execution_count on the parent.
+    // execution_count / last_executed_at do not exist on the live table,
+    // so only the timestamp is bumped after a manual run.
     await supabaseAdmin()
       .from("ai_followups")
-      .update({
-        execution_count: (data?.length ?? 0),
-        last_executed_at: now,
-        updated_at: now,
-      })
+      .update({ updated_at: now })
       .eq("id", followupId);
 
     return NextResponse.json({

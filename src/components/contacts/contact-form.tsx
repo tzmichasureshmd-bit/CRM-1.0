@@ -33,7 +33,7 @@ import {
 } from '@/components/ui/select';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { LEAD_STATUS_VALUES, SUGGESTED_CATEGORIES } from '@/lib/contacts/contact-fields';
+import { LEAD_STATUS_VALUES, leadStatusLabel, SUGGESTED_CATEGORIES } from '@/lib/contacts/contact-fields';
 
 interface ContactFormProps {
   open: boolean;
@@ -496,8 +496,8 @@ export function ContactForm({
                 </SelectTrigger>
                 <SelectContent className="bg-popover border-border">
                   {LEAD_STATUS_VALUES.map((s) => (
-                    <SelectItem key={s} value={s} className="capitalize">
-                      {s}
+                    <SelectItem key={s} value={s}>
+                      {leadStatusLabel(s)}
                     </SelectItem>
                   ))}
                 </SelectContent>

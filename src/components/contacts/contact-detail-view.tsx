@@ -25,7 +25,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { LeadStatusSelect } from '@/components/inbox/lead-status-select';
+import { parseLeadStatus } from '@/lib/crm/lead-status';
 import {
   Phone,
   Mail,
@@ -116,9 +117,8 @@ export function ContactDetailView({
   const [documents, setDocuments] = useState<Message[]>([]);
   const [loadingDocuments, setLoadingDocuments] = useState(false);
 
-  // Lead status
-  const [leadStatus, setLeadStatus] = useState<LeadStatus>('new');
-  const [savingLeadStatus, setSavingLeadStatus] = useState(false);
+  // Lead status — written by the shared CRM STATUS control (spec §23–§27)
+  const [leadStatus, setLeadStatus] = useState<LeadStatus | null>(null);
 
   // Follow-ups tab
   const [followUps, setFollowUps] = useState<FollowUp[]>([]);
@@ -150,7 +150,7 @@ export function ContactDetailView({
       setEditWebsite(data.website ?? '');
       setEditRating(data.rating != null ? String(data.rating) : '');
       setEditReviewCount(data.review_count != null ? String(data.review_count) : '');
-      if (data.lead_status) setLeadStatus(data.lead_status);
+      setLeadStatus(parseLeadStatus(data.lead_status));
     }
     setLoading(false);
   }, [contactId, supabase]);
@@ -334,24 +334,6 @@ export function ContactDetailView({
       setLoadingFollowUps(false);
     }
   }, [contactId]);
-
-  async function saveLeadStatus() {
-    if (!contactId) return;
-    setSavingLeadStatus(true);
-    const { error } = await supabase
-      .from('contacts')
-      .update({ lead_status: leadStatus, updated_at: new Date().toISOString() })
-      .eq('id', contactId);
-
-    if (error) {
-      toast.error(t('toastUpdateFailed'));
-    } else {
-      toast.success(t('toastUpdated'));
-      setContact((prev) => prev ? { ...prev, lead_status: leadStatus } : prev);
-      onUpdated();
-    }
-    setSavingLeadStatus(false);
-  }
 
   async function addFollowUp() {
     if (!contactId || !newFollowUpTitle.trim()) return;
@@ -878,29 +860,28 @@ export function ContactDetailView({
 
                   <div className="space-y-1.5">
                     <Label className="text-muted-foreground text-xs">{t('leadStatus', { fallback: 'Lead Status' })}</Label>
-                    <Select value={leadStatus} onValueChange={(v) => setLeadStatus(v as LeadStatus)}>
-                      <SelectTrigger className="bg-muted border-border text-foreground h-8 text-sm">
-                        <SelectValue placeholder="Select lead status" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-popover border-border">
-                        <SelectItem value="new">New</SelectItem>
-                        <SelectItem value="contacted">Contacted</SelectItem>
-                        <SelectItem value="qualified">Qualified</SelectItem>
-                        <SelectItem value="proposal">Proposal</SelectItem>
-                        <SelectItem value="negotiation">Negotiation</SelectItem>
-                        <SelectItem value="won">Won</SelectItem>
-                        <SelectItem value="lost">Lost</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <LeadStatusSelect
+                      key={contactId ?? ''}
+                      contactId={contactId ?? ''}
+                      value={leadStatus}
+                      placeholder="Select lead status"
+                      className="w-full"
+                      triggerClassName="bg-muted border-border text-foreground h-8 text-sm w-full"
+                      onChange={(status) => {
+                        setLeadStatus(status);
+                        setContact((prev) => (prev ? { ...prev, lead_status: status } : prev));
+                        onUpdated();
+                      }}
+                    />
                   </div>
 
                   <Button
-                    onClick={() => { saveDetails(); saveLeadStatus(); }}
-                    disabled={savingDetails || savingLeadStatus}
+                    onClick={saveDetails}
+                    disabled={savingDetails}
                     className="bg-primary hover:bg-primary/90 text-primary-foreground w-full"
                     size="sm"
                   >
-                    {(savingDetails || savingLeadStatus) ? (
+                    {savingDetails ? (
                       <Loader2 className="size-3.5 animate-spin" />
                     ) : (
                       <Save className="size-3.5" />

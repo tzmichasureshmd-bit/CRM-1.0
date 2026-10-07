@@ -29,7 +29,10 @@ export async function GET(request: Request) {
 
     if (error) {
       console.error("Failed to fetch AI follow-ups:", error);
-      return NextResponse.json({ error: "Failed to fetch AI follow-ups" }, { status: 500 });
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({ followups: data ?? [] });
@@ -41,9 +44,11 @@ export async function GET(request: Request) {
 /**
  * POST /api/ai/followups  (agent+)
  *
- * Creates a new AI follow-up recipe. The body matches the real
- * ai_followups schema (migration 051). Executions are created
- * separately via the manual-run endpoint or the scheduler.
+ * Creates a new AI follow-up recipe. Only columns that exist on
+ * `ai_followups` (migration 051) are written — anything else the caller
+ * sends is ignored rather than failing the insert. Spec-only fields
+ * (channel, audience, message, conditions, schedule) live inside
+ * `trigger_config`.
  */
 export async function POST(request: Request) {
   try {
@@ -56,23 +61,13 @@ export async function POST(request: Request) {
 
     const {
       name,
-      description,
       trigger_type,
       trigger_config,
       max_followups,
       delay_hours,
-      working_hours_only,
-      working_hours_start,
-      working_hours_end,
-      stop_on_reply,
-      stop_on_opt_out,
-      ai_provider,
-      ai_model,
+      status,
       ai_system_prompt,
-      ai_temperature,
-      ai_max_tokens,
       template_id,
-      use_template,
     } = body;
 
     if (!name || typeof name !== "string") {
@@ -84,37 +79,34 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `Invalid trigger_type. Must be one of: ${TRIGGER_TYPES.join(', ')}` }, { status: 400 });
     }
 
+    const STATUSES = ["draft", "active", "paused", "archived"];
+    if (status !== undefined && !STATUSES.includes(status as string)) {
+      return NextResponse.json({ error: `Invalid status. Must be one of: ${STATUSES.join(', ')}` }, { status: 400 });
+    }
+
     const { data, error } = await ctx.supabase
       .from("ai_followups")
       .insert({
         account_id: ctx.accountId,
         user_id: ctx.userId,
         name: name.trim(),
-        description: typeof description === "string" ? description.trim() || null : null,
         trigger_type: typeof trigger_type === "string" ? trigger_type : "manual",
         trigger_config: typeof trigger_config === "object" && trigger_config !== null ? trigger_config : {},
         max_followups: typeof max_followups === "number" ? max_followups : 3,
         delay_hours: typeof delay_hours === "number" ? delay_hours : 24,
-        working_hours_only: typeof working_hours_only === "boolean" ? working_hours_only : false,
-        working_hours_start: typeof working_hours_start === "string" ? working_hours_start : "09:00",
-        working_hours_end: typeof working_hours_end === "string" ? working_hours_end : "18:00",
-        stop_on_reply: typeof stop_on_reply === "boolean" ? stop_on_reply : true,
-        stop_on_opt_out: typeof stop_on_opt_out === "boolean" ? stop_on_opt_out : true,
-        ai_provider: typeof ai_provider === "string" ? ai_provider : null,
-        ai_model: typeof ai_model === "string" ? ai_model : null,
         ai_system_prompt: typeof ai_system_prompt === "string" ? ai_system_prompt.trim() || null : null,
-        ai_temperature: typeof ai_temperature === "number" ? ai_temperature : 0.7,
-        ai_max_tokens: typeof ai_max_tokens === "number" ? ai_max_tokens : 500,
-        template_id: typeof template_id === "string" ? template_id : null,
-        use_template: typeof use_template === "boolean" ? use_template : false,
-        status: "draft",
+        template_id: typeof template_id === "string" && template_id ? template_id : null,
+        status: typeof status === "string" ? status : "draft",
       })
       .select("*")
       .single();
 
     if (error) {
       console.error("Failed to create AI follow-up:", error);
-      return NextResponse.json({ error: "Failed to create AI follow-up" }, { status: 500 });
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({ followup: data }, { status: 201 });

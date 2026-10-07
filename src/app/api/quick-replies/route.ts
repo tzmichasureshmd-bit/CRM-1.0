@@ -16,7 +16,7 @@ export async function GET() {
       .from('quick_replies')
       .select('*')
       .order('created_at', { ascending: false })
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return NextResponse.json({ error: error.message, code: error.code }, { status: 500 })
     return NextResponse.json({ quick_replies: data ?? [] })
   } catch (err) {
     return toErrorResponse(err)
@@ -60,21 +60,33 @@ export async function POST(request: Request) {
     content_text = text
   }
 
+  // Optional organisation columns (added by migration 077). Only sent when
+  // the caller supplies them so a deployment without 077 keeps working.
+  const insert: Record<string, unknown> = {
+    account_id: ctx.accountId,
+    user_id: ctx.userId,
+    title,
+    kind,
+    content_text,
+    interactive_payload,
+  }
+  if (typeof body.shortcut === "string" && body.shortcut.trim()) {
+    const shortcut = body.shortcut.trim()
+    insert.shortcut = shortcut.startsWith("/") ? shortcut : `/${shortcut}`
+  }
+  if (typeof body.channel === "string") insert.channel = body.channel.trim() || null
+  if (typeof body.language === "string") insert.language = body.language.trim() || null
+  if (typeof body.category === "string") insert.category = body.category.trim() || null
+  if (typeof body.status === "string" && body.status.trim()) insert.status = body.status.trim()
+
   const { data, error } = await supabaseAdmin()
-    .from('quick_replies')
-    .insert({
-      account_id: ctx.accountId,
-      user_id: ctx.userId,
-      title,
-      kind,
-      content_text,
-      interactive_payload,
-    })
+    .from("quick_replies")
+    .insert(insert)
     .select()
     .single()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: error.message, code: error.code }, { status: 500 })
   }
   return NextResponse.json({ quick_reply: data }, { status: 201 })
 }

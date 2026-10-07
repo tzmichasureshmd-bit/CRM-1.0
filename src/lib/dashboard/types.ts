@@ -3,17 +3,31 @@
 // them up without type gymnastics.
 
 export interface MetricDelta {
+  /** Value for the current day/period. */
   current: number
+  /** Value for the day/period being compared against (yesterday, etc.). */
   previous: number
 }
 
 export interface MetricsBundle {
-  activeConversations: MetricDelta
+  /** Conversations currently open, right now. */
+  activeConversations: number
+  /** Conversations created today vs yesterday. */
+  newConversations: MetricDelta
   newContactsToday: MetricDelta
   openDealsValue: number
   openDealsCount: number
   messagesSentToday: MetricDelta
   followUpsToday: MetricDelta
+}
+
+/** Range-scoped totals for the dashboard's period summary. */
+export interface RangeSummary {
+  messages: number
+  newContacts: number
+  newConversations: number
+  newDeals: number
+  dealValue: number
 }
 
 export interface ConversationsSeriesPoint {

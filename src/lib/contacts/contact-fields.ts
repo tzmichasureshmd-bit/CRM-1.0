@@ -8,6 +8,8 @@
  * Rating, Reviews, Lead Status, Tags, Created Date.
  */
 
+import { LEAD_STATUSES } from '@/lib/crm/lead-status';
+
 export type ContactColumnKey =
   | 'name'
   | 'category'
@@ -272,20 +274,9 @@ export function filtersToGroups(
   return groups;
 }
 
-export const LEAD_STATUS_VALUES = [
-  'new',
-  'contacted',
-  'qualified',
-  'proposal',
-  'negotiation',
-  'won',
-  'lost',
-];
+export const LEAD_STATUS_VALUES: readonly string[] = LEAD_STATUSES;
 
-export function leadStatusLabel(status?: string | null): string {
-  if (!status) return '—';
-  return status.charAt(0).toUpperCase() + status.slice(1);
-}
+export { leadStatusLabel } from '@/lib/crm/lead-status';
 
 export const SUGGESTED_CATEGORIES = [
   'School',

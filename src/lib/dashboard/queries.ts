@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   daysAgoStart,
   DOW_SHORT_MON_FIRST,
-  lastNDayKeys,
+  dayKeysInclusive,
   localDayKey,
   mondayIndex,
   startOfLocalDay,
@@ -13,6 +13,7 @@ import type {
   MetricsBundle,
   PipelineDonutData,
   PipelineStageSlice,
+  RangeSummary,
   ResponseTimeBucket,
   ResponseTimeSummary,
   RecentConversation,
@@ -51,12 +52,10 @@ export async function loadMetrics(db: DB): Promise<MetricsBundle> {
     db
       .from('conversations')
       .select('id', { count: 'exact', head: true })
-      .eq('status', 'open')
       .gte('created_at', todayStart),
     db
       .from('conversations')
       .select('id', { count: 'exact', head: true })
-      .eq('status', 'open')
       .gte('created_at', yesterdayStart)
       .lt('created_at', todayStart),
     db.from('contacts').select('id', { count: 'exact', head: true }).gte('created_at', todayStart),
@@ -94,9 +93,10 @@ export async function loadMetrics(db: DB): Promise<MetricsBundle> {
   const openDealsValue = openDealsRows.reduce((sum, d) => sum + (d.value ?? 0), 0)
 
   return {
-    activeConversations: {
-      current: openConvCur.count ?? 0,
-      previous: (newConvToday.count ?? 0) - (newConvYesterday.count ?? 0),
+    activeConversations: openConvCur.count ?? 0,
+    newConversations: {
+      current: newConvToday.count ?? 0,
+      previous: newConvYesterday.count ?? 0,
     },
     newContactsToday: {
       current: newContactsToday.count ?? 0,
@@ -110,26 +110,57 @@ export async function loadMetrics(db: DB): Promise<MetricsBundle> {
     },
     followUpsToday: {
       current: followUpsToday.count ?? 0,
-      previous: (followUpsToday.count ?? 0) - (followUpsYesterday.count ?? 0),
+      previous: followUpsYesterday.count ?? 0,
     },
   }
 }
 
 // --- 2. Conversations over time ---------------------------------------
 
-export async function loadConversationsSeries(
+/** ISO bounds for an inclusive local-day range (`end` is exclusive). */
+export interface RangeBounds {
+  start: string
+  end: string
+}
+
+function dayBounds(fromKey: string, toKey: string): RangeBounds | null {
+  const parse = (key: string) => {
+    const [y, m, d] = key.split('-').map(Number)
+    if (!y || !m || !d) return null
+    const date = new Date(y, m - 1, d)
+    return Number.isNaN(date.getTime()) ? null : date
+  }
+  const start = parse(fromKey)
+  const end = parse(toKey)
+  if (!start || !end || start > end) return null
+  const endExclusive = new Date(end)
+  endExclusive.setDate(endExclusive.getDate() + 1)
+  return { start: start.toISOString(), end: endExclusive.toISOString() }
+}
+
+/**
+ * Incoming/outgoing message buckets for every local day in the inclusive
+ * `fromKey … toKey` range. The range is pushed into the SQL query
+ * (`created_at >= start AND created_at < end`) so the transfer stays
+ * bounded no matter how wide the selection is.
+ */
+export async function loadConversationsSeriesRange(
   db: DB,
-  rangeDays: number,
+  fromKey: string,
+  toKey: string,
 ): Promise<ConversationsSeriesPoint[]> {
-  const start = daysAgoStart(rangeDays - 1).toISOString()
+  const bounds = dayBounds(fromKey, toKey)
+  const keys = dayKeysInclusive(fromKey, toKey)
+  if (!bounds || keys.length === 0) return []
+
   const { data, error } = await db
     .from('messages')
     .select('created_at, sender_type')
-    .gte('created_at', start)
+    .gte('created_at', bounds.start)
+    .lt('created_at', bounds.end)
     .order('created_at', { ascending: true })
   if (error) throw error
 
-  const keys = lastNDayKeys(rangeDays)
   const buckets = new Map<string, { incoming: number; outgoing: number }>()
   for (const k of keys) buckets.set(k, { incoming: 0, outgoing: 0 })
 
@@ -142,6 +173,59 @@ export async function loadConversationsSeries(
   }
 
   return keys.map((day) => ({ day, ...(buckets.get(day) ?? { incoming: 0, outgoing: 0 }) }))
+}
+
+/** Range-scoped totals for the dashboard's period summary, plus the same
+ *  totals for the equally long window immediately before it (when given). */
+export async function loadRangeSummary(
+  db: DB,
+  current: RangeBounds,
+  previous: RangeBounds | null,
+): Promise<{ current: RangeSummary; previous: RangeSummary | null }> {
+  const fetchSummary = async (bounds: RangeBounds): Promise<RangeSummary> => {
+    const [messages, contacts, conversations, deals, dealRows] = await Promise.all([
+      db
+        .from('messages')
+        .select('id', { count: 'exact', head: true })
+        .gte('created_at', bounds.start)
+        .lt('created_at', bounds.end),
+      db
+        .from('contacts')
+        .select('id', { count: 'exact', head: true })
+        .gte('created_at', bounds.start)
+        .lt('created_at', bounds.end),
+      db
+        .from('conversations')
+        .select('id', { count: 'exact', head: true })
+        .gte('created_at', bounds.start)
+        .lt('created_at', bounds.end),
+      db
+        .from('deals')
+        .select('id', { count: 'exact', head: true })
+        .gte('created_at', bounds.start)
+        .lt('created_at', bounds.end),
+      db
+        .from('deals')
+        .select('value')
+        .gte('created_at', bounds.start)
+        .lt('created_at', bounds.end),
+    ])
+
+    return {
+      messages: messages.count ?? 0,
+      newContacts: contacts.count ?? 0,
+      newConversations: conversations.count ?? 0,
+      newDeals: deals.count ?? 0,
+      dealValue: (dealRows.data ?? []).reduce(
+        (sum, d) => sum + ((d as { value: number | null }).value ?? 0),
+        0,
+      ),
+    }
+  }
+
+  const currentSummary = await fetchSummary(current)
+  const previousSummary = previous ? await fetchSummary(previous) : null
+  return { current: currentSummary, previous: previousSummary }
 }
 
 // --- 3. Pipeline donut -------------------------------------------------

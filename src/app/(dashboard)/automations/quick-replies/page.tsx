@@ -9,17 +9,18 @@ import {
   Trash2,
   Loader2,
   Search,
-  Tag,
 } from "lucide-react"
 
 import { createClient } from "@/lib/supabase/client"
+import { hasColumn } from "@/lib/db/schema"
+import { describeError } from "@/lib/errors"
 import { useAuth } from "@/hooks/use-auth"
 import { useTranslations } from "next-intl"
+import type { QuickReplyKind } from "@/types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import {
   Dialog,
@@ -30,6 +31,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   Table,
   TableBody,
   TableCell,
@@ -37,27 +45,52 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { SetupRequired, EmptyState } from "@/components/shared"
+import {
+  InteractiveBuilder,
+  blankButtonsPayload,
+} from "@/components/interactive/interactive-builder"
+import {
+  interactivePayloadPreviewText,
+  validateInteractivePayload,
+  type InteractiveMessagePayload,
+} from "@/lib/whatsapp/interactive"
+
+type OptionalColumn = "shortcut" | "channel" | "language" | "category" | "status"
+
+const OPTIONAL_COLUMNS: OptionalColumn[] = [
+  "shortcut",
+  "channel",
+  "language",
+  "category",
+  "status",
+]
 
 interface QuickReplyRow {
   id: string
-  account_id: string
-  shortcut: string
   title: string
-  message: string
-  category: string | null
-  is_global: boolean
-  created_by: string
+  kind: QuickReplyKind
+  content_text?: string | null
+  interactive_payload?: InteractiveMessagePayload | null
+  shortcut?: string | null
+  channel?: string | null
+  language?: string | null
+  category?: string | null
+  status?: string | null
   created_at: string
-  updated_at: string
 }
 
 interface DraftState {
   id?: string
-  shortcut: string
   title: string
-  message: string
+  kind: QuickReplyKind
+  content_text: string
+  interactive_payload: InteractiveMessagePayload
+  shortcut: string
   category: string
-  is_global: boolean
+  channel: string
+  language: string
+  status: string
 }
 
 const CATEGORIES = [
@@ -69,15 +102,9 @@ const CATEGORIES = [
   "follow-up",
 ]
 
-function emptyDraft(): DraftState {
-  return {
-    shortcut: "",
-    title: "",
-    message: "",
-    category: "general",
-    is_global: false,
-  }
-}
+const CHANNELS = ["whatsapp", "instagram", "facebook", "email"]
+
+const LANGUAGES = ["en", "es", "fr", "pt", "de", "ar", "hi"]
 
 const VARIABLE_HINTS = [
   "{{first_name}}",
@@ -87,12 +114,46 @@ const VARIABLE_HINTS = [
   "{{company}}",
 ]
 
+function emptyDraft(): DraftState {
+  return {
+    title: "",
+    kind: "text",
+    content_text: "",
+    interactive_payload: blankButtonsPayload(),
+    shortcut: "",
+    category: "general",
+    channel: "",
+    language: "",
+    status: "active",
+  }
+}
+
+async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(path, {
+    ...init,
+    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+  })
+  const body: unknown = await res.json().catch(() => null)
+  if (!res.ok) {
+    const record = (body ?? {}) as Record<string, unknown>
+    const err = new Error(
+      typeof record.error === "string" && record.error
+        ? record.error
+        : `Request failed (${res.status})`,
+    ) as Error & { code?: string }
+    if (typeof record.code === "string") err.code = record.code
+    throw err
+  }
+  return body as T
+}
+
 export default function QuickRepliesPage() {
   const t = useTranslations("Automations.quickReplies")
-  const { accountId, canSendMessages } = useAuth()
+  const { canSendMessages } = useAuth()
 
   const [items, setItems] = useState<QuickReplyRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [cols, setCols] = useState<Record<OptionalColumn, boolean> | null>(null)
   const [search, setSearch] = useState("")
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
 
@@ -103,44 +164,62 @@ export default function QuickRepliesPage() {
 
   const fetchSeq = useRef(0)
 
+  useEffect(() => {
+    const supabase = createClient()
+    let cancelled = false
+    void Promise.all(
+      OPTIONAL_COLUMNS.map(
+        async (column) =>
+          [column, await hasColumn(supabase, "quick_replies", column)] as const,
+      ),
+    ).then((results) => {
+      if (cancelled) return
+      setCols(Object.fromEntries(results) as Record<OptionalColumn, boolean>)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const load = useCallback(async () => {
     const seq = ++fetchSeq.current
     setLoading(true)
-    const supabase = createClient()
-
-    let query = supabase
-      .from("quick_replies")
-      .select("*")
-      .order("created_at", { ascending: false })
-
-    if (accountId) {
-      query = query.eq("account_id", accountId)
+    try {
+      const body = await api<{ quick_replies?: QuickReplyRow[] }>(
+        "/api/quick-replies",
+      )
+      if (seq !== fetchSeq.current) return
+      setItems(body.quick_replies ?? [])
+    } catch (err) {
+      if (seq !== fetchSeq.current) return
+      setItems([])
+      toast.error(t("toast.loadError"), {
+        description: describeError(err, t("toast.loadError")),
+      })
+    } finally {
+      if (seq === fetchSeq.current) setLoading(false)
     }
-
-    const { data, error } = await query
-    if (seq !== fetchSeq.current) return
-    if (error) {
-      toast.error(t("toast.loadError"))
-      setLoading(false)
-      return
-    }
-
-    setItems((data as QuickReplyRow[]) ?? [])
-    setLoading(false)
-  }, [accountId, t])
+  }, [t])
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load()
+    void load()
   }, [load])
 
+  const missingColumns = cols ? OPTIONAL_COLUMNS.filter((c) => !cols[c]) : []
+  const missingLabel =
+    missingColumns.length === 1
+      ? `Column quick_replies.${missingColumns[0]} is missing.`
+      : `Columns ${missingColumns
+          .map((c) => `quick_replies.${c}`)
+          .join(", ")} are missing.`
+
   const filtered = items.filter((qr) => {
-    const term = search.toLowerCase()
+    const term = search.trim().toLowerCase()
     const matchesSearch =
       !term ||
-      qr.shortcut.toLowerCase().includes(term) ||
       qr.title.toLowerCase().includes(term) ||
-      qr.message.toLowerCase().includes(term)
+      (qr.content_text ?? "").toLowerCase().includes(term) ||
+      (qr.shortcut ?? "").toLowerCase().includes(term)
     const matchesCategory = !categoryFilter || qr.category === categoryFilter
     return matchesSearch && matchesCategory
   })
@@ -156,11 +235,15 @@ export default function QuickRepliesPage() {
   function openEdit(qr: QuickReplyRow) {
     setDraft({
       id: qr.id,
-      shortcut: qr.shortcut,
       title: qr.title,
-      message: qr.message,
+      kind: qr.kind,
+      content_text: qr.content_text ?? "",
+      interactive_payload: qr.interactive_payload ?? blankButtonsPayload(),
+      shortcut: qr.shortcut ?? "",
       category: qr.category ?? "general",
-      is_global: qr.is_global,
+      channel: qr.channel ?? "",
+      language: qr.language ?? "",
+      status: qr.status ?? "active",
     })
   }
 
@@ -170,80 +253,83 @@ export default function QuickRepliesPage() {
       toast.error(t("toast.titleRequired"))
       return
     }
-    if (!draft.message.trim()) {
-      toast.error(t("toast.messageRequired"))
-      return
-    }
-    if (!draft.shortcut.startsWith("/")) {
-      setDraft({ ...draft, shortcut: `/${draft.shortcut}` })
-      return
+    if (draft.kind === "text") {
+      if (!draft.content_text.trim()) {
+        toast.error(t("toast.messageRequired"))
+        return
+      }
+    } else {
+      const check = validateInteractivePayload(draft.interactive_payload)
+      if (!check.ok) {
+        toast.error(check.error)
+        return
+      }
     }
 
     setSaving(true)
-    const supabase = createClient()
-
-    const payload = {
-      shortcut: draft.shortcut.trim(),
-      title: draft.title.trim(),
-      message: draft.message.trim(),
-      category: draft.category || null,
-      is_global: draft.is_global,
-    }
-
-    if (draft.id) {
-      const { error } = await supabase
-        .from("quick_replies")
-        .update(payload)
-        .eq("id", draft.id)
-      if (error) {
-        toast.error(t("toast.saveError"))
-        setSaving(false)
-        return
+    try {
+      const payload: Record<string, unknown> = {
+        title: draft.title.trim(),
+        kind: draft.kind,
+        content_text: draft.kind === "text" ? draft.content_text : null,
+        interactive_payload:
+          draft.kind === "interactive" ? draft.interactive_payload : null,
       }
-      toast.success(t("toast.updated"))
-    } else {
-      const { error } = await supabase.from("quick_replies").insert({
-        ...payload,
-        account_id: accountId,
-        created_by: accountId,
+      if (cols) {
+        if (cols.shortcut) payload.shortcut = draft.shortcut.trim()
+        if (cols.channel) payload.channel = draft.channel
+        if (cols.language) payload.language = draft.language.trim()
+        if (cols.category) payload.category = draft.category.trim() || null
+        if (cols.status) payload.status = draft.status || "active"
+      }
+
+      if (draft.id) {
+        await api(`/api/quick-replies/${draft.id}`, {
+          method: "PATCH",
+          body: JSON.stringify(payload),
+        })
+        toast.success(t("toast.updated"))
+      } else {
+        await api("/api/quick-replies", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        })
+        toast.success(t("toast.created"))
+      }
+      setDraft(null)
+      void load()
+    } catch (err) {
+      toast.error(t("toast.saveError"), {
+        description: describeError(err, t("toast.saveError")),
       })
-      if (error) {
-        toast.error(t("toast.saveError"))
-        setSaving(false)
-        return
-      }
-      toast.success(t("toast.created"))
+    } finally {
+      setSaving(false)
     }
-
-    setDraft(null)
-    setSaving(false)
-    load()
   }
 
   async function confirmDelete() {
     if (!pendingDelete) return
     setDeleting(true)
-    const supabase = createClient()
-    const { error } = await supabase
-      .from("quick_replies")
-      .delete()
-      .eq("id", pendingDelete.id)
-    setDeleting(false)
-    if (error) {
-      toast.error(t("toast.deleteError"))
-      return
+    try {
+      await api(`/api/quick-replies/${pendingDelete.id}`, { method: "DELETE" })
+      toast.success(t("toast.deleted"))
+      setPendingDelete(null)
+      void load()
+    } catch (err) {
+      toast.error(t("toast.deleteError"), {
+        description: describeError(err, t("toast.deleteError")),
+      })
+    } finally {
+      setDeleting(false)
     }
-    toast.success(t("toast.deleted"))
-    setPendingDelete(null)
-    load()
   }
 
   function insertVariable(varName: string) {
     if (!draft) return
-    setDraft({ ...draft, message: draft.message + varName })
+    setDraft({ ...draft, content_text: draft.content_text + varName })
   }
 
-  if (loading) {
+  if (loading || !cols) {
     return (
       <div className="flex h-64 items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -268,6 +354,14 @@ export default function QuickRepliesPage() {
         )}
       </div>
 
+      {missingColumns.length > 0 && (
+        <SetupRequired
+          feature="Quick Replies"
+          migration="077_crm20_stabilization.sql"
+          missing={missingLabel}
+        />
+      )}
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative w-full max-w-sm">
           <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -278,35 +372,20 @@ export default function QuickRepliesPage() {
             className="h-9 pl-8 bg-card border-border text-foreground placeholder:text-muted-foreground"
           />
         </div>
-        <div className="flex flex-wrap gap-1.5">
-          <button
-            type="button"
-            onClick={() => setCategoryFilter(null)}
-            className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
-              !categoryFilter
-                ? "border-primary bg-primary/10 text-primary"
-                : "border-border text-muted-foreground hover:bg-muted"
-            }`}
-          >
-            {t("all")}
-          </button>
-          {CATEGORIES.map((cat) => (
+        {cols.category && (
+          <div className="flex flex-wrap gap-1.5">
             <button
-              key={cat}
               type="button"
-              onClick={() => setCategoryFilter(categoryFilter === cat ? null : cat)}
-              className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium transition-colors capitalize ${
-                categoryFilter === cat
+              onClick={() => setCategoryFilter(null)}
+              className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                !categoryFilter
                   ? "border-primary bg-primary/10 text-primary"
                   : "border-border text-muted-foreground hover:bg-muted"
               }`}
             >
-              {cat}
+              {t("all")}
             </button>
-          ))}
-          {categories
-            .filter((c) => !CATEGORIES.includes(c))
-            .map((cat) => (
+            {Array.from(new Set([...CATEGORIES, ...categories])).map((cat) => (
               <button
                 key={cat}
                 type="button"
@@ -320,102 +399,151 @@ export default function QuickRepliesPage() {
                 {cat}
               </button>
             ))}
-        </div>
+          </div>
+        )}
       </div>
 
       {filtered.length === 0 ? (
-        <div className="flex h-48 flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card/40">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-            <MessageSquare className="h-6 w-6 text-primary" />
-          </div>
-          <p className="mt-3 text-sm font-medium text-foreground">
-            {items.length === 0 ? t("emptyTitle") : t("noResults")}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {items.length === 0 ? t("emptyDesc") : t("noResultsDesc")}
-          </p>
-        </div>
+        items.length === 0 ? (
+          <EmptyState
+            icon={MessageSquare}
+            title={t("emptyTitle")}
+            description={t("emptyDesc")}
+            action={
+              canSendMessages ? (
+                <Button onClick={openCreate} className="bg-primary text-primary-foreground hover:bg-primary/90">
+                  <Plus className="h-4 w-4" />
+                  {t("create")}
+                </Button>
+              ) : undefined
+            }
+          />
+        ) : (
+          <EmptyState
+            icon={Search}
+            title={t("noResults")}
+            description={t("noResultsDesc")}
+          />
+        )
       ) : (
         <div className="rounded-lg border border-border overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
-                <TableHead className="w-40 text-muted-foreground">{t("table.shortcut")}</TableHead>
+                {cols.shortcut && (
+                  <TableHead className="w-32 text-muted-foreground">{t("table.shortcut")}</TableHead>
+                )}
                 <TableHead className="text-muted-foreground">{t("table.title")}</TableHead>
                 <TableHead className="text-muted-foreground hidden md:table-cell">{t("table.message")}</TableHead>
-                <TableHead className="text-muted-foreground hidden sm:table-cell">{t("table.category")}</TableHead>
-                <TableHead className="text-muted-foreground hidden lg:table-cell w-20">{t("table.global")}</TableHead>
+                {cols.category && (
+                  <TableHead className="text-muted-foreground hidden sm:table-cell">{t("table.category")}</TableHead>
+                )}
+                {cols.channel && (
+                  <TableHead className="text-muted-foreground hidden lg:table-cell">{t("table.channel")}</TableHead>
+                )}
+                {cols.status && (
+                  <TableHead className="text-muted-foreground hidden lg:table-cell w-24">{t("table.status")}</TableHead>
+                )}
                 <TableHead className="text-muted-foreground w-12" />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((qr) => (
-                <TableRow key={qr.id} className="border-border hover:bg-muted/50">
-                  <TableCell>
-                    <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-primary">
-                      {qr.shortcut}
-                    </code>
-                  </TableCell>
-                  <TableCell className="text-foreground font-medium">
-                    {qr.title}
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    <p className="max-w-xl truncate text-xs text-muted-foreground" title={qr.message}>
-                      {qr.message}
-                    </p>
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell">
-                    {qr.category ? (
-                      <Badge variant="outline" className="text-[10px] capitalize">
-                        {qr.category}
-                      </Badge>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">-</span>
+              {filtered.map((qr) => {
+                const preview =
+                  qr.kind === "interactive" && qr.interactive_payload
+                    ? interactivePayloadPreviewText(qr.interactive_payload)
+                    : (qr.content_text ?? "")
+                return (
+                  <TableRow key={qr.id} className="border-border hover:bg-muted/50">
+                    {cols.shortcut && (
+                      <TableCell>
+                        {qr.shortcut ? (
+                          <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-primary">
+                            {qr.shortcut}
+                          </code>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
                     )}
-                  </TableCell>
-                  <TableCell className="hidden lg:table-cell">
-                    {qr.is_global ? (
-                      <Badge variant="secondary" className="text-[10px]">
-                        <Tag className="mr-1 h-3 w-3" />
-                        {t("badge.global")}
-                      </Badge>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">-</span>
+                    <TableCell className="text-foreground font-medium">
+                      {qr.title}
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      <p className="max-w-xl truncate text-xs text-muted-foreground" title={preview}>
+                        {preview}
+                      </p>
+                    </TableCell>
+                    {cols.category && (
+                      <TableCell className="hidden sm:table-cell">
+                        {qr.category ? (
+                          <Badge variant="outline" className="text-[10px] capitalize">
+                            {qr.category}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
                     )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      {canSendMessages && (
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => openEdit(qr)}
-                          className="text-muted-foreground hover:text-foreground"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                      )}
-                      {canSendMessages && (
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => setPendingDelete(qr)}
-                          className="text-red-400 hover:bg-red-500/10 hover:text-red-300"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+                    {cols.channel && (
+                      <TableCell className="hidden lg:table-cell">
+                        {qr.channel ? (
+                          <Badge variant="secondary" className="text-[10px] capitalize">
+                            {qr.channel}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                    )}
+                    {cols.status && (
+                      <TableCell className="hidden lg:table-cell">
+                        {qr.status ? (
+                          <Badge
+                            variant={qr.status === "active" ? "default" : "secondary"}
+                            className="text-[10px] capitalize"
+                          >
+                            {qr.status}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                    )}
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        {canSendMessages && (
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => openEdit(qr)}
+                            className="text-muted-foreground hover:text-foreground"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {canSendMessages && (
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => setPendingDelete(qr)}
+                            className="text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
             </TableBody>
           </Table>
         </div>
       )}
 
       <Dialog open={!!draft} onOpenChange={(v) => !v && setDraft(null)}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>
               {draft?.id ? t("dialog.editTitle") : t("dialog.createTitle")}
@@ -427,20 +555,6 @@ export default function QuickRepliesPage() {
           {draft && (
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="qr-shortcut">{t("dialog.shortcut")}</Label>
-                <Input
-                  id="qr-shortcut"
-                  value={draft.shortcut}
-                  onChange={(e) => setDraft({ ...draft, shortcut: e.target.value })}
-                  placeholder="/price"
-                  className="bg-muted text-foreground font-mono"
-                />
-                <p className="text-xs text-muted-foreground">
-                  {t("dialog.shortcutHint")}
-                </p>
-              </div>
-
-              <div className="space-y-2">
                 <Label htmlFor="qr-title">{t("dialog.title")}</Label>
                 <Input
                   id="qr-title"
@@ -451,58 +565,165 @@ export default function QuickRepliesPage() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="qr-message">{t("dialog.message")}</Label>
-                <Textarea
-                  id="qr-message"
-                  value={draft.message}
-                  onChange={(e) => setDraft({ ...draft, message: e.target.value })}
-                  placeholder={t("dialog.messagePlaceholder")}
-                  className="min-h-28 bg-muted text-foreground"
-                />
-                <div className="flex flex-wrap gap-1.5">
-                  {VARIABLE_HINTS.map((v) => (
-                    <button
-                      key={v}
-                      type="button"
-                      onClick={() => insertVariable(v)}
-                      className="inline-flex items-center rounded border border-border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    >
-                      {v}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="qr-category">{t("dialog.category")}</Label>
-                <Input
-                  id="qr-category"
-                  value={draft.category}
-                  onChange={(e) => setDraft({ ...draft, category: e.target.value })}
-                  placeholder="general"
-                  className="bg-muted text-foreground"
-                  list="category-options"
-                />
-                <datalist id="category-options">
-                  {CATEGORIES.map((cat) => (
-                    <option key={cat} value={cat} />
-                  ))}
-                </datalist>
-              </div>
-
-              <div className="flex items-center justify-between rounded-lg border border-border p-3">
-                <div className="space-y-0.5">
-                  <Label className="text-sm">{t("dialog.globalLabel")}</Label>
+              {cols.shortcut && (
+                <div className="space-y-2">
+                  <Label htmlFor="qr-shortcut">{t("dialog.shortcut")}</Label>
+                  <Input
+                    id="qr-shortcut"
+                    value={draft.shortcut}
+                    onChange={(e) => setDraft({ ...draft, shortcut: e.target.value })}
+                    placeholder="/price"
+                    className="bg-muted text-foreground font-mono"
+                  />
                   <p className="text-xs text-muted-foreground">
-                    {t("dialog.globalHint")}
+                    {t("dialog.shortcutHint")}
                   </p>
                 </div>
-                <Switch
-                  checked={draft.is_global}
-                  onCheckedChange={(v) => setDraft({ ...draft, is_global: !!v })}
-                />
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>{t("dialog.kind")}</Label>
+                  <Select
+                    value={draft.kind}
+                    onValueChange={(v) =>
+                      setDraft({ ...draft, kind: v as QuickReplyKind })
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="text">{t("dialog.kindText")}</SelectItem>
+                      <SelectItem value="interactive">
+                        {t("dialog.kindInteractive")}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {cols.status && (
+                  <div className="space-y-2">
+                    <Label>{t("dialog.status")}</Label>
+                    <Select
+                      value={draft.status || "active"}
+                      onValueChange={(v) =>
+                        setDraft({ ...draft, status: v ?? "active" })
+                      }
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">{t("dialog.statusActive")}</SelectItem>
+                        <SelectItem value="inactive">{t("dialog.statusInactive")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
+
+              {draft.kind === "text" ? (
+                <div className="space-y-2">
+                  <Label htmlFor="qr-message">{t("dialog.message")}</Label>
+                  <Textarea
+                    id="qr-message"
+                    value={draft.content_text}
+                    onChange={(e) =>
+                      setDraft({ ...draft, content_text: e.target.value })
+                    }
+                    placeholder={t("dialog.messagePlaceholder")}
+                    className="min-h-28 bg-muted text-foreground"
+                  />
+                  <div className="flex flex-wrap gap-1.5">
+                    {VARIABLE_HINTS.map((v) => (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => insertVariable(v)}
+                        className="inline-flex items-center rounded border border-border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      >
+                        {v}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    {t("dialog.interactiveHint")}
+                  </p>
+                  <InteractiveBuilder
+                    value={draft.interactive_payload}
+                    onChange={(payload) =>
+                      setDraft({ ...draft, interactive_payload: payload })
+                    }
+                    showPreview={false}
+                  />
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                {cols.category && (
+                  <div className="space-y-2">
+                    <Label htmlFor="qr-category">{t("dialog.category")}</Label>
+                    <Input
+                      id="qr-category"
+                      value={draft.category}
+                      onChange={(e) => setDraft({ ...draft, category: e.target.value })}
+                      placeholder="general"
+                      className="bg-muted text-foreground"
+                      list="category-options"
+                    />
+                    <datalist id="category-options">
+                      {CATEGORIES.map((cat) => (
+                        <option key={cat} value={cat} />
+                      ))}
+                    </datalist>
+                  </div>
+                )}
+                {cols.channel && (
+                  <div className="space-y-2">
+                    <Label>{t("dialog.channel")}</Label>
+                    <Select
+                      value={draft.channel || "_any"}
+                      onValueChange={(v) =>
+                        setDraft({ ...draft, channel: v && v !== "_any" ? v : "" })
+                      }
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="_any">{t("dialog.channelAny")}</SelectItem>
+                        {CHANNELS.map((ch) => (
+                          <SelectItem key={ch} value={ch}>
+                            {t(`dialog.channel${ch.charAt(0).toUpperCase()}${ch.slice(1)}`)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+
+              {cols.language && (
+                <div className="space-y-2">
+                  <Label htmlFor="qr-language">{t("dialog.language")}</Label>
+                  <Input
+                    id="qr-language"
+                    value={draft.language}
+                    onChange={(e) => setDraft({ ...draft, language: e.target.value })}
+                    placeholder="en"
+                    className="bg-muted text-foreground"
+                    list="language-options"
+                  />
+                  <datalist id="language-options">
+                    {LANGUAGES.map((lang) => (
+                      <option key={lang} value={lang} />
+                    ))}
+                  </datalist>
+                </div>
+              )}
             </div>
           )}
           <DialogFooter>
@@ -530,7 +751,7 @@ export default function QuickRepliesPage() {
               {t("dialog.cancel")}
             </Button>
             <Button variant="destructive" onClick={confirmDelete} disabled={deleting}>
-              {deleting ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              {deleting ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Trash2 className="mr-1 h-4 w-4" />}
               {t("dialog.delete")}
             </Button>
           </DialogFooter>

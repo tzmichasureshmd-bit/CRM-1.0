@@ -20,6 +20,9 @@ import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { formatINR } from "@/lib/currency";
 import { useTranslations } from "next-intl";
+import { LeadStatusBadge } from "@/components/crm/lead-status-badge";
+import { stageMilestone, leadStatusForMilestone } from "@/lib/crm/leads";
+import type { LeadStatus } from "@/lib/crm/lead-status";
 
 interface PipelineBoardProps {
   stages: PipelineStage[];
@@ -27,6 +30,13 @@ interface PipelineBoardProps {
   onDealMoved: (dealId: string, newStageId: string) => void;
   onAddDeal: (stageId: string) => void;
   onEditDeal: (deal: Deal) => void;
+  /**
+   * Opt-in CRM STATUS sync (spec §23–§27): pushes a stage's expected
+   * `lead_status` onto the deal's contact. Omit to hide the control.
+   */
+  onSyncStatus?: (deal: Deal, status: LeadStatus) => void;
+  /** Deal whose contact status write is currently in flight. */
+  syncingDealId?: string | null;
 }
 
 export function PipelineBoard({
@@ -35,6 +45,8 @@ export function PipelineBoard({
   onDealMoved,
   onAddDeal,
   onEditDeal,
+  onSyncStatus,
+  syncingDealId = null,
 }: PipelineBoardProps) {
   const [activeDealId, setActiveDealId] = useState<string | null>(null);
 
@@ -116,6 +128,8 @@ export function PipelineBoard({
               totalValue={totalValue}
               onAddDeal={onAddDeal}
               onEditDeal={onEditDeal}
+              onSyncStatus={onSyncStatus}
+              syncingDealId={syncingDealId}
             />
           );
         })}
@@ -189,15 +203,22 @@ function StageColumn({
   totalValue,
   onAddDeal,
   onEditDeal,
+  onSyncStatus,
+  syncingDealId,
 }: {
   stage: PipelineStage;
   deals: Deal[];
   totalValue: number;
   onAddDeal: (stageId: string) => void;
   onEditDeal: (deal: Deal) => void;
+  onSyncStatus?: (deal: Deal, status: LeadStatus) => void;
+  syncingDealId?: string | null;
 }) {
   const t = useTranslations("Pipelines.board");
   const { setNodeRef, isOver } = useDroppable({ id: stage.id });
+  // The stage → lead-status mapping (spec §23–§27), shown as a chip so a
+  // reviewer can see at a glance which status a card dropped here implies.
+  const stageStatus = leadStatusForMilestone(stageMilestone(stage));
 
   return (
     // On mobile each column is `w-[85vw]` (with a reasonable min/max)
@@ -212,13 +233,20 @@ function StageColumn({
         className="-mx-4 -mt-4 h-[3px] rounded-t-xl"
         style={{ backgroundColor: stage.color }}
       />
-      <div className="flex items-center justify-between pt-3">
+      <div className="flex items-center justify-between gap-2 pt-3">
         <h3 className="truncate text-sm font-semibold text-foreground">
           {stage.name}
         </h3>
-        <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-          {deals.length}
-        </span>
+        <div className="flex shrink-0 items-center gap-1.5">
+          {stageStatus && (
+            <span title={t("crmStatus")}>
+              <LeadStatusBadge status={stageStatus} />
+            </span>
+          )}
+          <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+            {deals.length}
+          </span>
+        </div>
       </div>
       <p className="text-xs text-muted-foreground">
         {formatINR(totalValue)}
@@ -243,6 +271,8 @@ function StageColumn({
               deal={deal}
               stage={stage}
               onEdit={onEditDeal}
+              onSyncStatus={onSyncStatus}
+              syncing={syncingDealId === deal.id}
             />
           ))
         )}
@@ -265,10 +295,14 @@ function DraggableDealCard({
   deal,
   stage,
   onEdit,
+  onSyncStatus,
+  syncing,
 }: {
   deal: Deal;
   stage: PipelineStage;
   onEdit: (deal: Deal) => void;
+  onSyncStatus?: (deal: Deal, status: LeadStatus) => void;
+  syncing?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: deal.id,
@@ -281,7 +315,13 @@ function DraggableDealCard({
       {...attributes}
       style={{ opacity: isDragging ? 0.3 : 1, touchAction: "none" }}
     >
-      <DealCard deal={deal} stage={stage} onEdit={onEdit} />
+      <DealCard
+        deal={deal}
+        stage={stage}
+        onEdit={onEdit}
+        onSyncStatus={onSyncStatus}
+        syncing={syncing}
+      />
     </div>
   );
 }

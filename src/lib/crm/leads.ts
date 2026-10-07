@@ -1,4 +1,5 @@
 import type { Deal, FollowUp, PipelineStage } from "@/types";
+import type { LeadStatus } from "@/lib/crm/lead-status";
 
 /**
  * CRM lead-management helpers — single source of truth for the /crm
@@ -94,10 +95,15 @@ export function stageProgress(
   return Math.round((idx / (active.length - 1)) * 100);
 }
 
-/** contact.lead_status values the deal stage maps to (or null, no guess). */
+/**
+ * `contacts.lead_status` the deal stage maps to (or null when the stage
+ * carries no milestone to guess from). Shared vocabulary lives in
+ * `@/lib/crm/lead-status`.
+ */
 export function leadStatusForMilestone(
-  m: LeadProgression,
-): "new" | "contacted" | "qualified" | "proposal" | "negotiation" | "won" | "lost" | null {
+  m: LeadProgression | null,
+): LeadStatus | null {
+  if (m === null) return null;
   switch (m) {
     case "new":
       return "new";
@@ -126,6 +132,18 @@ export function dealProgression(
 ): LeadProgression | null {
   const stage = sortedStages.find((s) => s.id === deal.stage_id);
   return stage ? stageMilestone(stage) : null;
+}
+
+/**
+ * The `lead_status` the deal's contact should carry for its current
+ * stage, or null when the stage has no milestone (nothing to sync to).
+ */
+export function leadStatusForDeal(
+  deal: Deal,
+  sortedStages: PipelineStage[],
+): LeadStatus | null {
+  const progression = dealProgression(deal, sortedStages);
+  return progression ? leadStatusForMilestone(progression) : null;
 }
 
 /** Deal value, per-stage progress — used by the board's weighted totals. */
