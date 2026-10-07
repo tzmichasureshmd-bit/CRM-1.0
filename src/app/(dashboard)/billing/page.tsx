@@ -26,6 +26,7 @@ import {
   Send,
   Bot,
   Receipt,
+  Phone,
 } from "lucide-react";
 import type {
   SubscriptionPlan,
@@ -206,9 +207,45 @@ export default function BillingPage() {
       <div>
         <h1 className="text-2xl font-bold text-foreground">Plans & Billing</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Manage your CRM subscription and view usage.
+          View your current plan, usage, and the available plans. Plans are
+          informational only — to change your plan, contact our consultant.
         </p>
       </div>
+
+      {/* Consultant contact — the only action available on this page */}
+      <Card className="border-border bg-card">
+        <CardContent className="flex flex-col items-center gap-4 py-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
+              <Phone className="h-5 w-5 text-primary" />
+            </div>
+            <div className="text-center sm:text-left">
+              <p className="text-base font-semibold text-foreground">
+                Please Contact Our Consultant
+              </p>
+              <p className="text-sm text-muted-foreground">
+                To arrange a plan change, upgrade, or billing question, call
+                our billing team directly.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-col items-center gap-2 sm:items-start">
+            <a
+              href="tel:+919346947043"
+              aria-label="Call consultant at 9346947043"
+              className="inline-flex"
+            >
+              <Button>
+                <Phone className="mr-2 h-4 w-4" />
+                Call Consultant
+              </Button>
+            </a>
+            <span className="text-sm font-medium text-foreground">
+              9346947043
+            </span>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Current Plan — prominent hero card */}
       <Card className="border-border bg-card overflow-hidden">
@@ -246,7 +283,8 @@ export default function BillingPage() {
                 )}
               </div>
               <Button variant="outline" onClick={() => setSelectedPlan(plans.find(p => p.id === currentPlan.id) || null)}>
-                Manage Plan
+                Contact Consultant
+                <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </div>
           ) : (
@@ -493,10 +531,11 @@ export default function BillingPage() {
                     </Button>
                   ) : (
                     <Button
+                      variant="outline"
                       className="w-full"
                       onClick={() => setSelectedPlan(plan)}
                     >
-                      {currentPlan ? "Upgrade" : "Choose Plan"}
+                      Contact Consultant
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>
                   )}
@@ -507,13 +546,18 @@ export default function BillingPage() {
         </div>
       </div>
 
-      {/* Plan Selection Dialog */}
+      {/* Plan Selection Dialog — informational only. There is no self-service
+          checkout anywhere in this app: plan changes are arranged by our
+          billing team, so every CTA routes the user to a consultant rather
+          than opening a fake payment flow. */}
       {selectedPlan && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <Card className="w-full max-w-md border-border bg-card">
             <CardHeader>
               <CardTitle>
-                {currentPlan ? `Upgrade to ${selectedPlan.name}` : `Choose ${selectedPlan.name}`}
+                {currentPlan
+                  ? `Change to ${selectedPlan.name}`
+                  : `${selectedPlan.name} plan`}
               </CardTitle>
               <CardDescription>
                 {formatPrice(
@@ -529,20 +573,32 @@ export default function BillingPage() {
               {currentPlan && (
                 <div className="text-sm text-muted-foreground">
                   <p>Current plan: {currentPlan.name}</p>
-                  <p>New plan: {selectedPlan.name}</p>
+                  <p>Requested plan: {selectedPlan.name}</p>
                 </div>
               )}
               <div className="rounded-lg bg-muted/50 p-4 text-sm text-muted-foreground">
-                Online checkout is not available yet — no charge has been made
-                and nothing has been saved. Contact support to change your plan.
+                Plans are informational only. Online checkout is not available
+                in the CRM, so no payment is taken here. Contact our consultant
+                to arrange this plan change.
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" className="flex-1" onClick={() => setSelectedPlan(null)}>
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setSelectedPlan(null)}
+                >
                   Go Back
                 </Button>
-                <Button className="flex-1" disabled>
-                  Continue to Payment
-                </Button>
+                <a
+                  href="tel:+919346947043"
+                  className="flex-1 inline-flex"
+                  aria-label="Call consultant at 9346947043"
+                >
+                  <Button className="w-full">
+                    <Phone className="mr-2 h-4 w-4" />
+                    Call Consultant
+                  </Button>
+                </a>
               </div>
             </CardContent>
           </Card>
