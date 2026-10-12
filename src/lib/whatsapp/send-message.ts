@@ -48,6 +48,7 @@ import { sendMessagingToConversation } from '@/lib/meta/messaging-send';
 import { sendTelegramMessage } from '@/lib/telegram/telegram-send';
 import { sendXMessage } from '@/lib/x/x-send';
 import { sendThreadsMessage } from '@/lib/threads/threads-send';
+import { onOutboundMessage } from '@/lib/crm/activity';
 
 export const MEDIA_KINDS = ['image', 'video', 'document', 'audio'] as const;
 export const VALID_MESSAGE_TYPES = [
@@ -629,6 +630,26 @@ export async function persistOutboundMessage(
   } catch (err) {
     console.error(
       '[flows] pause-on-agent-send threw:',
+      err instanceof Error ? err.message : err
+    );
+  }
+
+  // CRM activity tracking + follow-up rules. Best-effort — a logging or
+  // reminder failure must never surface as a failed send.
+  try {
+    await onOutboundMessage(supabaseAdmin(), {
+      accountId,
+      contactId,
+      conversationId,
+      messageId: messageRecord.id,
+      providerMessageId: opts.metaMessageId,
+      body: lastMessageText,
+      status: 'sent',
+      occurredAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.warn(
+      '[activity] outbound hook failed:',
       err instanceof Error ? err.message : err
     );
   }

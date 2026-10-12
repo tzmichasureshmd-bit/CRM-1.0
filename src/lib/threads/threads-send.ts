@@ -13,6 +13,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { decrypt } from '@/lib/whatsapp/encryption'
 import { replyToPost, publishTextPost, ThreadsApiError } from '@/lib/threads/threads-api'
 import { SendMessageError } from '@/lib/whatsapp/send-message'
+import { onOutboundMessage } from '@/lib/crm/activity'
 
 export interface ThreadsSendParams {
   messageType: string
@@ -116,6 +117,25 @@ export async function sendThreadsMessage(
       updated_at: new Date().toISOString(),
     })
     .eq('id', conversation.id)
+
+  // CRM activity tracking + follow-up rules (best-effort).
+  try {
+    await onOutboundMessage(db, {
+      accountId,
+      contactId: conversation.contact_id as string,
+      conversationId: conversation.id as string,
+      messageId: msgRow.id as string,
+      providerMessageId: postId,
+      channel: 'threads',
+      body: contentText.trim(),
+      status: 'sent',
+    })
+  } catch (err) {
+    console.warn(
+      '[activity] threads outbound hook failed:',
+      err instanceof Error ? err.message : err,
+    )
+  }
 
   return { messageId: msgRow.id as string, externalMessageId: postId }
 }

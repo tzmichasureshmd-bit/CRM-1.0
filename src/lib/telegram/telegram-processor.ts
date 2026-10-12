@@ -16,6 +16,7 @@ import { runAutomationsForTrigger } from '@/lib/automations/engine'
 import { dispatchInboundToFlows } from '@/lib/flows/engine'
 import { dispatchInboundToAiReply } from '@/lib/ai/auto-reply'
 import { dispatchWebhookEvent } from '@/lib/webhooks/deliver'
+import { onInboundMessage } from '@/lib/crm/activity'
 import type { TelegramUpdate, TelegramMessage } from '@/lib/telegram/telegram-api'
 
 interface TelegramBotRow {
@@ -128,6 +129,18 @@ export async function processTelegramUpdate(
     .then(({ error }: { error: unknown }) => {
       if (error) console.warn('[telegram] contact recency update skipped:', error)
     })
+
+  // ── CRM activity log + follow-up rules (best-effort) ───────────
+  void onInboundMessage(admin, {
+    accountId,
+    contactId: contact.id,
+    conversationId: conversation.id,
+    providerMessageId: messageIdStr,
+    channel: 'telegram',
+    body: contentText ?? null,
+    status: 'delivered',
+    occurredAt: new Date(message.date * 1000).toISOString(),
+  })
 
   // ── Update conversation ───────────────────────────────────────
   await admin

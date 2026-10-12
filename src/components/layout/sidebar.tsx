@@ -48,9 +48,6 @@ function IconPresets({ className }: { className?: string }) {
 function IconAutomations({ className }: { className?: string }) {
   return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>;
 }
-function IconFlows({ className }: { className?: string }) {
-  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 012 2v7"/><path d="M11 18H8a2 2 0 01-2-2V9"/></svg>;
-}
 function IconBot({ className }: { className?: string }) {
   return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>;
 }
@@ -74,9 +71,6 @@ function IconPipelines({ className }: { className?: string }) {
 }
 function IconReports({ className }: { className?: string }) {
   return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>;
-}
-function IconSaveMoney({ className }: { className?: string }) {
-  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a10 10 0 100 20A10 10 0 0012 2z"/><path d="M12 6v6l4 2"/><path d="M9 12h6"/></svg>;
 }
 function IconNotifications({ className }: { className?: string }) {
   return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>;
@@ -185,7 +179,6 @@ const navSections: NavSection[] = [
     items: [
       { href: "/pipelines", labelKey: "pipelines", icon: IconPipelines },
       { href: "/crm", labelKey: "crm", icon: IconCRM },
-      { href: "/save-money", labelKey: "saveMoney", icon: IconSaveMoney },
     ],
   },
   {
@@ -201,8 +194,7 @@ const navSections: NavSection[] = [
   {
     labelKey: "sectionAutomation",
     items: [
-      { href: "/automations", labelKey: "automations", icon: IconAutomations },
-      { href: "/automations/flows", labelKey: "automationFlows", icon: IconFlows },
+      { href: "/automations", labelKey: "automationFlows", icon: IconAutomations },
       { href: "/automations/bot-builder", labelKey: "botFlowBuilder", icon: IconBot, beta: true },
       { href: "/automations/followups", labelKey: "aiFollowups", icon: IconFollowups },
       { href: "/automations/quick-replies", labelKey: "quickReplies", icon: IconQuickReplies },

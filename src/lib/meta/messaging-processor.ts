@@ -28,6 +28,7 @@ import { dispatchInboundToFlows } from '@/lib/flows/engine';
 import { dispatchInboundToAiReply } from '@/lib/ai/auto-reply';
 import { dispatchWebhookEvent } from '@/lib/webhooks/deliver';
 import { generateFallbackPhone } from '@/lib/meta/lead-processor';
+import { onInboundMessage } from '@/lib/crm/activity';
 import {
   fetchMessengerProfile,
   fetchInstagramProfile,
@@ -284,6 +285,18 @@ async function processMessagingEvent(event: MessengerWebhookMessagingEvent) {
   }
 
   console.log('[messaging] PERSISTED platform=', platform, 'mid=', mid, 'conversation_id=', conversation.id, 'contact_id=', contact.id, 'account_id=', accountId);
+
+  // CRM activity log + follow-up rules (best-effort, idempotent on mid).
+  void onInboundMessage(admin, {
+    accountId,
+    contactId: contact.id,
+    conversationId: conversation.id,
+    providerMessageId: mid,
+    channel: platform,
+    body: contentText ?? null,
+    status: 'delivered',
+    occurredAt: timestampMs.toISOString(),
+  });
 
   // Contact recency + conversation state (lifted from broadcast/lead
   // scoring signals — same updates the WhatsApp webhook makes).

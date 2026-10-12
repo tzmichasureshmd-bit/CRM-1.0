@@ -9,6 +9,7 @@ import { runAutomationsForTrigger } from '@/lib/automations/engine'
 import { dispatchInboundToFlows } from '@/lib/flows/engine'
 import { dispatchInboundToAiReply } from '@/lib/ai/auto-reply'
 import { dispatchWebhookEvent } from '@/lib/webhooks/deliver'
+import { onInboundMessage } from '@/lib/crm/activity'
 import {
   handleTemplateWebhookChange,
   isTemplateWebhookField,
@@ -845,6 +846,18 @@ async function processMessage(
         )
       }
     })
+
+  // CRM activity log + follow-up rules (best-effort, idempotent on message id).
+  void onInboundMessage(supabaseAdmin(), {
+    accountId,
+    contactId: contactRecord.id,
+    conversationId: conversation.id,
+    providerMessageId: message.id,
+    channel: 'whatsapp',
+    body: contentText ?? null,
+    status: 'delivered',
+    occurredAt: new Date(parseInt(message.timestamp) * 1000).toISOString(),
+  })
 
   // Record "last inbound message" + clear any stale registration error on
   // the owning config (diagnostics). The number demonstrably routes events

@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { getCurrentAccount, toErrorResponse } from "@/lib/auth/account";
-import type { FollowUp } from "@/types";
+import { recordActivity } from "@/lib/crm/activity";
+import type { FollowUp, FollowUpPriority } from "@/types";
+
+const PRIORITIES: readonly FollowUpPriority[] = ["low", "normal", "high", "urgent"];
 
 export async function GET(
   request: Request,
@@ -41,11 +44,18 @@ export async function PATCH(
     }
 
     const updates: Record<string, unknown> = {};
-    const allowedFields = ["title", "description", "due_date", "reminder_at", "status"];
+    const allowedFields = ["title", "description", "due_date", "reminder_at", "status", "priority"];
     for (const field of allowedFields) {
       if (field in body) {
         updates[field] = body[field];
       }
+    }
+
+    if (
+      "priority" in updates &&
+      !(typeof updates.priority === "string" && (PRIORITIES as readonly string[]).includes(updates.priority))
+    ) {
+      return NextResponse.json({ error: "Invalid priority" }, { status: 400 });
     }
 
     if (updates.status === "completed") {
@@ -71,7 +81,49 @@ export async function PATCH(
       return NextResponse.json({ error: "Failed to update follow-up" }, { status: 500 });
     }
 
-    return NextResponse.json(data as FollowUp);
+    const updated = data as FollowUp;
+    const occurredAt = new Date().toISOString();
+
+    if (updates.status === "completed") {
+      await recordActivity(ctx.supabase, {
+        accountId: ctx.accountId,
+        contactId: updated.contact_id,
+        userId: ctx.userId,
+        kind: "follow_up_completed",
+        title: `Follow-up completed: ${updated.title}`,
+        body: updated.description ?? null,
+        status: "completed",
+        externalId: `followup:${updated.id}:completed:${updated.completed_at ?? occurredAt}`,
+        occurredAt: updated.completed_at ?? occurredAt,
+        metadata: { followUpId: updated.id },
+      });
+    } else if (updates.status === "cancelled") {
+      await recordActivity(ctx.supabase, {
+        accountId: ctx.accountId,
+        contactId: updated.contact_id,
+        userId: ctx.userId,
+        kind: "follow_up_cancelled",
+        title: `Follow-up cancelled: ${updated.title}`,
+        status: "cancelled",
+        externalId: `followup:${updated.id}:cancelled:${occurredAt}`,
+        occurredAt,
+        metadata: { followUpId: updated.id },
+      });
+    } else if ("due_date" in updates) {
+      await recordActivity(ctx.supabase, {
+        accountId: ctx.accountId,
+        contactId: updated.contact_id,
+        userId: ctx.userId,
+        kind: "follow_up_rescheduled",
+        title: `Follow-up rescheduled: ${updated.title}`,
+        status: updated.priority ?? "normal",
+        externalId: `followup:${updated.id}:rescheduled:${occurredAt}`,
+        occurredAt,
+        metadata: { followUpId: updated.id, dueDate: updated.due_date },
+      });
+    }
+
+    return NextResponse.json(updated);
   } catch (err) {
     return toErrorResponse(err);
   }

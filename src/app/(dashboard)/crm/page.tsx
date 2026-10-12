@@ -1,50 +1,37 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useCan } from "@/hooks/use-can";
-import type {
-  Deal,
-  FollowUp,
-  Pipeline,
-  PipelineStage,
-  Tag,
-} from "@/types";
-import {
-  stageMilestone,
-  leadStatusForMilestone,
-  attentionItems,
-  waLink,
-  type LeadProgression,
-} from "@/lib/crm/leads";
-import { setContactLeadStatus } from "@/lib/crm/lead-status";
-import {
-  CrmPipelineBoard,
-} from "@/components/crm/crm-pipeline-board";
-import { CrmStats, type CrmStats as CrmStatsShape } from "@/components/crm/crm-stats";
-import {
-  CrmFilters,
-  DEFAULT_FILTERS,
-  QUICK_FILTERS,
-  type CrmFilterState,
-} from "@/components/crm/crm-filters";
-import { CrmLeadList } from "@/components/crm/crm-lead-list";
-import { CrmAnalytics } from "@/components/crm/crm-analytics";
-import { CrmNeedsAttention } from "@/components/crm/crm-needs-attention";
-import { DealForm } from "@/components/pipelines/deal-form";
-import { PipelineSettings } from "@/components/pipelines/pipeline-settings";
+import { toast } from "sonner";
+import { useTranslations } from "next-intl";
+import type { Contact, ContactTag, FollowUp, Tag } from "@/types";
+import { LEAD_STATUS_OPTIONS } from "@/lib/crm/lead-status";
+import { sourceBadgeInfo, waLink } from "@/lib/crm/leads";
+import { LeadStatusBadge } from "@/components/crm/lead-status-badge";
+import { ContactForm } from "@/components/contacts/contact-form";
 import { ContactDetailView } from "@/components/contacts/contact-detail-view";
+import { ImportModal } from "@/components/contacts/import-modal";
+import { CustomFieldsManager } from "@/components/contacts/custom-fields-manager";
+import { SendMessageModal } from "@/components/contacts/send-message-modal";
+import { ConfidentialWatermark } from "@/components/shared/confidential-watermark";
+import { CrmOverview, type WorkspaceTab, type NavigateOptions } from "@/components/crm/crm-overview";
+import { CrmFollowUpCenter } from "@/components/crm/crm-followup-center";
+import { CrmActivityTimeline } from "@/components/crm/crm-activity-timeline";
 import { Button } from "@/components/ui/button";
 import { GatedButton } from "@/components/ui/gated-button";
+import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -52,946 +39,1414 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
-  GitBranch,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Search,
   Plus,
-  ChevronDown,
-  Settings,
-  Target,
-  Columns3,
-  List,
-  ChartColumn,
-  RefreshCw,
+  Upload,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+  Loader2,
+  Users,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  ArrowUp,
+  ArrowDown,
+  SlidersHorizontal,
+  MessageSquare,
+  Phone as PhoneIcon,
+  Mail,
+  Building2,
+  CalendarClock,
+  AlarmClock,
+  Sparkles,
+  Activity,
+  UserCheck,
+  Tag as TagIcon,
+  Clock,
 } from "lucide-react";
-import { toast } from "sonner";
-import { useTranslations } from "next-intl";
 
-type CrmView = "kanban" | "list" | "analytics";
+const PAGE_SIZE = 25;
 
-// Same seed the Pipelines page uses, so the CRM tab and /pipelines share
-// one source of truth for newly-created pipelines.
-const SPEC_DEFAULT_STAGES = [
-  { name: "New Lead", color: "#3b82f6", position: 0 },
-  { name: "Qualified", color: "#eab308", position: 1 },
-  { name: "Proposal Sent", color: "#f97316", position: 2 },
-  { name: "Negotiation", color: "#8b5cf6", position: 3 },
-  { name: "Won", color: "#22c55e", position: 4 },
-  { name: "Lost", color: "#ef4444", position: 5 },
+const TABS = [
+  "all",
+  "active",
+  "new",
+  "contacted",
+  "qualified",
+  "won",
+  "lost",
+] as const;
+type TabKey = (typeof TABS)[number];
+
+const SOURCES: { value: string; label: string }[] = [
+  { value: "facebook", label: "Facebook" },
+  { value: "instagram", label: "Instagram" },
+  { value: "meta", label: "Meta" },
+  { value: "whatsapp", label: "WhatsApp" },
+  { value: "google_form", label: "Google Form" },
+  { value: "website", label: "Website" },
+  { value: "manual", label: "Manual" },
 ];
+
+const ACTIVE_STATUSES = ["new", "contacted", "qualified", "proposal", "negotiation"];
+
+interface Row extends Contact {
+  tags?: Tag[];
+}
+
+type Group = { field: string; op: string; value: string }[];
+
+function initials(name?: string | null): string {
+  if (!name) return "?";
+  return name
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+function relativeTime(iso?: string | null, locale = "en-US"): string {
+  if (!iso) return "—";
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "—";
+  const diff = Date.now() - then;
+  const mins = Math.round(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.round(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString(locale, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function formatDate(iso?: string | null, locale = "en-US"): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString(locale, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function endOfToday(): number {
+  const d = new Date();
+  d.setHours(23, 59, 59, 999);
+  return d.getTime();
+}
 
 export default function CrmPage() {
   const t = useTranslations("Crm");
-  const ma = useTranslations("Crm.mainActions");
   const supabase = createClient();
-  const router = useRouter();
-  const { accountId, defaultCurrency } = useAuth();
+  const { accountId, profile, account } = useAuth();
+  const canEdit = useCan("send-messages");
   const canEditSettings = useCan("edit-settings");
-  const canCreateDeals = useCan("send-messages");
 
-  const [pipelines, setPipelines] = useState<Pipeline[]>([]);
-  const [selectedPipelineId, setSelectedPipelineId] = useState("");
-  const [stages, setStages] = useState<PipelineStage[]>([]);
-  const [deals, setDeals] = useState<Deal[]>([]);
+  const [contacts, setContacts] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+  const [activeTab, setActiveTab] = useState<TabKey>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [sourceFilter, setSourceFilter] = useState<string>("all");
+  const [tagIds, setTagIds] = useState<string[]>([]);
+  const [sort, setSort] = useState("created_at");
+  const [sortAsc, setSortAsc] = useState(false);
+  const [rangeFilter, setRangeFilter] = useState<"last7" | null>(null);
+
+  const [activeCount, setActiveCount] = useState<number | null>(null);
+
+  const [stats, setStats] = useState<{
+    total_contacts: number;
+    total_leads: number;
+    new_leads: number;
+    week_leads: number;
+  } | null>(null);
 
   const [followUps, setFollowUps] = useState<FollowUp[]>([]);
-  const [contactTags, setContactTags] = useState<Record<string, Tag[]>>({});
-  const [conversationsByContact, setConversationsByContact] = useState<
-    Record<string, string>
-  >({});
+  const [assignees, setAssignees] = useState<Record<string, string>>({});
+  const [allTags, setAllTags] = useState<Tag[]>([]);
+  const [followUpNames, setFollowUpNames] = useState<Record<string, Row>>({});
 
-  const [view, setView] = useState<CrmView>("kanban");
-  const [filters, setFilters] = useState<CrmFilterState>(DEFAULT_FILTERS);
-  const [activeQuick, setActiveQuick] = useState("all");
+  // Modals
+  const [formOpen, setFormOpen] = useState(false);
+  const [editContact, setEditContact] = useState<Contact | null>(null);
+  const [editContactTags, setEditContactTags] = useState<ContactTag[]>([]);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailContactId, setDetailContactId] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [customFieldsOpen, setCustomFieldsOpen] = useState(false);
+  const [sendOpen, setSendOpen] = useState(false);
+  const [sendTarget, setSendTarget] = useState<Contact | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Contact | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [followUpsOpen, setFollowUpsOpen] = useState(false);
 
-  // Dialogs / sheets
-  const [dealFormOpen, setDealFormOpen] = useState(false);
-  const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
-  const [defaultStageId, setDefaultStageId] = useState("");
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [contactDetailOpen, setContactDetailOpen] = useState(false);
-  const [contactId, setContactId] = useState<string | null>(null);
-  const [newPipelineOpen, setNewPipelineOpen] = useState(false);
-  const [newPipelineName, setNewPipelineName] = useState("");
-  const [creating, setCreating] = useState(false);
+  // Workspace (top-level) tabs — Overview is the landing tab.
+  const [topTab, setTopTab] = useState<WorkspaceTab>("overview");
+  const [followUpBucket, setFollowUpBucket] = useState<
+    "overdue" | "today" | "upcoming" | "all"
+  >("all");
+  const [overviewKey, setOverviewKey] = useState(0);
 
-  const seedAttempted = useRef(false);
-
-  const sortedStages = useMemo(
-    () => [...stages].sort((a, b) => a.position - b.position),
-    [stages],
-  );
-
-  // ---------------------------------------------------------------
-  // Loaders
-  // ---------------------------------------------------------------
-
-  const loadPipelines = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("pipelines")
-      .select("*")
-      .order("created_at");
-    if (error) {
-      console.error("Failed to load pipelines:", error.message);
-      return [] as Pipeline[];
-    }
-    return (data ?? []) as Pipeline[];
-  }, [supabase]);
-
-  const loadStages = useCallback(
-    async (pipelineId: string) => {
-      const { data } = await supabase
-        .from("pipeline_stages")
-        .select("*")
-        .eq("pipeline_id", pipelineId)
-        .order("position");
-      return (data ?? []) as PipelineStage[];
+  const handleNavigate = useCallback(
+    (tab: WorkspaceTab, opts?: NavigateOptions) => {
+      if (opts?.bucket) setFollowUpBucket(opts.bucket);
+      setTopTab(tab);
     },
-    [supabase],
+    [],
   );
 
-  const loadDeals = useCallback(
-    async (pipelineId: string) => {
-      const { data } = await supabase
-        .from("deals")
-        .select("*, contact:contacts(*), assignee:profiles!deals_assigned_to_fkey(*)")
-        .eq("pipeline_id", pipelineId)
-        .order("created_at", { ascending: false });
-      return (data ?? []) as Deal[];
-    },
-    [supabase],
-  );
+  const refreshOverview = useCallback(() => setOverviewKey((k) => k + 1), []);
 
-  const loadFollowUps = useCallback(async () => {
-    if (!accountId) return [] as FollowUp[];
-    const { data } = await supabase
-      .from("follow_ups")
-      .select("*")
-      .eq("account_id", accountId)
-      .eq("status", "pending")
-      .order("due_date", { ascending: true });
-    return (data ?? []) as FollowUp[];
-  }, [supabase, accountId]);
+  const fetchSeq = useRef(0);
 
-  const loadContactTags = useCallback(async (dealList: Deal[]) => {
-    const contactIds = Array.from(
-      new Set(
-        dealList
-          .map((d) => d.contact_id)
-          .filter((id): id is string => Boolean(id)),
-      ),
-    );
-    if (contactIds.length === 0) {
-      setContactTags({});
-      return;
-    }
-    const { data } = await supabase
-      .from("contacts")
-      .select("id, tags:contact_tags(tag:tags(*))")
-      .in("id", contactIds);
-    const map: Record<string, Tag[]> = {};
-    for (const row of data ?? []) {
-      const tags = (row.tags ?? [])
-        .map((ct: { tag?: Tag | Tag[] }) => ct.tag)
-        .flat()
-        .filter(Boolean) as Tag[];
-      map[row.id as string] = tags;
-    }
-    setContactTags(map);
-  }, [supabase]);
-
-  const loadConversations = useCallback(async (dealList: Deal[]) => {
-    const contactIds = Array.from(
-      new Set(
-        dealList
-          .map((d) => d.contact_id)
-          .filter((id): id is string => Boolean(id)),
-      ),
-    );
-    if (contactIds.length === 0) {
-      setConversationsByContact({});
-      return;
-    }
-    const { data } = await supabase
-      .from("conversations")
-      .select("id, contact_id, last_message_at")
-      .in("contact_id", contactIds)
-      .order("last_message_at", { ascending: false });
-    const map: Record<string, string> = {};
-    for (const row of data ?? []) {
-      const cid = row.contact_id as string;
-      if (!map[cid]) map[cid] = row.id as string;
-    }
-    setConversationsByContact(map);
-  }, [supabase]);
-
-  const seedDefaultPipeline = useCallback(async (): Promise<Pipeline | null> => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    const user = session?.user;
-    if (!user) return null;
-    if (!accountId) return null;
-
-    const { data: pipeline, error } = await supabase
-      .from("pipelines")
-      .insert({ user_id: user.id, account_id: accountId, name: "Sales Pipeline" })
-      .select()
-      .single();
-    if (error || !pipeline) {
-      console.error("Failed to seed pipeline:", error?.message);
-      return null;
-    }
-    const stagesPayload = SPEC_DEFAULT_STAGES.map((s) => ({
-      pipeline_id: pipeline.id,
-      name: s.name,
-      color: s.color,
-      position: s.position,
-    }));
-    await supabase.from("pipeline_stages").insert(stagesPayload);
-    return pipeline as Pipeline;
-  }, [supabase, accountId]);
-
-  // Initial load + seed-if-empty
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      setLoadError(null);
-      try {
-        let list = await loadPipelines();
-        if (list.length === 0 && !seedAttempted.current) {
-          seedAttempted.current = true;
-          const seeded = await seedDefaultPipeline();
-          if (seeded) list = await loadPipelines();
-        }
-        if (cancelled) return;
-        setPipelines(list);
-        if (list.length > 0) {
-          setSelectedPipelineId((prev) =>
-            prev && list.some((p) => p.id === prev) ? prev : list[0].id,
-          );
-        } else {
-          setSelectedPipelineId("");
-        }
-      } catch (e) {
-        console.error("CRM load failed:", e);
-        if (!cancelled) setLoadError(e instanceof Error ? e.message : "unknown");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [loadPipelines, seedDefaultPipeline]);
-
-  // Load stages + deals + context whenever the selected pipeline changes
-  useEffect(() => {
-    if (!selectedPipelineId) {
-      setStages([]);
-      setDeals([]);
-      setFollowUps([]);
-      setContactTags({});
-      setConversationsByContact({});
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      const [s, d, f] = await Promise.all([
-        loadStages(selectedPipelineId),
-        loadDeals(selectedPipelineId),
-        loadFollowUps(),
-      ]);
-      if (cancelled) return;
-      setStages(s);
-      setDeals(d);
-      setFollowUps(f);
-      await Promise.all([loadContactTags(d), loadConversations(d)]);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    selectedPipelineId,
-    loadStages,
-    loadDeals,
-    loadFollowUps,
-    loadContactTags,
-    loadConversations,
-  ]);
+  const locale =
+    typeof navigator !== "undefined" ? navigator.language || "en-US" : "en-US";
 
   // ---------------------------------------------------------------
-  // Derived state
+  // Derived
   // ---------------------------------------------------------------
 
   const followUpsByContact = useMemo(() => {
     const map: Record<string, FollowUp> = {};
     for (const f of followUps) {
-      if (!map[f.contact_id]) map[f.contact_id] = f;
+      if (f.status !== "pending") continue;
+      const existing = map[f.contact_id];
+      if (!existing) map[f.contact_id] = f;
+      else if (f.due_date && (!existing.due_date || f.due_date < existing.due_date)) {
+        map[f.contact_id] = f;
+      }
     }
     return map;
   }, [followUps]);
 
-  const stats: CrmStatsShape = useMemo(() => {
-    const progressionOf = (d: Deal) => {
-      const stage = sortedStages.find((s) => s.id === d.stage_id);
-      return stage ? stageMilestone(stage) : null;
-    };
-    const qualified: LeadProgression[] = ["qualified", "proposal", "negotiation"];
-    let total = 0,
-      new_ = 0,
-      inProgress = 0,
-      qualifiedCount = 0,
-      followUpCount = 0,
-      won = 0,
-      lost = 0;
-    for (const d of deals) {
-      total++;
-      const m = progressionOf(d);
-      if (m === "new") new_++;
-      if (d.status === "open") {
-        inProgress++;
-        if (m && (qualified as string[]).includes(m)) qualifiedCount++;
-        if (d.contact_id && followUpsByContact[d.contact_id]) followUpCount++;
-      }
-      if (d.status === "won") won++;
-      if (d.status === "lost") lost++;
-    }
-    return {
-      total,
-      new: new_,
-      inProgress,
-      qualified: qualifiedCount,
-      followUpRequired: followUpCount,
-      converted: won,
-      lost,
-      conversionRate: won + lost > 0 ? Math.round((won / (won + lost)) * 100) : 0,
-    };
-  }, [deals, sortedStages, followUpsByContact]);
-
-  const agents = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const d of deals) {
-      if (d.assignee?.full_name) {
-        map.set(d.assignee.id, d.assignee.full_name);
-      }
-    }
-    return Array.from(map, ([id, name]) => ({ id, name }));
-  }, [deals]);
-
-  const sources = useMemo(() => {
-    const set = new Set<string>();
-    for (const d of deals) {
-      const c = d.contact;
-      if (!c) continue;
-      set.add(c.source || c.source_platform || "Unknown");
-    }
-    return Array.from(set).sort();
-  }, [deals]);
-
-  const allTags = useMemo(() => {
-    const map = new Map<string, Tag>();
-    for (const tags of Object.values(contactTags)) {
-      for (const tag of tags) map.set(tag.id, tag);
-    }
-    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [contactTags]);
-
-  const filteredDeals = useMemo(() => {
-    let list = deals;
-    switch (activeQuick) {
-      case "new":
-        list = list.filter((d) => {
-          const stage = sortedStages.find((s) => s.id === d.stage_id);
-          return stage ? stageMilestone(stage) === "new" : false;
-        });
-        break;
-      case "qualified":
-        list = list.filter((d) => {
-          const stage = sortedStages.find((s) => s.id === d.stage_id);
-          const m = stage ? stageMilestone(stage) : null;
-          return (
-            d.status === "open" &&
-            (m === "qualified" || m === "proposal" || m === "negotiation")
-          );
-        });
-        break;
-      case "follow_up":
-        list = list.filter(
-          (d) =>
-            d.status === "open" &&
-            !!d.contact_id &&
-            !!followUpsByContact[d.contact_id],
-        );
-        break;
-      case "won":
-        list = list.filter((d) => d.status === "won");
-        break;
-      case "lost":
-        list = list.filter((d) => d.status === "lost");
-        break;
-      default:
-        break;
-    }
-
-    const q = filters.search.trim().toLowerCase();
-    if (q) {
-      list = list.filter((d) => {
-        const c = d.contact;
-        const haystack = [
-          d.title,
-          c?.name,
-          c?.phone,
-          c?.email,
-          c?.company,
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
-        return haystack.includes(q);
+  const followUpsDue = useMemo(() => {
+    const limit = endOfToday();
+    return followUps
+      .filter(
+        (f) =>
+          f.status === "pending" &&
+          (!f.due_date || new Date(f.due_date).getTime() <= limit),
+      )
+      .sort((a, b) => {
+        const av = a.due_date ? new Date(a.due_date).getTime() : Infinity;
+        const bv = b.due_date ? new Date(b.due_date).getTime() : Infinity;
+        return av - bv;
       });
-    }
-    if (filters.stageId) list = list.filter((d) => d.stage_id === filters.stageId);
-    if (filters.agentId) list = list.filter((d) => d.assigned_to === filters.agentId);
-    if (filters.status) list = list.filter((d) => d.status === filters.status);
-    if (filters.source) {
-      list = list.filter(
-        (d) =>
-          d.contact &&
-          (d.contact.source === filters.source ||
-            d.contact.source_platform === filters.source),
-      );
-    }
-    if (filters.tagId) {
-      list = list.filter((d) =>
-        (contactTags[d.contact_id ?? ""] ?? []).some(
-          (tag) => tag.id === filters.tagId,
-        ),
-      );
-    }
-    if (filters.minScore > 0) {
-      list = list.filter((d) => (d.contact?.lead_score ?? 0) >= filters.minScore);
-    }
-    return list;
-  }, [deals, activeQuick, filters, sortedStages, followUpsByContact, contactTags]);
+  }, [followUps]);
 
-  const attentionList = useMemo(
-    () => attentionItems(deals, followUps),
-    [deals, followUps],
+  const buildGroups = useCallback((): Group[] => {
+    const groups: Group[] = [];
+    const tabCond: Group | null =
+      activeTab === "all"
+        ? null
+        : activeTab === "active"
+          ? ACTIVE_STATUSES.map((s) => ({
+              field: "lead_status",
+              op: "is",
+              value: s,
+            }))
+          : [{ field: "lead_status", op: "is", value: activeTab }];
+    if (tabCond) groups.push(tabCond);
+    if (statusFilter !== "all") {
+      groups.push([{ field: "lead_status", op: "is", value: statusFilter }]);
+    }
+    if (sourceFilter !== "all") {
+      if (sourceFilter === "meta") {
+        groups.push([
+          { field: "source_platform", op: "is", value: "facebook" },
+          { field: "source_platform", op: "is", value: "instagram" },
+        ]);
+      } else if (sourceFilter === "facebook" || sourceFilter === "instagram") {
+        groups.push([
+          { field: "source_platform", op: "is", value: sourceFilter },
+        ]);
+      } else {
+        groups.push([{ field: "source", op: "is", value: sourceFilter }]);
+      }
+    }
+    if (rangeFilter === "last7") {
+      const since = new Date();
+      since.setDate(since.getDate() - 7);
+      groups.push([
+        {
+          field: "created_at",
+          op: "after",
+          value: since.toISOString().slice(0, 10),
+        },
+      ]);
+    }
+    return groups;
+  }, [activeTab, statusFilter, sourceFilter, rangeFilter]);
+
+  // ---------------------------------------------------------------
+  // Loaders
+  // ---------------------------------------------------------------
+
+  const fetchAssignees = useCallback(
+    async (ids: string[]) => {
+      if (ids.length === 0) {
+        setAssignees({});
+        return;
+      }
+      const map: Record<string, string> = {};
+      try {
+        const { data: dealRows } = await supabase
+          .from("deals")
+          .select(
+            "contact_id, assigned_to, assignee:profiles!deals_assigned_to_fkey(full_name)",
+          )
+          .in("contact_id", ids);
+        for (const d of (dealRows ?? []) as unknown as Array<{
+          contact_id: string | null;
+          assigned_to: string | null;
+          assignee?: { full_name: string | null }[] | { full_name: string | null } | null;
+        }>) {
+          const assignee = Array.isArray(d.assignee) ? d.assignee[0] : d.assignee;
+          if (d.contact_id && d.assigned_to && assignee?.full_name && !map[d.contact_id]) {
+            map[d.contact_id] = assignee.full_name;
+          }
+        }
+
+        const { data: convRows } = await supabase
+          .from("conversations")
+          .select("contact_id, assigned_agent_id")
+          .in("contact_id", ids)
+          .not("assigned_agent_id", "is", null);
+        const agentIds = Array.from(
+          new Set(
+            ((convRows ?? []) as Array<{ assigned_agent_id: string | null }>)
+              .map((c) => c.assigned_agent_id)
+              .filter((v): v is string => Boolean(v)),
+          ),
+        );
+        if (agentIds.length > 0) {
+          const { data: profs } = await supabase
+            .from("profiles")
+            .select("id, full_name")
+            .in("id", agentIds);
+          const nameById = new Map(
+            ((profs ?? []) as Array<{ id: string; full_name: string | null }>).map(
+              (p) => [p.id, p.full_name],
+            ),
+          );
+          for (const c of (convRows ?? []) as Array<{
+            contact_id: string | null;
+            assigned_agent_id: string | null;
+          }>) {
+            if (c.contact_id && c.assigned_agent_id && !map[c.contact_id]) {
+              const name = nameById.get(c.assigned_agent_id);
+              if (name) map[c.contact_id] = name;
+            }
+          }
+        }
+      } catch {
+        /* assignment is best-effort */
+      }
+      setAssignees(map);
+    },
+    [supabase],
   );
+
+  const fetchContacts = useCallback(async () => {
+    const seq = ++fetchSeq.current;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/contacts/query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          search: search.trim() || null,
+          groups: buildGroups(),
+          tagIds,
+          page,
+          pageSize: PAGE_SIZE,
+          order: sort,
+          ascending: sortAsc,
+        }),
+      });
+      if (!res.ok) throw new Error("query failed");
+      const data = await res.json();
+      if (seq !== fetchSeq.current) return;
+      const rows = (data.contacts ?? []) as Row[];
+      setContacts(rows);
+      setTotalCount(data.totalCount ?? 0);
+      void fetchAssignees(rows.map((c) => c.id));
+    } catch {
+      if (seq !== fetchSeq.current) return;
+      toast.error(t("loadError.description"));
+    } finally {
+      if (seq === fetchSeq.current) setLoading(false);
+    }
+  }, [search, buildGroups, tagIds, page, sort, sortAsc, fetchAssignees, t]);
+
+  const fetchStats = useCallback(async () => {
+    try {
+      const res = await fetch("/api/contacts/stats", { cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.stats) setStats(data.stats);
+    } catch {
+      /* stats are best-effort */
+    }
+  }, []);
+
+  const fetchActiveCount = useCallback(async () => {
+    try {
+      const res = await fetch("/api/contacts/query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          groups: [
+            ACTIVE_STATUSES.map((s) => ({
+              field: "lead_status",
+              op: "is",
+              value: s,
+            })),
+          ],
+          page: 0,
+          pageSize: 1,
+        }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (typeof data.totalCount === "number") setActiveCount(data.totalCount);
+    } catch {
+      /* best-effort */
+    }
+  }, []);
+
+  const fetchFollowUps = useCallback(async () => {
+    if (!accountId) return;
+    try {
+      const res = await fetch("/api/follow-ups?status=pending", {
+        cache: "no-store",
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setFollowUps(Array.isArray(data) ? (data as FollowUp[]) : []);
+    } catch {
+      /* follow-ups are best-effort */
+    }
+  }, [accountId]);
+
+  const fetchTags = useCallback(async () => {
+    const { data } = await supabase.from("tags").select("*").order("name");
+    setAllTags((data ?? []) as Tag[]);
+  }, [supabase]);
+
+  useEffect(() => {
+    void fetchTags();
+  }, [fetchTags]);
+
+  useEffect(() => {
+    const id = setTimeout(() => {
+      setSearch(searchInput.trim());
+      setPage(0);
+    }, 300);
+    return () => clearTimeout(id);
+  }, [searchInput]);
+
+  useEffect(() => {
+    void fetchContacts();
+  }, [fetchContacts]);
+
+  useEffect(() => {
+    void fetchStats();
+    void fetchFollowUps();
+    void fetchActiveCount();
+  }, [fetchStats, fetchFollowUps, fetchActiveCount]);
+
+  // Resolve customer names for the follow-ups panel (bounded to due rows).
+  useEffect(() => {
+    if (!followUpsOpen || followUpsDue.length === 0) return;
+    const ids = Array.from(new Set(followUpsDue.map((f) => f.contact_id)));
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("contacts")
+        .select("id, name, phone, lead_status, created_at, updated_at, user_id, account_id")
+        .in("id", ids);
+      if (cancelled) return;
+      const map: Record<string, Row> = {};
+      for (const c of (data ?? []) as Row[]) map[c.id] = c;
+      setFollowUpNames(map);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [followUpsOpen, followUpsDue, supabase]);
 
   // ---------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------
 
-  const refreshDeals = useCallback(async () => {
-    if (!selectedPipelineId) return;
-    const d = await loadDeals(selectedPipelineId);
-    setDeals(d);
-    await Promise.all([loadContactTags(d), loadConversations(d)]);
-  }, [selectedPipelineId, loadDeals, loadContactTags, loadConversations]);
+  function refreshAll() {
+    void fetchContacts();
+    void fetchStats();
+    void fetchFollowUps();
+    void fetchActiveCount();
+  }
 
-  const refreshStages = useCallback(async () => {
-    if (!selectedPipelineId) return;
-    setStages(await loadStages(selectedPipelineId));
-  }, [selectedPipelineId, loadStages]);
+  function openAddForm() {
+    setEditContact(null);
+    setEditContactTags([]);
+    setFormOpen(true);
+  }
 
-  const refreshPipelines = useCallback(async () => {
-    const list = await loadPipelines();
-    setPipelines(list);
-    if (list.length === 0) setSelectedPipelineId("");
-    else if (!list.some((p) => p.id === selectedPipelineId))
-      setSelectedPipelineId(list[0].id);
-  }, [loadPipelines, selectedPipelineId]);
+  async function openEditForm(contact: Contact) {
+    const { data } = await supabase
+      .from("contact_tags")
+      .select("*")
+      .eq("contact_id", contact.id);
+    setEditContact(contact);
+    setEditContactTags((data ?? []) as ContactTag[]);
+    setFormOpen(true);
+  }
 
-  const handleDealMoved = useCallback(
-    async (dealId: string, newStageId: string) => {
-      const prev = deals.find((d) => d.id === dealId);
-      setDeals((prevList) =>
-        prevList.map((d) => (d.id === dealId ? { ...d, stage_id: newStageId } : d)),
-      );
-      const { error } = await supabase
-        .from("deals")
-        .update({ stage_id: newStageId })
-        .eq("id", dealId);
-      if (error) {
-        toast.error(t("loadError.title"));
-        refreshDeals();
-        return;
-      }
-      // Keep the linked contact's lead_status in sync with the stage when
-      // the stage maps cleanly to a lead-status milestone. One write path
-      // (`setContactLeadStatus`) is shared with Inbox/Contacts/Pipeline.
-      const stage = sortedStages.find((s) => s.id === newStageId);
-      const milestone = stage ? stageMilestone(stage) : null;
-      const leadStatus = milestone ? leadStatusForMilestone(milestone) : null;
-      if (leadStatus && prev?.contact_id) {
-        const sync = await setContactLeadStatus(supabase, prev.contact_id, leadStatus);
-        if (sync.ok) {
-          setDeals((prevList) =>
-            prevList.map((d) =>
-              d.id === dealId && d.contact
-                ? { ...d, contact: { ...d.contact, lead_status: sync.status } }
-                : d,
-            ),
-          );
-        } else {
-          console.warn("Failed to sync contact lead_status:", sync.error);
-        }
-      }
-    },
-    [supabase, deals, sortedStages, refreshDeals, t],
-  );
+  function openDetail(contactId: string) {
+    setDetailContactId(contactId);
+    setDetailOpen(true);
+  }
 
-  const handleAddDeal = useCallback(
-    (stageId?: string) => {
-      setEditingDeal(null);
-      setDefaultStageId(stageId ?? sortedStages[0]?.id ?? "");
-      setDealFormOpen(true);
-    },
-    [sortedStages],
-  );
+  function openSend(contact: Contact) {
+    setSendTarget(contact);
+    setSendOpen(true);
+  }
 
-  const handleEditDeal = useCallback(
-    (deal: Deal) => {
-      setEditingDeal(deal);
-      setDefaultStageId(deal.stage_id);
-      setDealFormOpen(true);
-    },
-    [],
-  );
+  function openWhatsApp(contact: Contact) {
+    const link = waLink(contact.phone);
+    if (link) window.open(link, "_blank", "noopener,noreferrer");
+  }
 
-  const handleOpenLead = useCallback(
-    (deal: Deal) => {
-      if (deal.contact_id) {
-        setContactId(deal.contact_id);
-        setContactDetailOpen(true);
-      } else {
-        handleEditDeal(deal);
-      }
-    },
-    [handleEditDeal],
-  );
-
-  const handleWhatsApp = useCallback(
-    (deal: Deal) => {
-      const conversationId =
-        deal.conversation_id || conversationsByContact[deal.contact_id ?? ""];
-      if (conversationId) {
-        router.push(`/inbox?c=${conversationId}`);
-        return;
-      }
-      const link = waLink(deal.contact?.phone);
-      if (link) {
-        window.open(link, "_blank", "noopener,noreferrer");
-      }
-    },
-    [router, conversationsByContact],
-  );
-
-  const handleStageFilter = useCallback(
-    (stageId: string) => {
-      setActiveQuick("all");
-      setFilters((f) => ({ ...f, stageId }));
-    },
-    [],
-  );
-
-  const handleClearFilters = useCallback(() => {
-    setFilters(DEFAULT_FILTERS);
-    setActiveQuick("all");
-  }, []);
-
-  async function handleCreatePipeline() {
-    const name = newPipelineName.trim();
-    if (!name) return;
-    setCreating(true);
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    const user = session?.user;
-    if (!user || !accountId) {
-      setCreating(false);
-      return;
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    const { error } = await supabase
+      .from("contacts")
+      .delete()
+      .eq("id", deleteTarget.id);
+    if (error) {
+      toast.error(t("hub.deleteFailed"));
+    } else {
+      toast.success(t("hub.deleted"));
+      if (detailContactId === deleteTarget.id) setDetailOpen(false);
+      refreshAll();
     }
-    const { data: pipeline, error } = await supabase
-      .from("pipelines")
-      .insert({ user_id: user.id, account_id: accountId, name })
-      .select()
-      .single();
-    if (error || !pipeline) {
-      toast.error(t("loadError.title"));
-      setCreating(false);
-      return;
-    }
-    const stagesPayload = SPEC_DEFAULT_STAGES.map((s) => ({
-      pipeline_id: pipeline.id,
-      name: s.name,
-      color: s.color,
-      position: s.position,
-    }));
-    await supabase.from("pipeline_stages").insert(stagesPayload);
-    setNewPipelineName("");
-    setNewPipelineOpen(false);
-    setSelectedPipelineId(pipeline.id);
-    await refreshPipelines();
-    setCreating(false);
+    setDeleting(false);
+    setDeleteTarget(null);
   }
 
-  const selectedPipeline = pipelines.find((p) => p.id === selectedPipelineId);
-
-  // ---------------------------------------------------------------
-  // Loading / error / empty states
-  // ---------------------------------------------------------------
-
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between gap-3">
-          <div className="h-8 w-56 animate-pulse rounded bg-muted" />
-          <div className="h-9 w-28 animate-pulse rounded-lg bg-muted" />
-        </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-7">
-          {Array.from({ length: 7 }).map((_, i) => (
-            <div key={i} className="h-16 animate-pulse rounded-xl bg-muted/50" />
-          ))}
-        </div>
-        <div className="flex gap-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-96 w-72 animate-pulse rounded-xl bg-muted/40" />
-          ))}
-        </div>
-      </div>
-    );
+  function clearFilters() {
+    setSearchInput("");
+    setSearch("");
+    setActiveTab("all");
+    setStatusFilter("all");
+    setSourceFilter("all");
+    setTagIds([]);
+    setRangeFilter(null);
+    setPage(0);
   }
 
-  if (loadError) {
-    return (
-      <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-20">
-        <Target className="h-12 w-12 text-muted-foreground" />
-        <h3 className="mt-4 text-lg font-medium text-foreground">
-          {t("loadError.title")}
-        </h3>
-        <p className="mt-2 max-w-sm text-center text-sm text-muted-foreground">
-          {t("loadError.description")}
-        </p>
-        <Button
-          onClick={() => {
-            setLoadError(null);
-            setLoading(true);
-            seedAttempted.current = false;
-            // Simple retry: refetch pipelines via the normal path
-            (async () => {
-              const list = await loadPipelines();
-              setPipelines(list);
-              if (list.length > 0) setSelectedPipelineId(list[0].id);
-              setLoading(false);
-            })();
-          }}
-          className="mt-4 bg-primary text-primary-foreground hover:bg-primary/90"
-        >
-          <RefreshCw className="mr-1 h-4 w-4" />
-          {t("loadError.retry")}
-        </Button>
-      </div>
-    );
-  }
+  const hasActiveFilters =
+    search.trim().length > 0 ||
+    activeTab !== "all" ||
+    statusFilter !== "all" ||
+    sourceFilter !== "all" ||
+    rangeFilter !== null ||
+    tagIds.length > 0;
+
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+  const hasNext = page < totalPages - 1;
+  const hasPrev = page > 0;
+
+  const metrics = [
+    {
+      key: "total",
+      label: t("hub.totalCustomers"),
+      value: stats?.total_contacts ?? totalCount,
+      icon: Users,
+      accent: "text-primary",
+      onClick: clearFilters,
+      active: false,
+    },
+    {
+      key: "new",
+      label: t("stats.newLeads"),
+      value: stats?.new_leads ?? 0,
+      icon: Sparkles,
+      accent: "text-blue-500",
+      onClick: () => {
+        setActiveTab(activeTab === "new" ? "all" : "new");
+        setPage(0);
+      },
+      active: activeTab === "new",
+    },
+    {
+      key: "active",
+      label: t("hub.activeLeads"),
+      value: activeCount ?? stats?.total_leads ?? 0,
+      icon: Activity,
+      accent: "text-emerald-500",
+      onClick: () => {
+        setActiveTab(activeTab === "active" ? "all" : "active");
+        setPage(0);
+      },
+      active: activeTab === "active",
+    },
+    {
+      key: "followups",
+      label: t("hub.followUpsDue"),
+      value: followUpsDue.length,
+      icon: AlarmClock,
+      accent: "text-amber-500",
+      onClick: () => setFollowUpsOpen(true),
+      active: false,
+    },
+    {
+      key: "week",
+      label: t("hub.recentlyAdded"),
+      value: stats?.week_leads ?? 0,
+      icon: CalendarClock,
+      accent: "text-violet-500",
+      onClick: () => {
+        setRangeFilter(rangeFilter === "last7" ? null : "last7");
+        setActiveTab("all");
+        setPage(0);
+      },
+      active: rangeFilter === "last7",
+    },
+  ];
+
+  const SORTS = [
+    { value: "created_at", label: t("hub.sortNewest") },
+    { value: "name", label: t("hub.sortName") },
+    { value: "lead_status", label: t("hub.sortStatus") },
+    { value: "location", label: t("hub.sortLocation") },
+    { value: "category", label: t("hub.sortCategory") },
+  ];
 
   return (
-    <div className="space-y-5">
-      {/* Header: pipeline selector + actions */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <DropdownMenu>
-            <DropdownMenuTrigger className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted data-[popup-open]:bg-muted">
-              <GitBranch className="h-4 w-4 text-primary" />
-              <span className="font-semibold">
-                {selectedPipeline?.name ?? t("selectPipeline")}
-              </span>
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="start"
-              className="w-64 border-border bg-popover text-popover-foreground"
-            >
-              {pipelines.length === 0 && (
-                <DropdownMenuItem disabled className="text-muted-foreground">
-                  {t("empty.title")}
-                </DropdownMenuItem>
-              )}
-              {pipelines.map((p) => (
-                <DropdownMenuItem
-                  key={p.id}
-                  onClick={() => setSelectedPipelineId(p.id)}
-                  className={
-                    p.id === selectedPipelineId
-                      ? "text-primary"
-                      : "text-popover-foreground"
-                  }
-                >
-                  <GitBranch className="mr-2 h-3.5 w-3.5" />
-                  {p.name}
-                </DropdownMenuItem>
-              ))}
-              <DropdownMenuSeparator className="bg-border" />
-              {selectedPipeline && (
-                <DropdownMenuItem
-                  onClick={() => setSettingsOpen(true)}
-                  className="text-popover-foreground"
-                >
-                  <Settings className="mr-2 h-3.5 w-3.5" />
-                  {ma("managePipelines")}
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+    <div className="crm-protected space-y-5">
+      <ConfidentialWatermark
+        identifier={profile?.full_name || account?.name || undefined}
+      />
 
-          {/* View switcher */}
-          <div className="flex items-center rounded-lg border border-border bg-card p-0.5">
-            {(
-              [
-                ["kanban", Columns3],
-                ["list", List],
-                ["analytics", ChartColumn],
-              ] as Array<[CrmView, typeof List]>
-            ).map(([key, Icon]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setView(key)}
-                aria-pressed={view === key}
-                className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                  view === key
-                    ? "bg-muted text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">{t(`nav.${key}`)}</span>
-              </button>
-            ))}
-          </div>
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">
+            {t("page.title")}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {totalCount > 0
+              ? t("hub.subtitle", { count: totalCount })
+              : t("hub.subtitleZero")}
+          </p>
         </div>
-
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {canEditSettings && (
+            <Button
+              variant="outline"
+              onClick={() => setCustomFieldsOpen(true)}
+              className="border-border text-muted-foreground hover:bg-muted"
+            >
+              <SlidersHorizontal className="size-4" />
+              {t("hub.customFields")}
+            </Button>
+          )}
           <GatedButton
             variant="outline"
-            canAct={canEditSettings}
-            gateReason="create pipelines"
-            onClick={() => setNewPipelineOpen(true)}
-            className="border-border bg-card text-foreground hover:bg-muted"
+            canAct={canEdit}
+            gateReason="import contacts"
+            onClick={() => setImportOpen(true)}
+            className="border-border text-muted-foreground hover:bg-muted"
           >
-            <Plus className="mr-1 h-4 w-4" />
-            {ma("newPipeline")}
+            <Upload className="size-4" />
+            {t("hub.import")}
           </GatedButton>
           <GatedButton
-            canAct={canCreateDeals}
-            gateReason="create deals"
-            disabled={!selectedPipelineId || sortedStages.length === 0}
-            onClick={() => handleAddDeal()}
+            canAct={canEdit}
+            gateReason="add contacts"
+            onClick={openAddForm}
             className="bg-primary text-primary-foreground hover:bg-primary/90"
           >
-            <Plus className="mr-1 h-4 w-4" />
-            {t("addLead")}
+            <Plus className="size-4" />
+            {t("hub.addCustomer")}
           </GatedButton>
         </div>
       </div>
 
-      {pipelines.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-20">
-          <GitBranch className="h-12 w-12 text-muted-foreground" />
-          <h3 className="mt-4 text-lg font-medium text-foreground">
-            {t("empty.title")}
-          </h3>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {t("empty.description")}
-          </p>
-          <GatedButton
-            canAct={canEditSettings}
-            gateReason="create pipelines"
-            onClick={() => setNewPipelineOpen(true)}
-            className="mt-4 bg-primary text-primary-foreground hover:bg-primary/90"
+      {/* Workspace tabs */}
+      <div className="flex flex-wrap gap-1 rounded-lg border border-border p-1">
+        {(
+          [
+            { key: "overview", label: t("workspace.tabOverview") },
+            { key: "followups", label: t("workspace.tabFollowups") },
+            { key: "activity", label: t("workspace.tabActivity") },
+            { key: "customers", label: t("workspace.tabCustomers") },
+          ] as { key: WorkspaceTab; label: string }[]
+        ).map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => handleNavigate(tab.key)}
+            aria-pressed={topTab === tab.key}
+            className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              topTab === tab.key
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            }`}
           >
-            <Plus className="mr-1 h-4 w-4" />
-            {ma("newPipeline")}
-          </GatedButton>
-        </div>
-      ) : deals.length === 0 ? (
-        <>
-          <CrmStats stats={stats} activeFilter={activeQuick} onSelect={setActiveQuick} />
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-20">
-            <Target className="h-12 w-12 text-muted-foreground" />
-            <h3 className="mt-4 text-lg font-medium text-foreground">
-              {t("empty.title")}
-            </h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {t("empty.description")}
-            </p>
-            <GatedButton
-              canAct={canCreateDeals}
-              gateReason="create deals"
-              onClick={() => handleAddDeal()}
-              className="mt-4 bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-              <Plus className="mr-1 h-4 w-4" />
-              {t("empty.addFirstLead")}
-            </GatedButton>
-          </div>
-        </>
-      ) : (
-        <>
-          <CrmStats stats={stats} activeFilter={activeQuick} onSelect={setActiveQuick} />
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-          {view === "analytics" ? (
-            <>
-              <CrmAnalytics
-                stages={sortedStages}
-                deals={deals}
-                defaultCurrency={defaultCurrency}
-              />
-              <CrmNeedsAttention
-                items={attentionList}
-                sortedStages={sortedStages}
-                defaultCurrency={defaultCurrency}
-                onOpenLead={handleOpenLead}
-                onWhatsApp={handleWhatsApp}
-              />
-            </>
-          ) : (
-            <>
-              <CrmFilters
-                dealsCount={deals.length}
-                resultCount={filteredDeals.length}
-                stages={sortedStages}
-                agents={agents}
-                sources={sources}
-                allTags={allTags}
-                quickFilters={QUICK_FILTERS}
-                activeQuick={activeQuick}
-                filters={filters}
-                onChange={setFilters}
-                onQuickChange={setActiveQuick}
-                onClear={handleClearFilters}
-              />
-
-              <CrmNeedsAttention
-                items={attentionList}
-                sortedStages={sortedStages}
-                defaultCurrency={defaultCurrency}
-                onOpenLead={handleOpenLead}
-                onWhatsApp={handleWhatsApp}
-              />
-
-              {view === "kanban" ? (
-                <CrmPipelineBoard
-                  stages={sortedStages}
-                  deals={filteredDeals}
-                  contactTags={contactTags}
-                  followUpsByContact={followUpsByContact}
-                  defaultCurrency={defaultCurrency}
-                  canManage={canEditSettings}
-                  onDealMoved={handleDealMoved}
-                  onAddDeal={handleAddDeal}
-                  onOpenLead={handleOpenLead}
-                  onWhatsApp={handleWhatsApp}
-                  onStageSettings={() => setSettingsOpen(true)}
-                  onStageFilter={handleStageFilter}
-                />
-              ) : (
-                <CrmLeadList
-                  deals={filteredDeals}
-                  sortedStages={sortedStages}
-                  followUpsByContact={followUpsByContact}
-                  defaultCurrency={defaultCurrency}
-                  onOpenLead={handleOpenLead}
-                  onWhatsApp={handleWhatsApp}
-                />
-              )}
-            </>
-          )}
-        </>
+      {topTab === "overview" && (
+        <CrmOverview key={overviewKey} onNavigate={handleNavigate} />
       )}
 
-      {/* Deal form (create / edit) */}
-      <DealForm
-        open={dealFormOpen}
-        onOpenChange={setDealFormOpen}
-        deal={editingDeal}
-        pipelineId={selectedPipelineId}
-        stages={sortedStages}
-        defaultStageId={defaultStageId}
-        onSaved={refreshDeals}
-      />
-
-      {/* Pipeline settings */}
-      {selectedPipeline && (
-        <PipelineSettings
-          open={settingsOpen}
-          onOpenChange={setSettingsOpen}
-          pipeline={selectedPipeline}
-          stages={sortedStages}
-          onPipelinesChanged={refreshPipelines}
-          onStagesChanged={refreshStages}
-          onCreateNewPipeline={() => {
-            setSettingsOpen(false);
-            setNewPipelineOpen(true);
-          }}
+      {topTab === "followups" && (
+        <CrmFollowUpCenter
+          bucket={followUpBucket}
+          onOpenCustomer={(id) => openDetail(id)}
+          onChanged={refreshOverview}
         />
       )}
 
-      {/* Contact quick view */}
-      <ContactDetailView
-        open={contactDetailOpen}
-        onOpenChange={setContactDetailOpen}
-        contactId={contactId}
-        onUpdated={refreshDeals}
+      {topTab === "activity" && (
+        <CrmActivityTimeline onOpenCustomer={(id) => openDetail(id)} />
+      )}
+
+      {topTab === "customers" && (
+        <>
+      {/* Metrics */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+        {metrics.map((m) => {
+          const Icon = m.icon;
+          return (
+            <button
+              key={m.key}
+              type="button"
+              onClick={m.onClick}
+              aria-pressed={m.active}
+              className={`group relative overflow-hidden rounded-xl border p-3 text-left transition-all ${
+                m.active
+                  ? "border-primary/60 bg-primary/5 shadow-sm"
+                  : "border-border bg-card/60 hover:border-primary/40 hover:bg-card"
+              }`}
+            >
+              <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <Icon className={`size-3.5 ${m.accent}`} />
+                <span className="truncate">{m.label}</span>
+              </div>
+              <div className="mt-1 text-xl font-bold tabular-nums text-foreground">
+                {m.value.toLocaleString()}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Quick tabs */}
+      <div className="flex flex-wrap gap-1.5">
+        {TABS.map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => {
+              setActiveTab(tab);
+              setPage(0);
+            }}
+            aria-pressed={activeTab === tab}
+            className={`rounded-full px-3 py-1 text-xs font-medium capitalize transition-colors ${
+              activeTab === tab
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {t(`hub.tab${tab.charAt(0).toUpperCase()}${tab.slice(1)}`)}
+          </button>
+        ))}
+      </div>
+
+      {/* Toolbar */}
+      <div className="space-y-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="relative w-full sm:max-w-sm">
+            <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder={t("hub.searchPlaceholder")}
+              className="border-border bg-card pl-8 text-foreground placeholder:text-muted-foreground"
+            />
+          </div>
+
+          <Select
+            value={statusFilter}
+            onValueChange={(v) => {
+              setStatusFilter(v ?? "all");
+              setPage(0);
+            }}
+          >
+            <SelectTrigger className="h-9 w-full shrink-0 border-border bg-card text-sm text-muted-foreground sm:w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="border-border bg-popover">
+              <SelectItem value="all">{t("hub.allStatuses")}</SelectItem>
+              {LEAD_STATUS_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={sourceFilter}
+            onValueChange={(v) => {
+              setSourceFilter(v ?? "all");
+              setPage(0);
+            }}
+          >
+            <SelectTrigger className="h-9 w-full shrink-0 border-border bg-card text-sm text-muted-foreground sm:w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="border-border bg-popover">
+              <SelectItem value="all">{t("hub.allSources")}</SelectItem>
+              {SOURCES.map((s) => (
+                <SelectItem key={s.value} value={s.value}>
+                  {s.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Popover>
+            <PopoverTrigger
+              render={
+                <Button
+                  variant="outline"
+                  className={`shrink-0 border-border ${
+                    tagIds.length > 0
+                      ? "text-primary"
+                      : "text-muted-foreground hover:bg-muted"
+                  }`}
+                />
+              }
+            >
+              <TagIcon className="size-4" />
+              {t("hub.tags")}
+              {tagIds.length > 0 && (
+                <span className="ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
+                  {tagIds.length}
+                </span>
+              )}
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-64 p-0">
+              <div className="max-h-64 overflow-y-auto py-1">
+                {allTags.length === 0 ? (
+                  <p className="px-3 py-2 text-xs text-muted-foreground">
+                    {t("hub.noTags")}
+                  </p>
+                ) : (
+                  allTags.map((tag) => (
+                    <label
+                      key={tag.id}
+                      className="flex cursor-pointer items-center gap-2.5 px-3 py-1.5 hover:bg-muted/50"
+                    >
+                      <Checkbox
+                        checked={tagIds.includes(tag.id)}
+                        onCheckedChange={() => {
+                          setPage(0);
+                          setTagIds((prev) =>
+                            prev.includes(tag.id)
+                              ? prev.filter((id) => id !== tag.id)
+                              : [...prev, tag.id],
+                          );
+                        }}
+                      />
+                      <span
+                        className="size-2.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: tag.color }}
+                      />
+                      <span className="truncate text-sm text-popover-foreground">
+                        {tag.name}
+                      </span>
+                    </label>
+                  ))
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          <Select
+            value={sort}
+            onValueChange={(v) => {
+              setSort(v ?? "created_at");
+              setPage(0);
+            }}
+          >
+            <SelectTrigger className="h-9 w-full shrink-0 border-border bg-card text-sm text-muted-foreground sm:w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="border-border bg-popover">
+              {SORTS.map((s) => (
+                <SelectItem key={s.value} value={s.value}>
+                  {s.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setSortAsc((v) => !v)}
+            className="shrink-0 border-border text-muted-foreground hover:bg-muted"
+            aria-label={t("hub.toggleSort")}
+          >
+            {sortAsc ? (
+              <ArrowUp className="size-4" />
+            ) : (
+              <ArrowDown className="size-4" />
+            )}
+          </Button>
+
+          {hasActiveFilters && (
+            <Button
+              variant="ghost"
+              onClick={clearFilters}
+              className="shrink-0 text-muted-foreground hover:text-foreground"
+            >
+              <X className="size-4" />
+              {t("hub.clearAll")}
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="hidden overflow-hidden rounded-lg border border-border md:block">
+        <Table className="min-w-[64rem]">
+          <TableHeader>
+            <TableRow className="border-border hover:bg-transparent">
+              <TableHead className="text-muted-foreground">
+                {t("hub.colCustomer")}
+              </TableHead>
+              <TableHead className="text-muted-foreground">
+                {t("hub.colPhone")}
+              </TableHead>
+              <TableHead className="text-muted-foreground">
+                {t("hub.colEmail")}
+              </TableHead>
+              <TableHead className="text-muted-foreground">
+                {t("hub.colCompany")}
+              </TableHead>
+              <TableHead className="text-muted-foreground">
+                {t("hub.colSource")}
+              </TableHead>
+              <TableHead className="text-muted-foreground">
+                {t("hub.colStatus")}
+              </TableHead>
+              <TableHead className="text-muted-foreground">
+                {t("hub.colAssigned")}
+              </TableHead>
+              <TableHead className="text-muted-foreground">
+                {t("hub.colLastActivity")}
+              </TableHead>
+              <TableHead className="text-muted-foreground">
+                {t("hub.colNextFollowUp")}
+              </TableHead>
+              <TableHead className="w-12 text-muted-foreground" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              <TableRow className="border-border">
+                <TableCell colSpan={10} className="py-12 text-center">
+                  <div className="flex flex-col items-center gap-2">
+                    <Loader2 className="size-6 animate-spin text-primary" />
+                    <p className="text-sm text-muted-foreground">
+                      {t("hub.loading")}
+                    </p>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : contacts.length === 0 ? (
+              <TableRow className="border-border">
+                <TableCell colSpan={10} className="py-12 text-center">
+                  <div className="flex flex-col items-center gap-2">
+                    <Users className="size-8 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">
+                      {hasActiveFilters ? t("hub.noMatch") : t("hub.noCustomers")}
+                    </p>
+                    {!hasActiveFilters && (
+                      <GatedButton
+                        canAct={canEdit}
+                        gateReason="add contacts"
+                        variant="outline"
+                        size="sm"
+                        onClick={openAddForm}
+                        className="mt-2 border-border text-muted-foreground hover:bg-muted"
+                      >
+                        <Plus className="size-3.5" />
+                        {t("hub.addCustomer")}
+                      </GatedButton>
+                    )}
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : (
+              contacts.map((contact) => {
+                const nextFu = followUpsByContact[contact.id];
+                const overdue = nextFu?.due_date
+                  ? new Date(nextFu.due_date).getTime() < Date.now()
+                  : false;
+                return (
+                  <TableRow
+                    key={contact.id}
+                    className="cursor-pointer border-border hover:bg-muted/50"
+                    onClick={() => openDetail(contact.id)}
+                  >
+                    <TableCell>
+                      <div className="flex items-center gap-2.5">
+                        <Avatar className="size-8 border border-border bg-muted">
+                          <AvatarFallback className="bg-primary/10 text-[11px] font-medium text-primary">
+                            {initials(contact.name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-foreground">
+                            {contact.name || "(unnamed)"}
+                          </p>
+                          {contact.location && (
+                            <p className="truncate text-xs text-muted-foreground">
+                              {contact.location}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      {contact.phone}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {contact.email || "—"}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {contact.company || "—"}
+                    </TableCell>
+                    <TableCell>
+                      <SourceBadge contact={contact} />
+                    </TableCell>
+                    <TableCell>
+                      <LeadStatusBadge status={contact.lead_status} />
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {assignees[contact.id] || (
+                        <span className="text-muted-foreground/70">
+                          {t("hub.unassigned")}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {relativeTime(
+                        contact.last_contacted_at ||
+                          contact.last_customer_reply_at ||
+                          contact.updated_at,
+                        locale,
+                      )}
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      {nextFu?.due_date ? (
+                        <span
+                          className={
+                            overdue
+                              ? "font-medium text-red-500"
+                              : "text-muted-foreground"
+                          }
+                        >
+                          {overdue ? t("card.overdue") : formatDate(nextFu.due_date, locale)}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground/70">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div
+                        className="flex items-center justify-end"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <DropdownMenu>
+                          <DropdownMenuTrigger
+                            render={
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                className="text-muted-foreground hover:text-foreground"
+                              />
+                            }
+                          >
+                            <MoreHorizontal className="size-4" />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            align="end"
+                            className="border-border bg-popover"
+                          >
+                            <DropdownMenuItem
+                              onClick={() => openDetail(contact.id)}
+                              className="text-popover-foreground"
+                            >
+                              <UserCheck className="size-4" />
+                              {t("hub.viewProfile")}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              disabled={!canEdit}
+                              onClick={() => openEditForm(contact)}
+                              className="text-popover-foreground"
+                            >
+                              <Pencil className="size-4" />
+                              {t("hub.edit")}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              disabled={!canEdit}
+                              onClick={() => openSend(contact)}
+                              className="text-popover-foreground"
+                            >
+                              <MessageSquare className="size-4" />
+                              {t("hub.sendMessage")}
+                            </DropdownMenuItem>
+                            {waLink(contact.phone) && (
+                              <DropdownMenuItem
+                                onClick={() => openWhatsApp(contact)}
+                                className="text-popover-foreground"
+                              >
+                                <PhoneIcon className="size-4" />
+                                {t("hub.whatsApp")}
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuSeparator className="bg-border" />
+                            <DropdownMenuItem
+                              variant="destructive"
+                              disabled={!canEdit}
+                              onClick={() => setDeleteTarget(contact)}
+                            >
+                              <Trash2 className="size-4" />
+                              {t("hub.delete")}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* Mobile cards */}
+      <div className="space-y-2 md:hidden">
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="size-6 animate-spin text-primary" />
+          </div>
+        ) : contacts.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 py-12 text-sm text-muted-foreground">
+            <Users className="size-8" />
+            {hasActiveFilters ? t("hub.noMatch") : t("hub.noCustomers")}
+          </div>
+        ) : (
+          contacts.map((contact) => {
+            const nextFu = followUpsByContact[contact.id];
+            return (
+              <div
+                key={contact.id}
+                onClick={() => openDetail(contact.id)}
+                className="cursor-pointer rounded-lg border border-border bg-card p-3 hover:bg-muted/40"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <Avatar className="size-9 border border-border bg-muted">
+                      <AvatarFallback className="bg-primary/10 text-xs font-medium text-primary">
+                        {initials(contact.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-foreground">
+                        {contact.name || "(unnamed)"}
+                      </p>
+                      <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <PhoneIcon className="size-3" />
+                        {contact.phone}
+                      </p>
+                    </div>
+                  </div>
+                  <LeadStatusBadge status={contact.lead_status} />
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  {contact.email && (
+                    <span className="inline-flex items-center gap-1">
+                      <Mail className="size-3" />
+                      <span className="max-w-[10rem] truncate">{contact.email}</span>
+                    </span>
+                  )}
+                  {contact.company && (
+                    <span className="inline-flex items-center gap-1">
+                      <Building2 className="size-3" />
+                      {contact.company}
+                    </span>
+                  )}
+                  <SourceBadge contact={contact} />
+                </div>
+                <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
+                  <span className="inline-flex items-center gap-1">
+                    <Clock className="size-3" />
+                    {relativeTime(
+                      contact.last_contacted_at ||
+                        contact.last_customer_reply_at ||
+                        contact.updated_at,
+                      locale,
+                    )}
+                  </span>
+                  {nextFu?.due_date && (
+                    <span className="inline-flex items-center gap-1">
+                      <CalendarClock className="size-3" />
+                      {formatDate(nextFu.due_date, locale)}
+                    </span>
+                  )}
+                  <span className="inline-flex items-center gap-1">
+                    <UserCheck className="size-3" />
+                    {assignees[contact.id] || t("hub.unassigned")}
+                  </span>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Pagination */}
+      {totalCount > 0 && (
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">
+            {t("hub.showing", {
+              start: page * PAGE_SIZE + 1,
+              end: Math.min((page + 1) * PAGE_SIZE, totalCount),
+              total: totalCount,
+            })}
+          </p>
+          {totalPages > 1 && (
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon-sm"
+                disabled={!hasPrev}
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                className="border-border text-muted-foreground hover:bg-muted disabled:opacity-30"
+              >
+                <ChevronLeft className="size-4" />
+              </Button>
+              <span className="px-2 text-xs text-muted-foreground">
+                {t("hub.pageCount", { page: page + 1, total: totalPages })}
+              </span>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                disabled={!hasNext}
+                onClick={() => setPage((p) => p + 1)}
+                className="border-border text-muted-foreground hover:bg-muted disabled:opacity-30"
+              >
+                <ChevronRight className="size-4" />
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
+          </>
+        )}
+
+      {/* Modals */}
+      <ContactForm
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        contact={editContact}
+        contactTags={editContactTags}
+        onSaved={refreshAll}
+        onViewExisting={(id) => {
+          setFormOpen(false);
+          openDetail(id);
+        }}
       />
 
-      {/* New pipeline dialog */}
-      <Dialog open={newPipelineOpen} onOpenChange={setNewPipelineOpen}>
-        <DialogContent className="sm:max-w-sm border-border bg-popover">
+      <ContactDetailView
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        contactId={detailContactId}
+        onUpdated={refreshAll}
+      />
+
+      <SendMessageModal
+        open={sendOpen}
+        onOpenChange={setSendOpen}
+        contact={sendTarget}
+        onSent={refreshAll}
+      />
+
+      <ImportModal
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onImported={refreshAll}
+      />
+
+      {canEditSettings && (
+        <CustomFieldsManager
+          open={customFieldsOpen}
+          onOpenChange={setCustomFieldsOpen}
+        />
+      )}
+
+      {/* Delete confirm */}
+      <Dialog
+        open={deleteTarget !== null}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+      >
+        <DialogContent className="border-border bg-popover text-popover-foreground sm:max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-popover-foreground">
-              {ma("newPipeline")}
+              {t("hub.deleteTitle")}
             </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              {t("hub.deleteDesc", {
+                name:
+                  deleteTarget?.name || deleteTarget?.phone || "",
+              })}
+            </DialogDescription>
           </DialogHeader>
-          <div className="py-2">
-            <Label className="text-muted-foreground">{ma("pipelineName")}</Label>
-            <Input
-              value={newPipelineName}
-              onChange={(e) => setNewPipelineName(e.target.value)}
-              placeholder={ma("pipelineNamePlaceholder")}
-              className="mt-2 border-border bg-muted text-foreground"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleCreatePipeline();
-              }}
-            />
-            <p className="mt-2 text-xs text-muted-foreground">
-              {ma("newPipelineDesc")}
-            </p>
-          </div>
-          <DialogFooter className="border-border bg-popover/50">
+          <DialogFooter className="border-border bg-popover">
             <Button
               variant="outline"
-              onClick={() => setNewPipelineOpen(false)}
+              onClick={() => setDeleteTarget(null)}
               className="border-border text-muted-foreground hover:bg-muted"
             >
-              {ma("cancel")}
+              {t("hub.cancel")}
             </Button>
-            <Button
-              onClick={handleCreatePipeline}
-              disabled={creating || !newPipelineName.trim()}
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-              {creating ? ma("creating") : ma("createPipeline")}
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {deleting && <Loader2 className="size-4 animate-spin" />}
+              {t("hub.deleteBtn")}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Follow-ups due panel */}
+      <Dialog open={followUpsOpen} onOpenChange={setFollowUpsOpen}>
+        <DialogContent className="border-border bg-popover text-popover-foreground sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-popover-foreground">
+              {t("hub.followUpsTitle")}
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              {t("hub.followUpsDesc")}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-80 space-y-2 overflow-y-auto py-1">
+            {followUpsDue.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                {t("hub.noFollowUps")}
+              </p>
+            ) : (
+              followUpsDue.map((fu) => {
+                const contact = followUpNames[fu.contact_id];
+                const overdue = fu.due_date
+                  ? new Date(fu.due_date).getTime() < Date.now()
+                  : false;
+                return (
+                  <button
+                    key={fu.id}
+                    type="button"
+                    onClick={() => {
+                      setFollowUpsOpen(false);
+                      if (contact) openDetail(contact.id);
+                    }}
+                    className="flex w-full items-start justify-between gap-3 rounded-lg border border-border bg-card/60 p-3 text-left transition-colors hover:bg-muted/50"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-foreground">
+                        {fu.title}
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {contact?.name || contact?.phone || t("hub.viewCustomer")}
+                      </p>
+                      <p
+                        className={`mt-0.5 text-[11px] ${
+                          overdue ? "font-medium text-red-500" : "text-muted-foreground"
+                        }`}
+                      >
+                        {fu.due_date
+                          ? t("hub.due", { date: formatDate(fu.due_date, locale) })
+                          : t("hub.noDueDate")}
+                      </p>
+                    </div>
+                    {overdue && (
+                      <span className="shrink-0 rounded-full border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-[10px] font-medium text-red-500">
+                        {t("card.overdue")}
+                      </span>
+                    )}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+}
+
+function SourceBadge({ contact }: { contact: Row }) {
+  const info = sourceBadgeInfo(contact.source, contact.source_platform);
+  if (!info) return <span className="text-muted-foreground">—</span>;
+  return (
+    <span
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${info.className}`}
+    >
+      {info.label}
+    </span>
   );
 }

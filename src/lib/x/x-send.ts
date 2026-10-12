@@ -14,6 +14,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { decrypt } from '@/lib/whatsapp/encryption'
 import { postTweet, XApiError } from '@/lib/x/x-api'
 import { SendMessageError } from '@/lib/whatsapp/send-message'
+import { onOutboundMessage } from '@/lib/crm/activity'
 
 export interface XSendParams {
   messageType: string
@@ -104,6 +105,25 @@ export async function sendXMessage(
       updated_at: new Date().toISOString(),
     })
     .eq('id', conversation.id)
+
+  // CRM activity tracking + follow-up rules (best-effort).
+  try {
+    await onOutboundMessage(db, {
+      accountId,
+      contactId: conversation.contact_id as string,
+      conversationId: conversation.id as string,
+      messageId: msgRow.id as string,
+      providerMessageId: tweetId,
+      channel: 'x',
+      body: contentText.trim(),
+      status: 'sent',
+    })
+  } catch (err) {
+    console.warn(
+      '[activity] x outbound hook failed:',
+      err instanceof Error ? err.message : err,
+    )
+  }
 
   return { messageId: msgRow.id as string, externalMessageId: tweetId }
 }

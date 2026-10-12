@@ -223,6 +223,9 @@ export interface ContactNote {
   created_at: string;
 }
 
+export type FollowUpPriority = 'low' | 'normal' | 'high' | 'urgent';
+export type FollowUpSource = 'manual' | 'rule' | 'automation';
+
 export interface FollowUp {
   id: string;
   contact_id: string;
@@ -234,6 +237,82 @@ export interface FollowUp {
   reminder_at?: string;
   status: 'pending' | 'completed' | 'cancelled';
   completed_at?: string;
+  /** Added in migration 078. */
+  priority?: FollowUpPriority;
+  /** Why this follow-up exists (free text; rule follow-ups set a slug). */
+  reason?: string | null;
+  /** Provenance — 'rule' rows are engine-generated. */
+  source?: FollowUpSource;
+  /** The `follow_up_rules` row that created this follow-up, if any. */
+  rule_id?: string | null;
+  /** Assignee (defaults to the contact owner). */
+  assigned_to?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ActivityKind =
+  | 'message_sent'
+  | 'message_received'
+  | 'note'
+  | 'follow_up_created'
+  | 'follow_up_completed'
+  | 'follow_up_rescheduled'
+  | 'follow_up_cancelled'
+  | 'status_changed'
+  | 'deal_updated'
+  | 'system';
+
+export type ActivityDirection = 'inbound' | 'outbound';
+
+export interface CustomerActivity {
+  id: string;
+  account_id: string;
+  contact_id: string;
+  conversation_id?: string | null;
+  message_id?: string | null;
+  user_id?: string | null;
+  kind: ActivityKind;
+  direction?: ActivityDirection | null;
+  channel?: string | null;
+  title?: string | null;
+  body?: string | null;
+  status?: string | null;
+  external_id?: string | null;
+  metadata: Record<string, unknown>;
+  occurred_at: string;
+  created_at: string;
+}
+
+export type FollowUpRuleTrigger = 'no_reply' | 'after_outbound';
+export type FollowUpRuleAssignTo = 'owner' | 'conversation_assignee' | 'unassigned';
+
+/** Counters returned by the `crm_overview` RPC (migration 078). */
+export interface CrmOverviewCounts {
+  total_customers: number;
+  active_customers: number;
+  new_this_week: number;
+  follow_ups_due_today: number;
+  follow_ups_overdue: number;
+  waiting_for_reply: number;
+  recent_interactions: number;
+}
+
+export interface FollowUpRule {
+  id: string;
+  account_id: string;
+  name: string;
+  trigger: FollowUpRuleTrigger;
+  delay_minutes: number;
+  priority: FollowUpPriority;
+  business_hours_only: boolean;
+  business_start_hour: number;
+  business_end_hour: number;
+  business_days: number[];
+  timezone: string;
+  assign_to: FollowUpRuleAssignTo;
+  enabled: boolean;
+  created_by?: string | null;
   created_at: string;
   updated_at: string;
 }
