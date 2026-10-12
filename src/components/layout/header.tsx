@@ -53,9 +53,7 @@ const pageTitles: Record<string, string> = {
   '/media-library': 'mediaLibrary',
   '/api': 'apiDeveloper',
   '/save-money': 'saveMoney',
-  '/integrations': 'integrations',
   '/tickets': 'tickets',
-  '/social-media': 'socialMedia',
   '/guide': 'userGuide',
 };
 

@@ -266,12 +266,6 @@ export function GoogleFormsSettings() {
           >
             Contacts: Google Form
           </Link>
-          <Link
-            href="/social-media"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted"
-          >
-            Social Media count
-          </Link>
         </div>
       </div>
     </div>

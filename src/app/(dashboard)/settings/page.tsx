@@ -16,7 +16,6 @@ import { MembersTab } from '@/components/settings/members-tab';
 import { RolesSettings } from '@/components/settings/roles-settings';
 import { ActivityLog } from '@/components/settings/activity-log';
 import { WhatsAppConfig } from '@/components/settings/whatsapp-config';
-import { MetaLeadsConnect } from '@/components/settings/meta-leads-connect';
 import { GoogleFormsSettings } from '@/components/settings/google-forms-settings';
 import { EmailSettings } from '@/components/settings/email-settings';
 import { NotificationSettings } from '@/components/settings/notification-settings';
@@ -25,7 +24,6 @@ import { QuickRepliesManager } from '@/components/settings/quick-replies-manager
 import { FieldsAndTagsPanel } from '@/components/settings/fields-and-tags-panel';
 import { DealsSettings } from '@/components/settings/deals-settings';
 import { ApiKeysSettings } from '@/components/settings/api-keys-settings';
-import { TelegramSettings } from '@/components/settings/telegram-settings';
 import { AppSettings } from '@/components/settings/app-settings';
 import {
   resolveSection,
@@ -89,7 +87,6 @@ function SettingsPageInner() {
     roles: <RolesSettings />,
     activity: <ActivityLog />,
     whatsapp: <WhatsAppConfig />,
-    'meta-leads': <MetaLeadsConnect />,
     'google-forms': <GoogleFormsSettings />,
     email: <EmailSettings />,
     notifications: <NotificationSettings />,
@@ -98,7 +95,6 @@ function SettingsPageInner() {
     fields: <FieldsAndTagsPanel />,
     deals: <DealsSettings />,
     api: <ApiKeysSettings />,
-    telegram: <TelegramSettings />,
   };
 
   return (

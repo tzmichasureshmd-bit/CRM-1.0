@@ -533,9 +533,6 @@ function DashboardPageInner() {
       <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-[15px] font-semibold text-foreground">Lead Overview</h2>
-          <Link href="/social-media" className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline">
-            Social Media <ChevronRight className="h-3.5 w-3.5" />
-          </Link>
         </div>
         <LeadStatCards stats={leadStats} loading={leadStatsLoading} />
       </div>

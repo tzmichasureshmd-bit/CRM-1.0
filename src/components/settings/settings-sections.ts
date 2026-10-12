@@ -15,9 +15,7 @@ import {
   UserCog,
   Mail,
   Bell,
-  Megaphone,
   FileSpreadsheet,
-  Send,
   Smartphone,
   type LucideIcon,
 } from 'lucide-react';
@@ -41,7 +39,6 @@ export const SETTINGS_SECTIONS = [
   'roles',
   'activity',
   'whatsapp',
-  'meta-leads',
   'google-forms',
   'email',
   'notifications',
@@ -50,7 +47,6 @@ export const SETTINGS_SECTIONS = [
   'fields',
   'deals',
   'api',
-  'telegram',
 ] as const;
 
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
@@ -76,7 +72,6 @@ export const SECTION_META: Record<SettingsSection, SectionMeta> = {
   roles: { id: 'roles', label: 'Roles & permissions', icon: UserCog, group: 'workspace' },
   activity: { id: 'activity', label: 'Activity log', icon: History, group: 'workspace' },
   whatsapp: { id: 'whatsapp', label: 'WhatsApp', icon: PlugZap, group: 'workspace' },
-  'meta-leads': { id: 'meta-leads', label: 'Meta Leads', icon: Megaphone, group: 'workspace' },
   'google-forms': { id: 'google-forms', label: 'Google Forms', icon: FileSpreadsheet, group: 'workspace' },
   email: { id: 'email', label: 'Email', icon: Mail, group: 'workspace' },
   notifications: { id: 'notifications', label: 'Notifications', icon: Bell, group: 'workspace' },
@@ -85,7 +80,6 @@ export const SECTION_META: Record<SettingsSection, SectionMeta> = {
   fields: { id: 'fields', label: 'Fields & tags', icon: Tags, group: 'workspace' },
   deals: { id: 'deals', label: 'Deals & currency', icon: Coins, group: 'workspace' },
   api: { id: 'api', label: 'API keys', icon: KeyRound, group: 'workspace' },
-  telegram: { id: 'telegram', label: 'Telegram', icon: Send, group: 'workspace' },
 };
 
 export const RAIL_GROUPS: { label: string | null; group: SectionMeta['group'] }[] = [
